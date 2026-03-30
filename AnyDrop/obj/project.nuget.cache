@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "0dfgtjBZg9s=",
+  "success": true,
+  "projectFilePath": "D:\\Document\\Code\\anydrop\\AnyDrop\\AnyDrop.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\dongx\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.3\\microsoft.aspnetcore.app.internal.assets.10.0.3.nupkg.sha512",
+    "C:\\Users\\dongx\\.nuget\\packages\\microsoft.fluentui.aspnetcore.components\\4.13.2\\microsoft.fluentui.aspnetcore.components.4.13.2.nupkg.sha512",
+    "C:\\Users\\dongx\\.nuget\\packages\\microsoft.fluentui.aspnetcore.components.icons\\4.13.2\\microsoft.fluentui.aspnetcore.components.icons.4.13.2.nupkg.sha512"
+  ],
+  "logs": []
+}
