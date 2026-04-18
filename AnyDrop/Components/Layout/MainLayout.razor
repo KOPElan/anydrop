@@ -1,7 +1,13 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<div class="content">
-	@Body
+<div class="app-shell">
+    <aside class="sidebar bg-[var(--color-sidebar)] p-4">
+        <div class="text-sm font-semibold text-gray-700">AnyDrop</div>
+    </aside>
+
+    <main class="flex flex-col overflow-hidden">
+        @Body
+    </main>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>

@@ -6,6 +6,7 @@
 # Build outputs
 bin/
 obj/
+build/
 publish/
 artifacts/
 
@@ -39,6 +40,8 @@ secrets.*
 # Database files (do not commit runtime DB)
 /data/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 
 # Node / frontend
@@ -62,6 +65,8 @@ docker-compose.local.yml
 # Misc
 *.pid
 *.seed
+*.tmp
+*.swp
 
 # Ignore compiled test result files
 TestResults/
