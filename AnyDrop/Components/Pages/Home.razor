@@ -3,35 +3,48 @@
 <PageTitle>AnyDrop</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Class="chat-page">
-    <FluentLabel Typography="Typography.Subheading">跨设备实时共享</FluentLabel>
+    <FluentCard Class="chat-hero-card">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="4">
+            <FluentLabel Typography="Typography.Title2">跨设备实时共享</FluentLabel>
+            <FluentLabel Typography="Typography.Body1">输入一段文字，所有在线设备会立即同步更新。</FluentLabel>
+            <FluentLabel Typography="Typography.Caption1" Class="chat-hero-meta">当前消息数：@messages.Count</FluentLabel>
+        </FluentStack>
+    </FluentCard>
 
     <FluentCard Class="chat-timeline-card">
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="8" Class="chat-timeline" id="chatTimeline">
             @if (messages.Count is 0)
             {
-                <FluentLabel>暂无消息，开始发送第一条文本吧。</FluentLabel>
+                <div class="chat-empty-state">
+                    <FluentLabel Typography="Typography.Body1">暂无消息，开始发送第一条文本吧。</FluentLabel>
+                </div>
             }
             else
             {
-                @foreach (var message in messages)
+                @for (var index = 0; index < messages.Count; index++)
                 {
-                    <div class="chat-item">
-                        <FluentLabel Typography="Typography.Body1">@message.Content</FluentLabel>
-                        <FluentLabel Typography="Typography.Caption1">@message.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</FluentLabel>
+                    var message = messages[index];
+                    var chatItemClass = index % 2 is 0 ? "chat-item chat-item--left" : "chat-item chat-item--right";
+
+                    <div class="@chatItemClass">
+                        <FluentLabel Typography="Typography.Body1" Class="chat-item-content">@message.Content</FluentLabel>
+                        <FluentLabel Typography="Typography.Caption1" Class="chat-item-time">@message.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</FluentLabel>
                     </div>
                 }
             }
         </FluentStack>
     </FluentCard>
 
-    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Class="chat-composer">
-        <FluentTextField @bind-Value="draftText"
-                         Placeholder="输入要同步的文本"
-                         Class="chat-input" />
-        <FluentButton Appearance="Appearance.Accent" OnClick="SendAsync" Disabled="isSending">
-            发送
-        </FluentButton>
-    </FluentStack>
+    <FluentCard Class="chat-composer-card">
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Class="chat-composer">
+            <FluentTextField @bind-Value="draftText"
+                             Placeholder="输入要同步的文本"
+                             Class="chat-input" />
+            <FluentButton Appearance="Appearance.Accent" OnClick="SendAsync" Disabled="isSending">
+                发送
+            </FluentButton>
+        </FluentStack>
+    </FluentCard>
 
     @if (errorMessage is not null)
     {
