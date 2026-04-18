@@ -21,12 +21,10 @@
             }
             else
             {
-                @for (var index = 0; index < messages.Count; index++)
+                @foreach (var message in messages)
                 {
-                    var message = messages[index];
-                    var chatItemClass = index % 2 is 0 ? "chat-item chat-item--left" : "chat-item chat-item--right";
-
-                    <div class="@chatItemClass">
+                    var messageBubbleClasses = GetMessageBubbleClasses(message);
+                    <div class="@messageBubbleClasses">
                         <FluentLabel Typography="Typography.Body1" Class="chat-item-content">@message.Content</FluentLabel>
                         <FluentLabel Typography="Typography.Caption1" Class="chat-item-time">@message.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</FluentLabel>
                     </div>

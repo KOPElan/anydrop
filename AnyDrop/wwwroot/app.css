@@ -240,11 +240,18 @@ table {
 }
 
 .chat-page {
+    --chat-gradient-accent-opacity-percent: 14%;
+    --chat-gradient-transparent-stop-percent: 26%;
+    --chat-bubble-max-width: 42rem;
+    --chat-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    --chat-bubble-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+    --chat-bubble-hover-shadow: 0 10px 26px rgba(0, 0, 0, 0.11);
+    --chat-bubble-transition-duration: 120ms;
     height: calc(100dvh - 2rem);
     background: linear-gradient(
         180deg,
-        color-mix(in srgb, var(--accent-fill-rest) 14%, transparent),
-        transparent 26%
+        color-mix(in srgb, var(--accent-fill-rest) var(--chat-gradient-accent-opacity-percent), transparent),
+        transparent var(--chat-gradient-transparent-stop-percent)
     );
     border-radius: calc(var(--control-corner-radius) * 1px);
     padding: 0.5rem;
@@ -254,7 +261,7 @@ table {
     flex: 1;
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--accent-stroke-control-rest) 35%, var(--neutral-stroke-divider-rest));
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--chat-card-shadow);
 }
 
 .chat-timeline {
@@ -288,14 +295,14 @@ table {
     background: color-mix(in srgb, var(--neutral-layer-2) 90%, white);
     border-radius: calc(var(--control-corner-radius) * 1px);
     padding: 0.625rem 0.75rem;
-    max-width: min(90%, 42rem);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
-    transition: transform 120ms ease, box-shadow 120ms ease;
+    max-width: min(90%, var(--chat-bubble-max-width));
+    box-shadow: var(--chat-bubble-shadow);
+    transition: transform var(--chat-bubble-transition-duration) ease, box-shadow var(--chat-bubble-transition-duration) ease;
 }
 
 .chat-item:hover {
     transform: translateY(-1px);
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.11);
+    box-shadow: var(--chat-bubble-hover-shadow);
 }
 
 .chat-item--left {

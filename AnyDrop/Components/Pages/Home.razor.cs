@@ -137,4 +137,15 @@ public partial class Home : IAsyncDisposable
 
         await module.InvokeVoidAsync("scrollTimelineToBottom", "chatTimeline");
     }
+
+    /// <summary>
+    /// Returns stable message bubble classes based on message identity bytes.
+    /// </summary>
+    /// <param name="message">The message DTO.</param>
+    /// <returns>CSS class names for message bubble styling and alignment.</returns>
+    private static string GetMessageBubbleClasses(ShareItemDto message)
+    {
+        var firstByte = message.Id.ToByteArray()[0];
+        return firstByte % 2 is 0 ? "chat-item chat-item--left" : "chat-item chat-item--right";
+    }
 }
