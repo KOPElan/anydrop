@@ -89,6 +89,17 @@ public sealed class ShareServiceTests
         await action.Should().ThrowAsync<ArgumentOutOfRangeException>();
     }
 
+    [Fact]
+    public async Task GetRecentAsync_CountExceedsMax_ThrowsArgumentOutOfRangeException()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new ShareService(dbContext, CreateHubContext().Object);
+
+        var action = async () => await service.GetRecentAsync(ShareValidationRules.MaxRecentCountLimit + 1);
+
+        await action.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
     private static AnyDropDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()

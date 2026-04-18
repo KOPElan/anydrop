@@ -27,7 +27,6 @@
     <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Class="chat-composer">
         <FluentTextField @bind-Value="draftText"
                          Placeholder="输入要同步的文本"
-                         
                          Class="chat-input" />
         <FluentButton Appearance="Appearance.Accent" OnClick="SendAsync" Disabled="isSending">
             发送

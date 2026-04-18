@@ -19,20 +19,22 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
     /// <returns>The created share item DTO.</returns>
     public async Task<ShareItemDto> SendTextAsync(string content, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(content))
+        var normalizedContent = content.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedContent))
         {
             throw new ArgumentException("Text content cannot be empty.", nameof(content));
         }
 
-        if (content.Length > 10_000)
+        if (normalizedContent.Length > ShareValidationRules.MaxTextLength)
         {
-            throw new ArgumentException("Text content cannot exceed 10000 characters.", nameof(content));
+            throw new ArgumentException($"Text content cannot exceed {ShareValidationRules.MaxTextLength} characters.", nameof(content));
         }
 
         var item = new ShareItem
         {
             ContentType = ShareContentType.Text,
-            Content = content.Trim(),
+            Content = normalizedContent,
             CreatedAt = DateTimeOffset.UtcNow,
         };
 
@@ -53,9 +55,9 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
     /// <returns>The recent share item list.</returns>
     public async Task<IReadOnlyList<ShareItemDto>> GetRecentAsync(int count = 50, CancellationToken ct = default)
     {
-        if (count < 1 || count > 200)
+        if (count < 1 || count > ShareValidationRules.MaxRecentCountLimit)
         {
-            throw new ArgumentOutOfRangeException(nameof(count), "Count must be between 1 and 200.");
+            throw new ArgumentOutOfRangeException(nameof(count), $"Count must be between 1 and {ShareValidationRules.MaxRecentCountLimit}.");
         }
 
         var items = await dbContext.ShareItems

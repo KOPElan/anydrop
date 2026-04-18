@@ -41,6 +41,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
+    // MVP phase uses EnsureCreated; switch to Database.MigrateAsync when migrations are introduced.
     await dbContext.Database.EnsureCreatedAsync();
 }
 

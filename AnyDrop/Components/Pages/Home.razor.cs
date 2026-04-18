@@ -43,9 +43,9 @@ public partial class Home : IAsyncDisposable
 
         hubConnection.On<ShareItemDto>("ReceiveShareItem", message =>
         {
-            messages.Add(message);
             return InvokeAsync(async () =>
             {
+                messages.Add(message);
                 StateHasChanged();
                 await ScrollToBottomAsync();
             });
@@ -84,9 +84,9 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
-        if (draftText.Length > 10_000)
+        if (draftText.Length > ShareValidationRules.MaxTextLength)
         {
-            errorMessage = "文本长度不能超过 10000 字符。";
+            errorMessage = $"文本长度不能超过 {ShareValidationRules.MaxTextLength} 字符。";
             return;
         }
 

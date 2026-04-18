@@ -19,9 +19,9 @@ public static class ShareItemEndpoints
 
         group.MapGet("/", async (IShareService shareService, int count = 50, CancellationToken ct = default) =>
         {
-            if (count is < 1 or > 200)
+            if (count is < 1 or > ShareValidationRules.MaxRecentCountLimit)
             {
-                return Results.BadRequest(ApiEnvelope.Error("count must be between 1 and 200"));
+                return Results.BadRequest(ApiEnvelope.Error($"count must be between 1 and {ShareValidationRules.MaxRecentCountLimit}"));
             }
 
             var items = await shareService.GetRecentAsync(count, ct);
@@ -35,9 +35,14 @@ public static class ShareItemEndpoints
                 return Results.BadRequest(ApiEnvelope.Error("only text contentType is supported in MVP"));
             }
 
-            if (string.IsNullOrWhiteSpace(request.Content) || request.Content.Length > 10_000)
+            if (string.IsNullOrWhiteSpace(request.Content))
             {
-                return Results.BadRequest(ApiEnvelope.Error("content is required and must be ≤ 10000 characters"));
+                return Results.BadRequest(ApiEnvelope.Error("content is required"));
+            }
+
+            if (request.Content.Length > ShareValidationRules.MaxTextLength)
+            {
+                return Results.BadRequest(ApiEnvelope.Error($"content must be ≤ {ShareValidationRules.MaxTextLength} characters"));
             }
 
             var item = await shareService.SendTextAsync(request.Content, ct);
