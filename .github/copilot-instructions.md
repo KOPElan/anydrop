@@ -28,9 +28,9 @@ Key design goals:
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | Framework | .NET 10, Blazor Web App | Interactive Server render mode (no WASM) |
-| UI Components | [Microsoft Fluent UI for Blazor](https://www.fluentui-blazor.net/) v4.14.0 | Do NOT use Bootstrap or Tailwind |
-| Icons | `Microsoft.FluentUI.AspNetCore.Components.Icons` | Use Fluent icon names, e.g. `<FluentIcon Value="@(new Icons.Regular.Size24.Document())" />` |
-| Styling | CSS Variables (Fluent Design Tokens) | See `wwwroot/app.css`; avoid hardcoded colors |
+| UI Components | Tailwind CSS v4 | Do NOT use Bootstrap, Fluent UI, or other CSS component frameworks |
+| Icons | Heroicons (inline SVG) | Use inline SVG; do NOT import FluentUI icon packages |
+| Styling | Tailwind utility classes + `wwwroot/app.css` (`@layer`) | Avoid inline `style` attributes and hardcoded color values |
 | Mobile API | .NET 10 Minimal API | RESTful, prefix `/api/v1/`, MUST NOT use MVC Controllers |
 | Hosting | Kestrel (HTTP) | Dev: `http://localhost:5002` |
 
@@ -47,7 +47,7 @@ AnyDrop/├── Api/                  # Minimal API 端点扩展方法（如 M
 ├── Services/           # 业务逻辑服务（接口 + 实现），禁止在此依赖 Razor 组件
 ├── Hubs/               # SignalR Hub 类，仅调用 Service，不含业务逻辑
 ├── wwwroot/
-│   └── app.css         # Fluent Design Token 全局样式
+│   └── app.css         # Tailwind CSS @layer 自定义样式
 └── Program.cs          # DI 注册与中间件管道
 
 AnyDrop.Tests.Unit/     # xUnit + FluentAssertions + Moq 单元测试
@@ -58,7 +58,7 @@ AnyDrop.Tests.E2E/      # Playwright 端到端测试
 
 **Routing**: 404 is handled via `UseStatusCodePagesWithReExecute("/not-found")` → `Pages/NotFound.razor`.
 
-**Global usings** (already in `_Imports.razor`): `Microsoft.FluentUI.AspNetCore.Components`, `Microsoft.JSInterop`, `AnyDrop.*`.
+**Global usings** (already in `_Imports.razor`): `Microsoft.JSInterop`, `AnyDrop.*`.
 
 **Architecture rule（架构规则）**: Service 层(`Services/`) 禁止依赖 Razor 组件；Hub(`Hubs/`) 只调用 Service，不含业务逻辑；Razor 组件通过 `@inject` 使用 Service。
 
@@ -95,14 +95,16 @@ The solution file is `AnyDrop.slnx` (the new XML solution format).
 - 接口以大写 `I` 开头（如 `IMessageService`）
 
 ### UI
-- Use `<Fluent*>` components from FluentUI; avoid raw HTML equivalents when a Fluent component exists
-- Use Fluent Design Tokens for color/spacing (e.g. `var(--neutral-foreground-rest)`) instead of hardcoded values
+- Use Tailwind CSS utility classes for all styling; do NOT use `<Fluent*>` components or Fluent Design Tokens
+- Layout MUST use Tailwind Flexbox/Grid utilities (`flex`, `grid`, `gap-*`, `col-span-*`, etc.)
+- Custom styles MUST be defined in `wwwroot/app.css` using `@layer components` or `@layer utilities`; avoid inline `style` attributes
+- Icons: use Heroicons inline SVG; do NOT reference `Microsoft.FluentUI.AspNetCore.Components.Icons`
 - NavMenu icon visibility is controlled via `.navmenu-icon` CSS class (currently hidden; enable via CSS when nav is implemented)
 
 ### Data & State（数据与状态）
 - Use Blazor's built-in DI (`@inject`) to access services in components
 - For cross-component state, use scoped services or Blazor Cascading Values — avoid static state
-- File uploads: use `<FluentInputFile>` component; validate MIME type and size at service boundary
+- File uploads: use standard `<InputFile>` Blazor component; validate MIME type and size at service boundary
 
 ### API 规范（Minimal API）
 - 所有 HTTP API 端点使用 `app.Map*` Minimal API 注册，MUST NOT 使用 `[ApiController]` MVC 模式

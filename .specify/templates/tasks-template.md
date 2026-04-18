@@ -8,7 +8,7 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: AnyDrop Constitution (v1.0.0) mandates tests for all Service-layer business logic.
+**Tests**: AnyDrop Constitution (v2.0.0) mandates tests for all Service-layer business logic.
 Test tasks MUST be included for:
 - xUnit unit tests for all new `Services/` methods (Principle IV)
 - Moq-based verification for any SignalR Hub dispatch logic (Principle IV)

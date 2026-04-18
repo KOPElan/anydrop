@@ -31,10 +31,10 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify the following gates against `.specify/memory/constitution.md` (AnyDrop v1.1.0):
+Verify the following gates against `.specify/memory/constitution.md` (AnyDrop v2.0.0):
 
 - [ ] **I. 单体架构分离**：服务层实现于 `Services/`，Razor 组件仅调用 DI 注入的服务，无内联业务逻辑
-- [ ] **II. 技术栈合规**：仅使用 .NET 10 + Blazor Server + Fluent UI + SQLite/EF Core + SignalR + Minimal API，无替代方案
+- [ ] **II. 技术栈合规**：仅使用 .NET 10 + Blazor Server + Tailwind CSS v4 + SQLite/EF Core + SignalR，无替代方案；禁止引入 Fluent UI 或其他 CSS 组件框架
 - [ ] **III. 命名规范**：所有新增异步方法以 `Async` 结尾，接口以 `I` 开头，PascalCase 一致
 - [ ] **IV. 测试覆盖**：Service 层方法有 xUnit 单元测试，SignalR 分发逻辑有 Moq 验证，E2E 链路有 Playwright 用例
 - [ ] **V. 安全合规**：无硬编码凭证，文件上传有 MIME/大小验证，下载含 `Content-Disposition: attachment`

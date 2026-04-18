@@ -1,0 +1,70 @@
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+
+# Build outputs
+bin/
+obj/
+publish/
+artifacts/
+
+# Rider
+*.sln.iml
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+packages/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets and env
+.env
+.env.*
+secrets.json
+secrets.*
+*.Local.json
+
+# Database files (do not commit runtime DB)
+/data/
+*.db
+*.sqlite
+
+# Node / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Tailwind / build outputs
+wwwroot/dist/
+public/build/
+/dist/
+
+# Playwright
+/playwright-report/
+
+# Docker overrides for local development
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Misc
+*.pid
+*.seed
+
+# Ignore compiled test result files
+TestResults/
+
+# Ignore Visual Studio Code workspace settings
+*.code-workspace
