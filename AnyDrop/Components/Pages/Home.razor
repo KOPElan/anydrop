@@ -1,7 +1,43 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>AnyDrop</PageTitle>
 
-<h1>Hello, world!</h1>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Class="chat-page">
+    <FluentLabel Typography="Typography.Subheading">跨设备实时共享</FluentLabel>
 
-Welcome to your new Fluent Blazor app.
+    <FluentCard Class="chat-timeline-card">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8" Class="chat-timeline" id="chatTimeline">
+            @if (messages.Count is 0)
+            {
+                <FluentLabel>暂无消息，开始发送第一条文本吧。</FluentLabel>
+            }
+            else
+            {
+                @foreach (var message in messages)
+                {
+                    <div class="chat-item">
+                        <FluentLabel Typography="Typography.Body1">@message.Content</FluentLabel>
+                        <FluentLabel Typography="Typography.Caption1">@message.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</FluentLabel>
+                    </div>
+                }
+            }
+        </FluentStack>
+    </FluentCard>
+
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Class="chat-composer">
+        <FluentTextField @bind-Value="draftText"
+                         Placeholder="输入要同步的文本"
+                         
+                         Class="chat-input" />
+        <FluentButton Appearance="Appearance.Accent" OnClick="SendAsync" Disabled="isSending">
+            发送
+        </FluentButton>
+    </FluentStack>
+
+    @if (errorMessage is not null)
+    {
+        <FluentMessageBar Intent="MessageIntent.Error">
+            @errorMessage
+        </FluentMessageBar>
+    }
+</FluentStack>
