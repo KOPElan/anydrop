@@ -1,4 +1,5 @@
 using AnyDrop.Models;
+using AnyDrop.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnyDrop.Data;
@@ -24,7 +25,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
         {
             entity.HasKey(item => item.Id);
             entity.Property(item => item.ContentType).HasConversion<int>();
-            entity.Property(item => item.Content).HasMaxLength(10_000).IsRequired();
+            entity.Property(item => item.Content).HasMaxLength(ShareValidationRules.MaxTextLength).IsRequired();
             entity.Property(item => item.FileName).HasMaxLength(260);
             entity.Property(item => item.MimeType).HasMaxLength(127);
             entity.Property(item => item.CreatedAt)

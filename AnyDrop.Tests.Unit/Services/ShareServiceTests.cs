@@ -43,6 +43,18 @@ public sealed class ShareServiceTests
     }
 
     [Fact]
+    public async Task SendTextAsync_NullContent_ThrowsArgumentNullException()
+    {
+        await using var dbContext = CreateDbContext();
+        var hubContextMock = CreateHubContext();
+        var service = new ShareService(dbContext, hubContextMock.Object);
+
+        var action = async () => await service.SendTextAsync(null!);
+
+        await action.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
     public async Task SendTextAsync_EmptyContent_ThrowsArgumentException()
     {
         await using var dbContext = CreateDbContext();

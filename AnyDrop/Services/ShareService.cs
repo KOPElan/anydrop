@@ -19,6 +19,11 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
     /// <returns>The created share item DTO.</returns>
     public async Task<ShareItemDto> SendTextAsync(string content, CancellationToken ct = default)
     {
+        if (content is null)
+        {
+            throw new ArgumentNullException(nameof(content));
+        }
+
         var normalizedContent = content.Trim();
 
         if (string.IsNullOrWhiteSpace(normalizedContent))

@@ -3,6 +3,7 @@ using AnyDrop.Api;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.FluentUI.AspNetCore.Components;
 
@@ -30,7 +31,12 @@ if (databaseDirectory is not null)
 
 builder.Services.AddDbContext<AnyDropDbContext>(options =>
 {
-    options.UseSqlite($"Data Source={normalizedDatabasePath}");
+    var connectionStringBuilder = new SqliteConnectionStringBuilder
+    {
+        DataSource = normalizedDatabasePath,
+    };
+
+    options.UseSqlite(connectionStringBuilder.ToString());
 });
 
 builder.Services.AddScoped<IShareService, ShareService>();

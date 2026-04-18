@@ -46,7 +46,7 @@ public static class ShareItemEndpoints
             }
 
             var item = await shareService.SendTextAsync(request.Content, ct);
-            return Results.Created($"/api/v1/share-items/{item.Id}", ApiEnvelope.Success(item));
+            return Results.Ok(ApiEnvelope.Success(item));
         });
 
         return app;
