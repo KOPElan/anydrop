@@ -28,7 +28,7 @@ Key design goals:
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | Framework | .NET 10, Blazor Web App | Interactive Server render mode (no WASM) |
-| UI Components | [Microsoft Fluent UI for Blazor](https://www.fluentui-blazor.net/) v4.13.2 | Do NOT use Bootstrap or Tailwind |
+| UI Components | [Microsoft Fluent UI for Blazor](https://www.fluentui-blazor.net/) v4.14.0 | Do NOT use Bootstrap or Tailwind |
 | Icons | `Microsoft.FluentUI.AspNetCore.Components.Icons` | Use Fluent icon names, e.g. `<FluentIcon Value="@(new Icons.Regular.Size24.Document())" />` |
 | Styling | CSS Variables (Fluent Design Tokens) | See `wwwroot/app.css`; avoid hardcoded colors |
 | Hosting | Kestrel (HTTP) | Dev: `http://localhost:5002` |
