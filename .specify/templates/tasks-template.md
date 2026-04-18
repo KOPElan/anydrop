@@ -8,7 +8,11 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: AnyDrop Constitution (v1.0.0) mandates tests for all Service-layer business logic.
+Test tasks MUST be included for:
+- xUnit unit tests for all new `Services/` methods (Principle IV)
+- Moq-based verification for any SignalR Hub dispatch logic (Principle IV)
+- Playwright E2E test when the feature touches cross-device push flow (Principle IV)
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -18,12 +22,12 @@ description: "Task list template for feature implementation"
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
 - Include exact file paths in descriptions
 
-## Path Conventions
+## Path Conventions (AnyDrop — Blazor Server monolith)
 
-- **Single project**: `src/`, `tests/` at repository root
-- **Web app**: `backend/src/`, `frontend/src/`
-- **Mobile**: `api/src/`, `ios/src/` or `android/src/`
-- Paths shown below assume single project - adjust based on plan.md structure
+- **Source**: `AnyDrop/Models/`, `AnyDrop/Services/`, `AnyDrop/Hubs/`, `AnyDrop/Components/`
+- **Unit tests**: `AnyDrop.Tests.Unit/`
+- **E2E tests**: `AnyDrop.Tests.E2E/`
+- Adjust paths per plan.md structure
 
 <!-- 
   ============================================================================

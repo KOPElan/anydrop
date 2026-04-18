@@ -80,12 +80,18 @@
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
   Fill them out with the right functional requirements.
+  AnyDrop Constitution constraints (v1.0.0) apply to ALL requirements:
+  - Service layer MUST be separated from Razor components (Principle I)
+  - Only .NET 10 + Blazor Server + Fluent UI + SQLite/EF Core + SignalR (Principle II)
+  - All async methods MUST end with Async; interfaces MUST start with I (Principle III)
+  - Every Service method MUST have xUnit tests; SignalR dispatch MUST be Moq-verified (Principle IV)
+  - No hardcoded credentials; file uploads validated; downloads use Content-Disposition: attachment (Principle V)
 -->
 
 ### Functional Requirements
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
-- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
+- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
