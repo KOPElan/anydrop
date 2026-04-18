@@ -31,14 +31,16 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Verify the following gates against `.specify/memory/constitution.md` (AnyDrop v1.0.0):
+Verify the following gates against `.specify/memory/constitution.md` (AnyDrop v1.1.0):
 
 - [ ] **I. 单体架构分离**：服务层实现于 `Services/`，Razor 组件仅调用 DI 注入的服务，无内联业务逻辑
-- [ ] **II. 技术栈合规**：仅使用 .NET 10 + Blazor Server + Fluent UI + SQLite/EF Core + SignalR，无替代方案
+- [ ] **II. 技术栈合规**：仅使用 .NET 10 + Blazor Server + Fluent UI + SQLite/EF Core + SignalR + Minimal API，无替代方案
 - [ ] **III. 命名规范**：所有新增异步方法以 `Async` 结尾，接口以 `I` 开头，PascalCase 一致
 - [ ] **IV. 测试覆盖**：Service 层方法有 xUnit 单元测试，SignalR 分发逻辑有 Moq 验证，E2E 链路有 Playwright 用例
 - [ ] **V. 安全合规**：无硬编码凭证，文件上传有 MIME/大小验证，下载含 `Content-Disposition: attachment`
 - [ ] **VI. 容器化**：持久化数据通过 Volume 挂载，配置通过环境变量注入，Dockerfile 可用
+- [ ] **VII. RESTful API**：使用 Minimal API（`app.Map*`），路径前缀 `/api/v1/`，端点提取至 `Api/` 目录，
+  复用 Service 层业务逻辑，集成 OpenAPI，MUST NOT 使用 MVC Controller
 
 ## Project Structure
 

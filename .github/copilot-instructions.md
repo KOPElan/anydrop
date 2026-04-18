@@ -31,6 +31,7 @@ Key design goals:
 | UI Components | [Microsoft Fluent UI for Blazor](https://www.fluentui-blazor.net/) v4.14.0 | Do NOT use Bootstrap or Tailwind |
 | Icons | `Microsoft.FluentUI.AspNetCore.Components.Icons` | Use Fluent icon names, e.g. `<FluentIcon Value="@(new Icons.Regular.Size24.Document())" />` |
 | Styling | CSS Variables (Fluent Design Tokens) | See `wwwroot/app.css`; avoid hardcoded colors |
+| Mobile API | .NET 10 Minimal API | RESTful, prefix `/api/v1/`, MUST NOT use MVC Controllers |
 | Hosting | Kestrel (HTTP) | Dev: `http://localhost:5002` |
 
 ---
@@ -38,8 +39,7 @@ Key design goals:
 ## Architecture
 
 ```
-AnyDrop/
-├── Components/
+AnyDrop/├── Api/                  # Minimal API 端点扩展方法（如 MessageEndpoints.cs）├── Components/
 │   ├── Pages/          # 路由页面（所有新页面加 @page 指令）
 │   ├── Layout/         # MainLayout.razor、模态/抽屉组件
 │   └── _Imports.razor  # 全局 using — 新增命名空间在此注册
@@ -103,6 +103,13 @@ The solution file is `AnyDrop.slnx` (the new XML solution format).
 - Use Blazor's built-in DI (`@inject`) to access services in components
 - For cross-component state, use scoped services or Blazor Cascading Values — avoid static state
 - File uploads: use `<FluentInputFile>` component; validate MIME type and size at service boundary
+
+### API 规范（Minimal API）
+- 所有 HTTP API 端点使用 `app.Map*` Minimal API 注册，MUST NOT 使用 `[ApiController]` MVC 模式
+- 路径规范：`/api/v1/{resource}` 复数 kebab-case；组织在 `Api/` 目录的扩展方法中并在 `Program.cs` 注册
+- 响应体：统一使用 `{ success, data, error }` JSON 结构
+- API 端点 MUST 复用 `Services/` 中的服务接口，不得内联业务逻辑
+- 开发环境 MUST 集成 OpenAPI（`/openapi/v1.json`）与 Swagger UI
 
 ### Testing（测试规范）
 - 后端 Service 层：xUnit + FluentAssertions；所有涉及 EF Core 和业务逻辑的方法必须有单元测试
