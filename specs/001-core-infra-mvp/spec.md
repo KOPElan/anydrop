@@ -1,4 +1,4 @@
-# Feature Specification: 核心基础设施与最小 MVP
+﻿# Feature Specification: 核心基础设施与最小 MVP
 
 **Feature Branch**: `feat/001-core-infra-mvp`  
 **Created**: 2026-04-18  
@@ -66,7 +66,7 @@
 
 ## Requirements *(mandatory)*
 
-> AnyDrop Constitution v1.1.0 约束适用：服务层与 UI 层分离、.NET 10 + Blazor Server + SignalR + SQLite/EF Core + Minimal API、PascalCase + Async 后缀、xUnit + Moq + Playwright 测试、容器化就绪。
+> AnyDrop Constitution v1.1.0 约束适用：服务层与 UI 层分离、.NET 10 + Blazor Server + SignalR + SQLite/EF Core、PascalCase + Async 后缀、xUnit + Moq + Playwright 测试、容器化就绪。
 
 ### Functional Requirements
 
@@ -77,13 +77,13 @@
 - **FR-005**：系统 MUST 实现 `IFileStorageService`，提供文件保存与读取的物理存储抽象；MVP 阶段可仅实现接口，不需要文件上传 UI，但接口 MUST 存在以供后续实现。
 - **FR-006**：系统 MUST 初始化项目骨架：`MainLayout` 包含侧边栏区域（`<aside>`）与主内容区域（`<main>`），使用 Fluent UI 组件和 Fluent Design Tokens 实现，MUST NOT 使用硬编码颜色。
 - **FR-007**：首页（`/`）MUST 提供聊天式主界面：上方为消息时间线列表，下方为文本输入框 + 发送按钮；发送后输入框自动清空，消息列表自动滚动到最新。
-- **FR-008**：系统 MUST 在 `Program.cs` 完成所有 DI 注册和中间件配置，包括 EF Core、SignalR、服务注册，以及 API 路由（含 OpenAPI）。
+- **FR-008**：系统 MUST 在 `Program.cs` 完成所有 DI 注册和中间件配置，包括 EF Core、SignalR、服务注册。
 - **FR-009**：`ShareHub` MUST 仅调用 `IShareService`，不含业务逻辑；Razor 组件 MUST 通过 `@inject IShareService` 使用服务，不得直接操作数据库。
 
 ### Key Entities
 
 - **ShareItem**：核心共享内容实体。字段：`Id`（Guid，主键）、`ContentType`（枚举：Text/File/Image/Video/Link）、`Content`（字符串，文本内容或文件路径/URL）、`FileName`（可空，文件类型用）、`FileSize`（可空，字节数）、`CreatedAt`（DateTimeOffset，服务端时间）。
-- **ShareItemDto**：用于 SignalR 广播和 API 响应的数据传输对象，包含 `ShareItem` 的所有公开字段，不暴露导航属性。
+- **ShareItemDto**：用于 SignalR 广播的数据传输对象，包含 `ShareItem` 的所有公开字段，不暴露导航属性。
 
 ---
 
@@ -109,3 +109,11 @@
 - 历史消息分页策略：MVP 阶段固定加载最近 50 条，不实现无限滚动；该限制应在 `IShareService.GetRecentAsync(int count = 50)` 接口签名中体现。
 - Fluent UI 版本固定为当前项目已引用版本（v4.14.0），不升级。
 - 数据库文件默认路径：`./data/anydrop.db`（通过 `appsettings.json` 的 `Storage:DatabasePath` 配置）。
+- Minimal API 端点和 OpenAPI/Scalar 集成**不在本版本实现**，延迟至后续 Feature 中引入（本版本 `Program.cs` 无需注册任何 HTTP API 路由或 OpenAPI 中间件）。
+---
+
+## Clarifications
+
+### Session 2026-04-18
+
+- Q: FR-008 中的"API 路由（含 OpenAPI）"应如何处理？ → A: 完全删除，FR-008 只保留 EF Core/SignalR/Services DI 注册（选项 A）。
