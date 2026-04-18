@@ -66,7 +66,7 @@
 
 ## Requirements *(mandatory)*
 
-> AnyDrop Constitution v1.1.0 约束适用：服务层与 UI 层分离、.NET 10 + Blazor Server + SignalR + SQLite/EF Core、PascalCase + Async 后缀、xUnit + Moq + Playwright 测试、容器化就绪。
+> AnyDrop Constitution v2.0.0 约束适用：服务层与 UI 层分离、.NET 10 + Blazor Server + SignalR + SQLite/EF Core、Tailwind CSS v4（禁止 Fluent UI）、PascalCase + Async 后缀、xUnit + Moq + Playwright 测试、容器化就绪。
 
 ### Functional Requirements
 
@@ -75,7 +75,7 @@
 - **FR-003**：系统 MUST 实现 SignalR Hub（`ShareHub`），当新 `ShareItem` 被创建后，向所有已连接客户端广播该条目，延迟目标 < 1 秒（局域网内）。
 - **FR-004**：系统 MUST 实现 `IShareService`，提供 `SendTextAsync`（发送文本）、`GetRecentAsync`（获取最近 N 条）两个方法作为 MVP 最小接口。
 - **FR-005**：系统 MUST 实现 `IFileStorageService`，提供文件保存与读取的物理存储抽象；MVP 阶段可仅实现接口，不需要文件上传 UI，但接口 MUST 存在以供后续实现。
-- **FR-006**：系统 MUST 初始化项目骨架：`MainLayout` 包含侧边栏区域（`<aside>`）与主内容区域（`<main>`），使用 Fluent UI 组件和 Fluent Design Tokens 实现，MUST NOT 使用硬编码颜色。
+- **FR-006**：系统 MUST 初始化项目骨架：`MainLayout` 包含侧边栏区域（`<aside>`）与主内容区域（`<main>`），使用 Tailwind CSS v4 工具类实现，MUST NOT 使用硬编码颜色或内联 `style` 属性。
 - **FR-007**：首页（`/`）MUST 提供聊天式主界面：上方为消息时间线列表，下方为文本输入框 + 发送按钮；发送后输入框自动清空，消息列表自动滚动到最新。
 - **FR-008**：系统 MUST 在 `Program.cs` 完成所有 DI 注册和中间件配置，包括 EF Core、SignalR、服务注册。
 - **FR-009**：`ShareHub` MUST 仅调用 `IShareService`，不含业务逻辑；Razor 组件 MUST 通过 `@inject IShareService` 使用服务，不得直接操作数据库。
@@ -107,7 +107,7 @@
 - 认证（Authentication）在本 Feature **暂不实现**；AnyDrop 目标为内网私有部署，初期允许无认证访问，但架构设计应为后续加入认证留出扩展点（如中间件位置）。
 - `IFileStorageService` 本次仅定义接口和空实现（`LocalFileStorageService`），不实现文件上传入口。
 - 历史消息分页策略：MVP 阶段固定加载最近 50 条，不实现无限滚动；该限制应在 `IShareService.GetRecentAsync(int count = 50)` 接口签名中体现。
-- Fluent UI 版本固定为当前项目已引用版本（v4.14.0），不升级。
+- UI 层使用 Tailwind CSS v4，通过 Tailwind CLI 构建（`npx @tailwindcss/cli`）；开发环境可使用 CDN Play CDN 快速验证，生产环境 MUST 使用构建产物（`wwwroot/tailwind.css`）。
 - 数据库文件默认路径：`./data/anydrop.db`（通过 `appsettings.json` 的 `Storage:DatabasePath` 配置）。
 - Minimal API 端点和 OpenAPI/Scalar 集成**不在本版本实现**，延迟至后续 Feature 中引入（本版本 `Program.cs` 无需注册任何 HTTP API 路由或 OpenAPI 中间件）。
 ---
