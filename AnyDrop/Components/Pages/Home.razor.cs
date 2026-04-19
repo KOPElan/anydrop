@@ -323,10 +323,23 @@ public partial class Home : IAsyncDisposable
 
         foreach (var file in args.GetMultipleFiles())
         {
-            var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-            await using var stream = file.OpenReadStream(maxAllowedSize: maxFileSize);
-            await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value,
-                burnAfterReading: _burnAfterReading);
+            try
+            {
+                var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
+                await using var stream = file.OpenReadStream(maxAllowedSize: maxFileSize);
+                await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value,
+                    burnAfterReading: _burnAfterReading);
+            }
+            catch (IOException ex) when (ex.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
+            {
+                _validationError = $"文件\"{file.Name}\"超过最大允许大小，已跳过。";
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+                _validationError = $"文件\"{file.Name}\"上传失败，请重试。";
+                StateHasChanged();
+            }
         }
 
         // 主动刷新，确保在 SignalR 降级场景下也能立即呈现

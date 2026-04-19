@@ -11,7 +11,8 @@ public sealed class ShareService(
     IHubContext<ShareHub> hubContext,
     ITopicService topicService,
     IFileStorageService fileStorageService,
-    LinkMetadataService linkMetadataService) : IShareService
+    LinkMetadataService linkMetadataService,
+    IServiceScopeFactory scopeFactory) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
     {
@@ -78,7 +79,7 @@ public sealed class ShareService(
 
     /// <summary>
     /// 后台抓取链接元数据，更新数据库并推送更新后的 DTO 给所有客户端。
-    /// 此方法独立于请求生命周期运行，失败时静默忽略。
+    /// 此方法独立于请求生命周期运行，通过独立 DI Scope 操作 DbContext，失败时静默忽略。
     /// </summary>
     private async Task FetchAndUpdateLinkMetadataAsync(Guid itemId, string url)
     {
@@ -91,8 +92,11 @@ public sealed class ShareService(
                 return;
             }
 
-            // 使用新的 DbContext 以避免并发冲突（原 Scoped context 可能已释放）
-            var item = await dbContext.ShareItems.FindAsync(itemId);
+            // 创建独立 Scope，避免复用已被请求 Scope 释放的 DbContext
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
+
+            var item = await db.ShareItems.FindAsync(itemId);
             if (item is null)
             {
                 return;
@@ -100,7 +104,7 @@ public sealed class ShareService(
 
             item.LinkTitle = title;
             item.LinkDescription = description;
-            await dbContext.SaveChangesAsync();
+            await db.SaveChangesAsync();
 
             // 推送补全后的消息，让客户端更新气泡内容
             await hubContext.Clients.All.SendAsync("ReceiveShareItem", item.ToDto());

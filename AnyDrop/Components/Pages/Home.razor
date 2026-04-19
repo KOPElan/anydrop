@@ -308,8 +308,8 @@
                         title="@(_burnAfterReading ? "阅后即焚已开启（10分钟后自动删除）" : "开启阅后即焚")"
                         @onclick="ToggleBurnAfterReading">
                     <span class="material-symbols-outlined"
-                          style="font-variation-settings: '@(_burnAfterReading ? "FILL' 1" : "FILL' 0")';">
-                        @(_burnAfterReading ? "timer" : "timer")
+                          style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
+                        timer
                     </span>
                 </button>
             </div>

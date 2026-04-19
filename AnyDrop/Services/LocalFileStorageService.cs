@@ -44,7 +44,18 @@ public sealed class LocalFileStorageService(IConfiguration configuration) : IFil
     {
         var relative = storagePath.Replace('\\', '/').TrimStart('/');
         var combined = Path.GetFullPath(Path.Combine(_basePath, relative));
-        if (!combined.StartsWith(_basePath, StringComparison.Ordinal))
+
+        // 确保 _basePath 以目录分隔符结尾，防止前缀匹配绕过
+        // 例如 basePath=/data/files 时，/data/files_evil/x 不应通过
+        var baseWithSep = _basePath.EndsWith(Path.DirectorySeparatorChar)
+            ? _basePath
+            : _basePath + Path.DirectorySeparatorChar;
+
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (!combined.StartsWith(baseWithSep, comparison))
         {
             throw new InvalidOperationException("Invalid storage path.");
         }

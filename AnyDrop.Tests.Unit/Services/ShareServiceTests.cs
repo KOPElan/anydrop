@@ -5,6 +5,7 @@ using AnyDrop.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -163,6 +164,9 @@ public class ShareServiceTests
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
 
-        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object, fileStorageServiceMock.Object, linkMetadataService);
+        // IServiceScopeFactory: fire-and-forget 中使用，测试中不需要实际调用
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+
+        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object, fileStorageServiceMock.Object, linkMetadataService, scopeFactoryMock.Object);
     }
 }
