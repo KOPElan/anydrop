@@ -1,3 +1,3 @@
 namespace AnyDrop.Api;
 
-public sealed record CreateTextShareItemRequest(string Content);
+public sealed record CreateTextShareItemRequest(string Content, Guid? TopicId);

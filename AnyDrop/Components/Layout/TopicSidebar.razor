@@ -1,0 +1,43 @@
+<div class="flex h-full flex-col gap-3">
+    <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700">主题会话</h2>
+        <button type="button" class="btn-primary px-3 py-1 text-xs" @onclick="CreateTopicAsync">+ 新建主题</button>
+    </div>
+
+    <input
+        class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+        placeholder="输入主题名称（最多100字）"
+        maxlength="100"
+        @bind="_newTopicName" />
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <p class="text-xs text-red-600">@_error</p>
+    }
+
+    @if (_topics.Count == 0)
+    {
+        <div class="sidebar-empty-state">
+            暂无主题，点击“+ 新建主题”开始
+        </div>
+    }
+    else
+    {
+        <div id="topic-list" class="flex-1 space-y-2 overflow-y-auto">
+            @foreach (var topic in _topics)
+            {
+                var isActive = _selectedTopicId == topic.Id;
+                <button
+                    type="button"
+                    data-id="@topic.Id"
+                    class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
+                    @onclick="() => SelectTopicAsync(topic.Id)">
+                    <div class="truncate text-left text-sm font-medium">@topic.Name</div>
+                    <div class="text-left text-xs text-gray-500">
+                        @(topic.LastMessageAt?.ToLocalTime().ToString("MM-dd HH:mm") ?? "暂无消息")
+                    </div>
+                </button>
+            }
+        </div>
+    }
+</div>

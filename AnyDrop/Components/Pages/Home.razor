@@ -8,9 +8,13 @@
     </header>
 
     <div class="flex-1 overflow-y-auto px-6 py-4" id="timeline">
-        @if (_messages.Count == 0)
+        @if (!_selectedTopicId.HasValue)
         {
-            <p class="text-sm text-gray-500">No messages yet.</p>
+            <p class="text-sm text-gray-500">请先在左侧选择一个主题。</p>
+        }
+        else if (_messages.Count == 0)
+        {
+            <p class="text-sm text-gray-500">暂无内容，发送第一条消息吧</p>
         }
         else
         {

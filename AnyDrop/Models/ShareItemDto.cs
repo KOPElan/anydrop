@@ -7,5 +7,6 @@ public sealed record ShareItemDto(
     string? FileName,
     long? FileSize,
     string? MimeType,
-    DateTimeOffset CreatedAt
+    DateTimeOffset CreatedAt,
+    Guid? TopicId
 );
