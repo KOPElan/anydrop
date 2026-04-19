@@ -10,6 +10,9 @@ build/
 publish/
 artifacts/
 
+# Ignore AnyDrop obj build outputs explicitly
+/AnyDrop/obj/
+
 # Rider
 *.sln.iml
 
