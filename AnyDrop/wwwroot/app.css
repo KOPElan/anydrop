@@ -2,59 +2,162 @@
 @source "../**/*.razor";
 
 @theme {
-    --color-brand: #6366f1;
-    --color-brand-hover: #4f46e5;
-    --color-surface: #f9fafb;
-    --color-sidebar: #f3f4f6;
+    /* The Fluid Archive Design System */
+    --font-headline: "Manrope", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-label: "Inter", sans-serif;
+
+    /* Primary */
+    --color-primary: #0050cb;
+    --color-primary-container: #0066ff;
+    --color-primary-fixed: #dae1ff;
+    --color-primary-fixed-dim: #b3c5ff;
+    --color-on-primary: #ffffff;
+    --color-on-primary-fixed: #001849;
+
+    /* Secondary */
+    --color-secondary: #425ca0;
+    --color-secondary-container: #9bb4fe;
+    --color-on-secondary: #ffffff;
+
+    /* Tertiary */
+    --color-tertiary: #a33200;
+    --color-on-tertiary: #ffffff;
+
+    /* Error */
+    --color-error: #ba1a1a;
+    --color-error-container: #ffdad6;
+    --color-on-error: #ffffff;
+
+    /* Surfaces */
+    --color-surface: #f8f9fa;
+    --color-surface-dim: #d9dadb;
+    --color-surface-variant: #e1e3e4;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f3f4f5;
+    --color-surface-container: #edeeef;
+    --color-surface-container-high: #e7e8e9;
+    --color-surface-container-highest: #e1e3e4;
+
+    /* On-surfaces */
+    --color-on-surface: #191c1d;
+    --color-on-surface-variant: #424656;
+    --color-inverse-surface: #2e3132;
+    --color-inverse-on-surface: #f0f1f2;
+
+    /* Outline */
+    --color-outline: #727687;
+    --color-outline-variant: #c2c6d8;
+
+    /* Background */
+    --color-background: #f8f9fa;
+    --color-on-background: #191c1d;
+
+    /* Legacy compat */
+    --color-brand: #0050cb;
+    --color-brand-hover: #0040a0;
+    --color-sidebar: #f3f4f5;
 }
+
+/* Blazor 错误 UI — 默认隐藏，发生错误时由 Blazor JS 显示 */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fef9c3;
+    border-top: 1px solid #ca8a04;
+    padding: 0.5rem 1.5rem;
+    z-index: 9999;
+    font-size: 0.875rem;
+    color: #1c1917;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    float: right;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e1e3e4; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #c2c6d8; }
 
 @layer base {
     html,
     body {
-        @apply h-full antialiased bg-[var(--color-surface)];
+        @apply h-full antialiased;
+        background-color: var(--color-surface);
+        font-family: var(--font-body);
     }
 }
 
 @layer components {
     .btn-primary {
-        @apply rounded-lg bg-[var(--color-brand)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-60;
+        @apply rounded-full px-5 py-2 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60;
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        filter: brightness(1.1);
     }
 
     .btn-secondary {
-        @apply rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60;
+        @apply rounded-full px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+        color: var(--color-on-surface-variant);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background-color: var(--color-surface-container);
     }
 
     /* 侧边栏主题项 */
     .sidebar-item {
-        @apply w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/80 cursor-pointer;
+        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-colors;
+        color: var(--color-on-surface-variant);
+    }
+
+    .sidebar-item:hover {
+        background-color: var(--color-surface-container);
     }
 
     .sidebar-item--active {
-        @apply bg-white shadow-sm ring-1 ring-indigo-200 hover:bg-white;
+        color: var(--color-primary);
+        font-weight: 600;
     }
 
-    .sidebar-item__header {
-        @apply flex items-center gap-1;
+    .sidebar-item--active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 60%;
+        background-color: var(--color-primary);
+        border-radius: 0 4px 4px 0;
     }
 
     .sidebar-item__name {
-        @apply flex-1 truncate text-sm font-medium text-gray-800;
-    }
-
-    .sidebar-item--active .sidebar-item__name {
-        @apply text-indigo-700;
+        @apply flex-1 truncate text-sm;
     }
 
     .sidebar-item__time {
-        @apply shrink-0 text-[11px] text-gray-400;
+        @apply shrink-0 text-[11px];
+        color: var(--color-outline);
     }
 
     .sidebar-item__preview {
-        @apply mt-0.5 truncate text-xs text-gray-500;
+        @apply truncate text-xs;
+        color: var(--color-outline);
     }
 
     .sidebar-empty-state {
-        @apply rounded-lg border border-dashed border-gray-300 p-4 text-xs text-gray-500;
+        @apply rounded-xl border border-dashed p-4 text-xs;
+        border-color: var(--color-outline-variant);
+        color: var(--color-on-surface-variant);
     }
 
     /* Modal */
@@ -63,11 +166,14 @@
     }
 
     .modal-content {
-        @apply w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl mx-4;
+        @apply w-full max-w-sm rounded-2xl p-6 shadow-xl mx-4;
+        background-color: var(--color-surface-container-lowest);
     }
 
     .modal-title {
-        @apply text-base font-semibold text-gray-800;
+        @apply text-base font-semibold;
+        color: var(--color-on-surface);
+        font-family: var(--font-headline);
     }
 
     .modal-actions {
@@ -77,7 +183,7 @@
     /* 整体布局 */
     .app-shell {
         @apply grid h-screen;
-        grid-template-columns: 15rem 1fr;
+        grid-template-columns: 16rem 1fr;
     }
 
     @media (max-width: 768px) {

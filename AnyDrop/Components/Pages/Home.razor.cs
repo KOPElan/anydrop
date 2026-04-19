@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace AnyDrop.Components.Pages;
 
@@ -17,6 +18,7 @@ public partial class Home : IAsyncDisposable
     [Inject] public required IConfiguration Configuration { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Home> Logger { get; set; }
+    [Inject] public required IJSRuntime JS { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
@@ -30,6 +32,11 @@ public partial class Home : IAsyncDisposable
     private Guid? _selectedTopicId;
     private string? _selectedTopicName;
     private bool _selectedTopicPinned;
+
+    private ElementReference _chatSectionRef;
+    private ElementReference _messageListRef;
+    private DotNetObjectReference<Home>? _dotNetRef;
+    private bool _shouldScrollToBottom;
 
     protected override async Task OnInitializedAsync()
     {
@@ -48,37 +55,64 @@ public partial class Home : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (firstRender)
         {
-            return;
-        }
-
-        _hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"))
-            .WithAutomaticReconnect()
-            .Build();
-
-        _hubConnection.On<ShareItemDto>("ReceiveShareItem", dto =>
-        {
-            return InvokeAsync(async () =>
+            // 设置聊天区域拖放处理（JS 端负责消抖，仅在状态变化时回调 .NET）
+            _dotNetRef = DotNetObjectReference.Create(this);
+            try
             {
-                if (_selectedTopicId.HasValue && dto.TopicId == _selectedTopicId)
-                {
-                    _messages.Insert(0, dto);
-                    StateHasChanged();
-                }
-            });
-        });
+                await JS.InvokeVoidAsync("AnyDropInterop.setupDropZone", _chatSectionRef, _dotNetRef);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to initialize drop zone JS interop.");
+            }
 
-        try
-        {
-            await _hubConnection.StartAsync();
+            // 启动 SignalR 连接
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hubConnection.On<ShareItemDto>("ReceiveShareItem", dto =>
+            {
+                return InvokeAsync(async () =>
+                {
+                    // 只处理当前主题的消息，且去重避免与主动刷新产生重复
+                    if (_selectedTopicId.HasValue
+                        && dto.TopicId == _selectedTopicId
+                        && !_messages.Any(m => m.Id == dto.Id))
+                    {
+                        _messages.Add(dto); // 追加到末尾，保持时间升序（最新在底）
+                        _shouldScrollToBottom = true;
+                        StateHasChanged();
+                    }
+                });
+            });
+
+            try
+            {
+                await _hubConnection.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to start ShareHub connection. Falling back to polling.");
+                _pollingCts = new CancellationTokenSource();
+                _pollingTask = StartPollingAsync(_pollingCts.Token);
+            }
         }
-        catch (Exception ex)
+
+        if (_shouldScrollToBottom)
         {
-            Logger.LogWarning(ex, "Failed to start ShareHub connection. Falling back to polling.");
-            _pollingCts = new CancellationTokenSource();
-            _pollingTask = StartPollingAsync(_pollingCts.Token);
+            _shouldScrollToBottom = false;
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
+            }
+            catch
+            {
+                // Ignore JS interop errors during scroll (e.g., component being disposed).
+            }
         }
     }
 
@@ -89,7 +123,7 @@ public partial class Home : IAsyncDisposable
         var trimmedText = _inputText.Trim();
         if (string.IsNullOrWhiteSpace(trimmedText))
         {
-            _validationError = "Message content is required.";
+            _validationError = "消息内容不能为空。";
             return;
         }
 
@@ -101,7 +135,7 @@ public partial class Home : IAsyncDisposable
 
         if (trimmedText.Length > 10_000)
         {
-            _validationError = "Message cannot exceed 10,000 characters.";
+            _validationError = "消息不能超过 10,000 个字符。";
             return;
         }
 
@@ -110,6 +144,7 @@ public partial class Home : IAsyncDisposable
         {
             await ShareService.SendTextAsync(trimmedText, _selectedTopicId);
             _inputText = string.Empty;
+            // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示
             await LoadSelectedTopicMessagesAsync();
         }
         finally
@@ -154,21 +189,34 @@ public partial class Home : IAsyncDisposable
             await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value);
         }
 
+        // 主动刷新，确保在 SignalR 降级场景下也能立即呈现
         await LoadSelectedTopicMessagesAsync();
     }
 
-    private void OnDragEnter(DragEventArgs _)
-    {
-        _isDragging = true;
-    }
-
-    private void OnDragLeave(DragEventArgs _)
+    /// <summary>
+    /// 文件拖放到聊天区域时触发（由覆盖层 InputFile 处理）。
+    /// 关闭拖放覆盖层后转交给 OnFilesSelected 处理。
+    /// </summary>
+    private async Task OnFilesDropped(InputFileChangeEventArgs args)
     {
         _isDragging = false;
+        await OnFilesSelected(args);
+    }
+
+    /// <summary>
+    /// 由 JS 拖放处理逻辑回调，通知 .NET 端切换拖放覆盖层显示状态。
+    /// </summary>
+    [JSInvokable]
+    public Task SetDragging(bool isDragging)
+    {
+        _isDragging = isDragging;
+        return InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
     {
+        _dotNetRef?.Dispose();
+
         _pollingCts?.Cancel();
         if (_pollingTask is not null)
         {
@@ -219,7 +267,9 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
-        _messages.AddRange(response.Messages);
+        // 服务端返回最新 N 条（降序），这里逆序后使列表保持时间升序（最旧在顶，最新在底）
+        _messages.AddRange(response.Messages.Reverse());
+        _shouldScrollToBottom = true;
     }
 
     private async Task LoadSelectedTopicMetaAsync(CancellationToken ct = default)
@@ -241,4 +291,16 @@ public partial class Home : IAsyncDisposable
         => download
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
+
+    /// <summary>将字节数格式化为人类可读的大小字符串。</summary>
+    private static string FormatFileSize(long bytes)
+    {
+        return bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+            < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+            _ => $"{bytes / (1024.0 * 1024 * 1024):F1} GB"
+        };
+    }
 }

@@ -1,118 +1,225 @@
 @page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>@(_selectedTopicName ?? "AnyDrop")</PageTitle>
 
-<section class="flex h-full flex-col">
-    <header class="border-b border-gray-200 px-6 py-4">
-        <div class="flex items-center justify-between gap-3">
-            <h1 class="text-lg font-semibold text-gray-900">@(_selectedTopicName ?? "请选择主题")</h1>
-            @if (_selectedTopicId.HasValue)
-            {
-                <button type="button"
-                        class="rounded-md border px-2 py-1 text-xs font-medium transition hover:bg-gray-50"
-                        @onclick="TogglePinAsync">
-                    @(_selectedTopicPinned ? "取消置顶" : "置顶主题")
-                </button>
-            }
+<section @ref="_chatSectionRef"
+         class="flex h-full flex-col relative bg-surface"
+         @ondragover:preventDefault>
+
+    @* ─────────── 顶部标题栏 ─────────── *@
+    <header class="sticky top-0 z-40 flex items-center justify-between px-6 py-4"
+            style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px);">
+        <div class="flex items-center gap-3">
+            <h2 class="font-headline font-bold text-on-surface text-lg leading-tight">
+                @(_selectedTopicName ?? "选择主题")
+            </h2>
         </div>
+        @if (_selectedTopicId.HasValue)
+        {
+            <button type="button"
+                    class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors @(_selectedTopicPinned ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container")"
+                    @onclick="TogglePinAsync">
+                <span class="material-symbols-outlined" style="font-size: 16px; font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
+                @(_selectedTopicPinned ? "已置顶" : "置顶")
+            </button>
+        }
     </header>
 
-    <div class="flex-1 overflow-y-auto px-6 py-4" id="timeline">
+    @* ─────────── 消息列表（最新在下，此区域也是拖放目标）─────────── *@
+    <div @ref="_messageListRef"
+         id="message-list"
+         class="flex-1 overflow-y-auto px-6 py-8 space-y-6">
         @if (!_selectedTopicId.HasValue)
         {
-            <p class="text-sm text-gray-500">请先在左侧选择一个主题。</p>
+            <div class="flex h-full flex-col items-center justify-center text-center">
+                <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">chat_bubble_outline</span>
+                <p class="mt-4 text-sm font-medium text-on-surface-variant">请先在左侧选择一个主题</p>
+            </div>
         }
         else if (_messages.Count == 0)
         {
-            <p class="text-sm text-gray-500">暂无内容，发送第一条消息吧</p>
+            <div class="flex h-full flex-col items-center justify-center text-center">
+                <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">chat_bubble_outline</span>
+                <p class="mt-4 text-sm font-medium text-on-surface-variant">暂无内容，发送第一条消息吧</p>
+            </div>
         }
         else
         {
-            <ul class="space-y-3">
-                @foreach (var message in _messages)
-                {
-                    <li class="rounded-lg bg-white p-3 shadow-sm ring-1 ring-gray-200">
-                        <div class="mb-1 text-xs text-gray-500">@message.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</div>
-                        @switch (message.ContentType)
-                        {
-                            case ShareContentType.Link:
-                                <a class="break-all text-sm text-blue-600 underline" href="@message.Content" target="_blank" rel="noopener noreferrer">@message.Content</a>
-                                break;
-                            case ShareContentType.Image:
-                                <div class="space-y-2">
-                                    <img class="max-h-80 rounded-md" src="@GetFileUrl(message.Id)" alt="@message.FileName" />
-                                    <a class="text-xs text-blue-600 underline" href="@GetFileUrl(message.Id, true)">下载图片</a>
+            @* 消息按时间升序排列，最新的在最底部 *@
+            @foreach (var message in _messages)
+            {
+                <div class="flex flex-col items-start max-w-2xl">
+                    @switch (message.ContentType)
+                    {
+                        case ShareContentType.Link:
+                            <div class="bg-surface-container-low p-5 rounded-2xl border-l-4 border-primary max-w-full">
+                                <div class="flex items-center gap-2 text-primary mb-2">
+                                    <span class="material-symbols-outlined text-sm">link</span>
+                                    <span class="text-xs font-semibold uppercase tracking-wide">Link</span>
                                 </div>
-                                break;
-                            case ShareContentType.Video:
-                                <div class="space-y-2">
-                                    <video class="max-h-80 w-full rounded-md" controls src="@GetFileUrl(message.Id)"></video>
-                                    <a class="text-xs text-blue-600 underline" href="@GetFileUrl(message.Id, true)">下载视频</a>
+                                <a class="text-sm text-primary underline break-all"
+                                   href="@message.Content"
+                                   target="_blank"
+                                   rel="noopener noreferrer">@message.Content</a>
+                            </div>
+                            break;
+
+                        case ShareContentType.Image:
+                            <div class="bg-surface-container-lowest p-3 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                                <div class="rounded-xl overflow-hidden mb-3">
+                                    <img class="max-h-72 w-full object-contain"
+                                         src="@GetFileUrl(message.Id)"
+                                         alt="@message.FileName" />
                                 </div>
-                                break;
-                            case ShareContentType.File:
-                                <div class="space-y-1 text-sm text-gray-900">
-                                    <div>📎 @(message.FileName ?? "附件")</div>
-                                    <a class="text-xs text-blue-600 underline" href="@GetFileUrl(message.Id, true)">下载附件</a>
+                                <div class="flex items-center justify-between px-1">
+                                    <div class="flex items-center gap-3">
+                                        <div class="p-2 bg-primary-fixed rounded-lg text-primary">
+                                            <span class="material-symbols-outlined text-lg">image</span>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "图片")</h4>
+                                            @if (message.FileSize.HasValue)
+                                            {
+                                                <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                            }
+                                        </div>
+                                    </div>
+                                    <a href="@GetFileUrl(message.Id, true)"
+                                       class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                        <span class="material-symbols-outlined">download</span>
+                                    </a>
                                 </div>
-                                break;
-                            default:
-                                <div class="whitespace-pre-wrap break-words text-sm text-gray-900">@message.Content</div>
-                                break;
-                        }
-                    </li>
-                }
-            </ul>
+                            </div>
+                            break;
+
+                        case ShareContentType.Video:
+                            <div class="bg-surface-container-lowest p-3 rounded-2xl shadow-sm w-full max-w-lg">
+                                <div class="rounded-xl overflow-hidden mb-3">
+                                    <video class="w-full max-h-64 rounded-xl bg-on-surface"
+                                           controls
+                                           src="@GetFileUrl(message.Id)"></video>
+                                </div>
+                                <div class="flex items-center justify-between px-1">
+                                    <div class="flex items-center gap-3">
+                                        <div class="p-2 bg-primary-fixed rounded-lg text-primary">
+                                            <span class="material-symbols-outlined text-lg">videocam</span>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "视频")</h4>
+                                            @if (message.FileSize.HasValue)
+                                            {
+                                                <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                            }
+                                        </div>
+                                    </div>
+                                    <a href="@GetFileUrl(message.Id, true)"
+                                       class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                        <span class="material-symbols-outlined">download</span>
+                                    </a>
+                                </div>
+                            </div>
+                            break;
+
+                        case ShareContentType.File:
+                            <div class="bg-surface-container-lowest p-4 rounded-2xl shadow-sm flex items-center justify-between gap-4 w-full max-w-md">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 bg-error-container/30 flex items-center justify-center rounded-xl text-error">
+                                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "附件")</h4>
+                                        @if (message.FileSize.HasValue)
+                                        {
+                                            <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                        }
+                                    </div>
+                                </div>
+                                <a href="@GetFileUrl(message.Id, true)"
+                                   class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                            </div>
+                            break;
+
+                        default:
+                            <div class="bg-surface-container-low p-5 rounded-2xl border-l-4 border-primary">
+                                <p class="text-sm text-on-surface leading-relaxed whitespace-pre-wrap break-words">@message.Content</p>
+                            </div>
+                            break;
+                    }
+                    <div class="mt-2 ml-1 flex items-center gap-1.5 text-[11px] font-bold text-primary">
+                        <span class="material-symbols-outlined" style="font-size: 12px;">schedule</span>
+                        @message.CreatedAt.ToLocalTime().ToString("HH:mm")
+                    </div>
+                </div>
+            }
         }
     </div>
 
-    <footer class="border-t border-gray-200 px-6 py-4">
-        <div class="space-y-2">
-            <div class="relative rounded-lg border border-dashed border-gray-300 p-3 text-xs text-gray-500 @(_isDragging ? "ring-2 ring-indigo-300" : string.Empty)"
-                 role="region"
-                 aria-label="文件上传区域"
-                 tabindex="0"
-                 @ondragenter="OnDragEnter"
-                 @ondragleave="OnDragLeave"
-                 @ondragover:preventDefault
-                 @ondrop="OnDragLeave">
-                拖拽文件到此处可自动发送
-                <InputFile class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                           aria-label="拖拽或选择文件上传"
-                           multiple
-                           OnChange="OnFilesSelected" />
+    @* ─────────── 拖放覆盖层（整个聊天框作为拖放目标）─────────── *@
+    @if (_isDragging)
+    {
+        <div class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
+             style="background: rgba(0,80,203,0.08); backdrop-filter: blur(4px);">
+            <div class="pointer-events-none flex flex-col items-center gap-3 text-primary">
+                <span class="material-symbols-outlined text-6xl" style="font-variation-settings: 'FILL' 1;">upload_file</span>
+                <p class="text-lg font-bold font-headline">拖放文件到此处发送</p>
+            </div>
+            <InputFile class="absolute inset-0 h-full w-full cursor-copy opacity-0"
+                       multiple
+                       OnChange="OnFilesDropped" />
+        </div>
+    }
+
+    @* ─────────── 输入区 ─────────── *@
+    <footer class="p-4 bg-surface-container-low">
+        <div class="flex items-end gap-3 bg-surface-container-lowest p-3 rounded-[2rem]"
+             style="box-shadow: 0 8px 32px rgba(25,28,29,0.06);">
+            @* 附件按钮 *@
+            <div class="flex gap-1 px-1 mb-1">
+                <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                       title="上传图片或视频">
+                    <span class="material-symbols-outlined">image</span>
+                    <InputFile class="hidden" multiple accept="image/*,video/*" OnChange="OnFilesSelected" />
+                </label>
+                <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                       title="上传附件">
+                    <span class="material-symbols-outlined">attachment</span>
+                    <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
+                </label>
             </div>
 
-            <textarea
-                class="h-28 w-full rounded-lg border border-gray-300 p-3 text-sm outline-none ring-indigo-200 transition focus:ring"
-                placeholder="Type a message..."
-                maxlength="10000"
-                @bind="_inputText"
-                @onkeydown="HandleKeyDown" />
+            @* 文本输入 *@
+            <div class="flex-1 min-w-0">
+                <textarea class="w-full resize-none bg-transparent py-2 px-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/50"
+                          style="border: none; max-height: 8rem; field-sizing: content;"
+                          placeholder="输入消息，或拖入文件到聊天区域…（Ctrl+Enter 发送）"
+                          maxlength="10000"
+                          rows="1"
+                          @bind="_inputText"
+                          @bind:event="oninput"
+                          @onkeydown="HandleKeyDown"></textarea>
+                @if (!string.IsNullOrWhiteSpace(_validationError))
+                {
+                    <p class="px-2 text-xs text-error">@_validationError</p>
+                }
+            </div>
 
-            @if (!string.IsNullOrWhiteSpace(_validationError))
-            {
-                <p class="text-sm text-red-600">@_validationError</p>
-            }
-
-            <div class="flex justify-end gap-2">
-                <label class="inline-flex cursor-pointer items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                       aria-label="上传图片或视频">
-                    📷/🎬
-                    <InputFile class="hidden"
-                               multiple
-                               accept="image/*,video/*"
-                               OnChange="OnFilesSelected" />
-                </label>
-                <label class="inline-flex cursor-pointer items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                       aria-label="上传附件">
-                    📎
-                    <InputFile class="hidden"
-                               multiple
-                               OnChange="OnFilesSelected" />
-                </label>
-                <button type="button" class="btn-primary" disabled="@_isSending" @onclick="SendAsync">Send</button>
+            @* 发送按钮 *@
+            <div class="mb-1 mr-1">
+                <button type="button"
+                        class="flex h-10 w-10 items-center justify-center rounded-full text-white shadow-md transition-all active:scale-90 disabled:opacity-50"
+                        style="background: linear-gradient(135deg, #0050cb, #0066ff);"
+                        disabled="@_isSending"
+                        @onclick="SendAsync">
+                    <span class="material-symbols-outlined font-bold"
+                          style="font-variation-settings: 'FILL' 1;">arrow_upward</span>
+                </button>
             </div>
         </div>
+        <p class="mt-3 text-center text-[10px] font-medium text-on-surface-variant opacity-50">
+            拖放文件到聊天区域可快速发送
+        </p>
     </footer>
+
 </section>
