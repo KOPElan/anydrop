@@ -22,6 +22,8 @@ public partial class Home : IAsyncDisposable
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
+    // O(1) 消息去重：避免 SignalR 推送与主动刷新产生重复条目
+    private readonly HashSet<Guid> _messageIds = [];
     private HubConnection? _hubConnection;
     private CancellationTokenSource? _pollingCts;
     private Task? _pollingTask;
@@ -78,10 +80,10 @@ public partial class Home : IAsyncDisposable
             {
                 return InvokeAsync(async () =>
                 {
-                    // 只处理当前主题的消息，且去重避免与主动刷新产生重复
+                    // 只处理当前主题的消息，且 O(1) 去重，避免与主动刷新产生重复
                     if (_selectedTopicId.HasValue
                         && dto.TopicId == _selectedTopicId
-                        && !_messages.Any(m => m.Id == dto.Id))
+                        && _messageIds.Add(dto.Id))
                     {
                         _messages.Add(dto); // 追加到末尾，保持时间升序（最新在底）
                         _shouldScrollToBottom = true;
@@ -109,9 +111,13 @@ public partial class Home : IAsyncDisposable
             {
                 await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
             }
-            catch
+            catch (JSDisconnectedException)
             {
-                // Ignore JS interop errors during scroll (e.g., component being disposed).
+                Logger.LogDebug("JS interop disconnected during scrollToBottom — component is being disposed.");
+            }
+            catch (TaskCanceledException)
+            {
+                Logger.LogDebug("scrollToBottom was cancelled — component is being disposed.");
             }
         }
     }
@@ -215,6 +221,20 @@ public partial class Home : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // 清理 JS 拖放事件监听器，防止内存泄漏
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.cleanupDropZone", _chatSectionRef);
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogDebug("JS interop disconnected during cleanupDropZone — component is being disposed.");
+        }
+        catch (TaskCanceledException)
+        {
+            Logger.LogDebug("cleanupDropZone was cancelled — component is being disposed.");
+        }
+
         _dotNetRef?.Dispose();
 
         _pollingCts?.Cancel();
@@ -255,6 +275,7 @@ public partial class Home : IAsyncDisposable
     private async Task LoadSelectedTopicMessagesAsync(CancellationToken ct = default)
     {
         _messages.Clear();
+        _messageIds.Clear();
         if (!_selectedTopicId.HasValue)
         {
             return;
@@ -267,8 +288,15 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
-        // 服务端返回最新 N 条（降序），这里逆序后使列表保持时间升序（最旧在顶，最新在底）
-        _messages.AddRange(response.Messages.Reverse());
+        // 服务端返回最新 N 条（降序），逆序后使列表保持时间升序（最旧在顶，最新在底）
+        foreach (var msg in response.Messages.Reverse())
+        {
+            if (_messageIds.Add(msg.Id))
+            {
+                _messages.Add(msg);
+            }
+        }
+
         _shouldScrollToBottom = true;
     }
 
