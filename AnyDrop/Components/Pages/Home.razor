@@ -32,8 +32,7 @@
     @* ─────────── 消息列表（覆盖整个 section，顶/底留出玻璃栏高度）─────────── *@
     <div @ref="_messageListRef"
          id="message-list"
-         class="absolute inset-0 overflow-y-auto px-6 space-y-6"
-         style="padding-top: 80px; padding-bottom: 120px;">
+         class="absolute inset-0 overflow-y-auto px-6 space-y-6 chat-message-list">
         @if (!_selectedTopicId.HasValue)
         {
             <div class="flex h-full flex-col items-center justify-center text-center">

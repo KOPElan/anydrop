@@ -44,7 +44,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
     {
         var topics = await dbContext.Topics
             .Where(x => x.IsArchived)
-            .OrderByDescending(x => x.ArchivedAt)
+            .OrderByDescending(x => x.ArchivedAt ?? x.CreatedAt)
             .AsNoTracking()
             .ToListAsync(ct);
 

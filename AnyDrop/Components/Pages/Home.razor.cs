@@ -251,20 +251,30 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
+        var archiving = !_selectedTopicArchived;
+
         try
         {
-            await TopicService.ArchiveTopicAsync(_selectedTopicId.Value, !_selectedTopicArchived);
+            await TopicService.ArchiveTopicAsync(_selectedTopicId.Value, archiving);
             CloseTopicSettingsModal();
 
-            // 归档后清空聊天区（主题不再显示在普通列表）
-            _selectedTopicId = null;
-            _selectedTopicName = null;
-            _selectedTopicPinned = false;
-            _selectedTopicArchived = false;
-            _selectedTopicIsBuiltIn = false;
-            _selectedTopicMessageCount = 0;
-            _messages.Clear();
-            _messageIds.Clear();
+            // 归档后主题从普通列表消失，清空聊天区
+            if (archiving)
+            {
+                _selectedTopicId = null;
+                _selectedTopicName = null;
+                _selectedTopicPinned = false;
+                _selectedTopicArchived = false;
+                _selectedTopicIsBuiltIn = false;
+                _selectedTopicMessageCount = 0;
+                _messages.Clear();
+                _messageIds.Clear();
+            }
+            else
+            {
+                // 取消归档：刷新元数据，主题重新出现在普通列表
+                await LoadSelectedTopicMetaAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -483,11 +493,11 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
-        // 检索所有主题（含归档）以获取完整元数据
+        // 先从普通列表中查找；找不到再从归档列表查找。
+        // 两次调用已分别走各自的 DB 查询过滤，分布在不同场景的结果集较小。
         var allTopics = await TopicService.GetAllTopicsAsync(ct);
         var topic = allTopics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
 
-        // 若在普通列表中找不到，再检索归档列表
         if (topic is null)
         {
             var archivedTopics = await TopicService.GetArchivedTopicsAsync(ct);
