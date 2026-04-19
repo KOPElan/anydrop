@@ -1,12 +1,14 @@
 @inherits LayoutComponentBase
 
 <div class="app-shell">
-    <aside class="sidebar bg-[var(--color-sidebar)] p-4">
-        <div class="text-sm font-semibold text-gray-700">AnyDrop</div>
+    <aside class="sidebar border-r border-gray-200 bg-[var(--color-sidebar)]">
+        <TopicSidebar OnTopicSelected="HandleTopicSelectedAsync" />
     </aside>
 
     <main class="flex flex-col overflow-hidden">
-        @Body
+        <CascadingValue Value="_selectedTopicId">
+            @Body
+        </CascadingValue>
     </main>
 </div>
 
@@ -15,3 +17,13 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private Guid? _selectedTopicId;
+
+    private Task HandleTopicSelectedAsync(Guid? topicId)
+    {
+        _selectedTopicId = topicId;
+        return Task.CompletedTask;
+    }
+}

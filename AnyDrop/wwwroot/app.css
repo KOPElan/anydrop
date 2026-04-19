@@ -20,9 +20,64 @@
         @apply rounded-lg bg-[var(--color-brand)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-60;
     }
 
+    .btn-secondary {
+        @apply rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    /* 侧边栏主题项 */
+    .sidebar-item {
+        @apply w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/80 cursor-pointer;
+    }
+
+    .sidebar-item--active {
+        @apply bg-white shadow-sm ring-1 ring-indigo-200 hover:bg-white;
+    }
+
+    .sidebar-item__header {
+        @apply flex items-center gap-1;
+    }
+
+    .sidebar-item__name {
+        @apply flex-1 truncate text-sm font-medium text-gray-800;
+    }
+
+    .sidebar-item--active .sidebar-item__name {
+        @apply text-indigo-700;
+    }
+
+    .sidebar-item__time {
+        @apply shrink-0 text-[11px] text-gray-400;
+    }
+
+    .sidebar-item__preview {
+        @apply mt-0.5 truncate text-xs text-gray-500;
+    }
+
+    .sidebar-empty-state {
+        @apply rounded-lg border border-dashed border-gray-300 p-4 text-xs text-gray-500;
+    }
+
+    /* Modal */
+    .modal-overlay {
+        @apply fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm;
+    }
+
+    .modal-content {
+        @apply w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl mx-4;
+    }
+
+    .modal-title {
+        @apply text-base font-semibold text-gray-800;
+    }
+
+    .modal-actions {
+        @apply flex justify-end gap-2;
+    }
+
+    /* 整体布局 */
     .app-shell {
         @apply grid h-screen;
-        grid-template-columns: 16rem 1fr;
+        grid-template-columns: 15rem 1fr;
     }
 
     @media (max-width: 768px) {
@@ -35,3 +90,4 @@
         }
     }
 }
+
