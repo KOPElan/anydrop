@@ -29,7 +29,9 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
                 t.SortOrder,
                 t.CreatedAt,
                 t.LastMessageAt,
-                counts.GetValueOrDefault(t.Id, 0)))
+                counts.GetValueOrDefault(t.Id, 0),
+                t.IsBuiltIn,
+                t.LastMessagePreview))
             .ToList();
     }
 
@@ -48,7 +50,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
         await BroadcastTopicsUpdatedAsync(ct);
 
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, 0);
+        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, 0, topic.IsBuiltIn, topic.LastMessagePreview);
     }
 
     public async Task<TopicDto?> UpdateTopicAsync(Guid topicId, UpdateTopicRequest request, CancellationToken ct = default)
@@ -64,13 +66,19 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount);
+        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview);
     }
 
     public async Task<bool> DeleteTopicAsync(Guid topicId, CancellationToken ct = default)
     {
         var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct);
         if (topic is null)
+        {
+            return false;
+        }
+
+        // Protect built-in topics from deletion.
+        if (topic.IsBuiltIn)
         {
             return false;
         }

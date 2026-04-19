@@ -23,12 +23,16 @@ public class TopicSidebarTests(E2ETestFixture fixture)
         var topicA = $"主题A-{Guid.NewGuid():N}";
         var topicB = $"主题B-{Guid.NewGuid():N}";
 
-        await pageA.FillAsync("input[placeholder='输入主题名称（最多100字）']", topicA);
-        await pageA.ClickAsync("button:has-text('+ 新建主题')");
+        // 通过图标按钮打开 Modal 创建主题 A
+        await pageA.ClickAsync("button[aria-label='新建主题']");
+        await pageA.FillAsync(".modal-content input[placeholder='输入主题名称（最多100字）']", topicA);
+        await pageA.ClickAsync(".modal-content button:has-text('创建')");
         await pageA.WaitForSelectorAsync($"button[data-id] >> text={topicA}");
 
-        await pageA.FillAsync("input[placeholder='输入主题名称（最多100字）']", topicB);
-        await pageA.ClickAsync("button:has-text('+ 新建主题')");
+        // 通过图标按钮打开 Modal 创建主题 B
+        await pageA.ClickAsync("button[aria-label='新建主题']");
+        await pageA.FillAsync(".modal-content input[placeholder='输入主题名称（最多100字）']", topicB);
+        await pageA.ClickAsync(".modal-content button:has-text('创建')");
         await pageA.WaitForSelectorAsync($"button[data-id] >> text={topicB}");
 
         await pageA.ClickAsync($"button:has-text('{topicB}')");

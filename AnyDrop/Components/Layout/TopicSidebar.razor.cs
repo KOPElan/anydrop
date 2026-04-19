@@ -21,9 +21,16 @@ public partial class TopicSidebar : IAsyncDisposable
     private IDisposable? _topicsUpdatedSubscription;
     private DotNetObjectReference<TopicSidebar>? _dotNetRef;
     private Guid? _selectedTopicId;
-    private string _newTopicName = string.Empty;
-    private string? _error;
     private bool _sortableInitialized;
+
+    // 排序错误提示
+    private string? _error;
+
+    // Modal 状态
+    private bool _showCreateModal;
+    private string _newTopicName = string.Empty;
+    private string? _modalError;
+    private ElementReference _modalInputRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -43,14 +50,28 @@ public partial class TopicSidebar : IAsyncDisposable
         _sortableInitialized = true;
     }
 
+    private void OpenCreateModal()
+    {
+        _newTopicName = string.Empty;
+        _modalError = null;
+        _showCreateModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        _showCreateModal = false;
+        _newTopicName = string.Empty;
+        _modalError = null;
+    }
+
     private async Task CreateTopicAsync()
     {
-        _error = null;
+        _modalError = null;
 
         var normalizedName = _newTopicName.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 100)
         {
-            _error = "主题名称不能为空，且不超过 100 个字符";
+            _modalError = "主题名称不能为空，且不超过 100 个字符";
             return;
         }
 
@@ -58,6 +79,7 @@ public partial class TopicSidebar : IAsyncDisposable
         {
             var topic = await TopicService.CreateTopicAsync(new CreateTopicRequest(normalizedName));
             _newTopicName = string.Empty;
+            _showCreateModal = false;
             await LoadTopicsAsync();
             _selectedTopicId = topic.Id;
             await OnTopicSelected.InvokeAsync(_selectedTopicId);
@@ -66,7 +88,7 @@ public partial class TopicSidebar : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to create topic");
-            _error = "创建主题失败";
+            _modalError = "创建主题失败";
         }
     }
 
@@ -124,7 +146,13 @@ public partial class TopicSidebar : IAsyncDisposable
         if (_selectedTopicId.HasValue && !_topics.Any(t => t.Id == _selectedTopicId.Value))
         {
             _selectedTopicId = null;
-            await OnTopicSelected.InvokeAsync(null);
+        }
+
+        // 若尚未选中任何主题，自动选中第一个（通常为内置"默认"主题）
+        if (!_selectedTopicId.HasValue && _topics.Count > 0)
+        {
+            _selectedTopicId = _topics[0].Id;
+            await OnTopicSelected.InvokeAsync(_selectedTopicId);
         }
     }
 

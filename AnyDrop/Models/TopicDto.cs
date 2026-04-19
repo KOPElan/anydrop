@@ -6,7 +6,9 @@ public sealed record TopicDto(
     int SortOrder,
     DateTimeOffset CreatedAt,
     DateTimeOffset? LastMessageAt,
-    int MessageCount
+    int MessageCount,
+    bool IsBuiltIn,
+    string? LastMessagePreview
 );
 
 public sealed record CreateTopicRequest(string Name);

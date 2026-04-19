@@ -15,6 +15,8 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
             entity.Property(e => e.SortOrder).IsRequired();
+            entity.Property(e => e.IsBuiltIn).IsRequired();
+            entity.Property(e => e.LastMessagePreview).HasMaxLength(100);
             entity.Property(e => e.CreatedAt)
                 .HasConversion(
                     value => value.ToString("O"),
@@ -25,6 +27,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                     value => value == null ? null : DateTimeOffset.Parse(value));
             entity.HasIndex(e => new { e.SortOrder, e.LastMessageAt });
             entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.IsBuiltIn);
         });
 
         modelBuilder.Entity<ShareItem>(entity =>

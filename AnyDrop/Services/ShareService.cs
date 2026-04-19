@@ -47,6 +47,7 @@ public sealed class ShareService(
         if (topic is not null)
         {
             topic.LastMessageAt = now;
+            topic.LastMessagePreview = BuildPreview(normalizedContent);
         }
 
         dbContext.ShareItems.Add(item);
@@ -75,5 +76,11 @@ public sealed class ShareService(
             .Take(safeCount)
             .Select(x => x.ToDto())
             .ToListAsync(ct);
+    }
+
+    private static string BuildPreview(string content)
+    {
+        const int maxLen = 80;
+        return content.Length > maxLen ? string.Concat(content.AsSpan(0, maxLen), "…") : content;
     }
 }
