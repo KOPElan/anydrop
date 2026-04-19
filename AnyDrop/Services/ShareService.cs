@@ -12,6 +12,7 @@ public sealed class ShareService(
     ITopicService topicService,
     IFileStorageService fileStorageService,
     LinkMetadataService linkMetadataService,
+    ISystemSettingsService systemSettingsService,
     IServiceScopeFactory scopeFactory) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
@@ -69,7 +70,7 @@ public sealed class ShareService(
         }
 
         // 异步抓取 OGP 元数据并更新，不阻塞本次返回
-        if (isLink)
+        if (isLink && await systemSettingsService.IsAutoFetchLinkPreviewEnabledAsync(ct))
         {
             _ = FetchAndUpdateLinkMetadataAsync(item.Id, normalizedContent);
         }

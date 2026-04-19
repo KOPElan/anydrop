@@ -7,7 +7,7 @@ public static class TopicEndpoints
 {
     public static IEndpointRouteBuilder MapTopicEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/topics").WithTags("Topics");
+        var group = app.MapGroup("/api/v1/topics").WithTags("Topics").RequireAuthorization();
 
         group.MapGet("/", GetAllTopicsAsync);
         group.MapGet("/archived", GetArchivedTopicsAsync);

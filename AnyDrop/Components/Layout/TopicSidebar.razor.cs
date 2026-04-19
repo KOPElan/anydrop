@@ -1,6 +1,7 @@
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
@@ -13,6 +14,7 @@ public partial class TopicSidebar : IAsyncDisposable
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ILogger<TopicSidebar> Logger { get; set; }
+    [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
 
     [Parameter] public EventCallback<Guid?> OnTopicSelected { get; set; }
 
@@ -34,9 +36,12 @@ public partial class TopicSidebar : IAsyncDisposable
     // 已归档主题下拉状态
     private bool _showArchivedDropdown;
     private readonly List<TopicDto> _archivedTopics = [];
+    private string _nickname = "用户";
 
     protected override async Task OnInitializedAsync()
     {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _nickname = state.User.FindFirst("nickname")?.Value ?? state.User.Identity?.Name ?? "用户";
         await LoadTopicsAsync();
         await InitializeHubAsync();
     }
@@ -224,6 +229,22 @@ public partial class TopicSidebar : IAsyncDisposable
         }
     }
 
+    private void OpenSettings() => NavigationManager.NavigateTo("/settings");
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            await JS.InvokeAsync<object>("authInterop.postJson", "/api/v1/auth/logout", new { });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Logout request failed; navigating to login page anyway.");
+        }
+
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
     public async ValueTask DisposeAsync()
     {
         _topicsUpdatedSubscription?.Dispose();
@@ -249,4 +270,3 @@ public partial class TopicSidebar : IAsyncDisposable
         }
     }
 }
-

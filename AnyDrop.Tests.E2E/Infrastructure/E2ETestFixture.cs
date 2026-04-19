@@ -58,7 +58,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
             try
             {
-                var response = await client.GetAsync(BaseUrl);
+                var response = await client.GetAsync($"{BaseUrl}/api/v1/auth/setup-status");
                 if (response.IsSuccessStatusCode)
                 {
                     return;

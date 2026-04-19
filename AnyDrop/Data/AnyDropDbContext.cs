@@ -7,6 +7,8 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
 {
     public DbSet<ShareItem> ShareItems => Set<ShareItem>();
     public DbSet<Topic> Topics => Set<Topic>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +62,47 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 .WithMany()
                 .HasForeignKey(e => e.TopicId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Nickname).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.PasswordHash).IsRequired();
+            entity.Property(e => e.PasswordSalt).IsRequired();
+            entity.Property(e => e.SessionVersion).HasDefaultValue(1);
+            entity.Property(e => e.CreatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.LastLoginAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.Property(e => e.UpdatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+
+            // 单用户语义：固定唯一值索引，保证只有一条记录可插入
+            entity.Property<int>("SingletonKey").HasDefaultValue(1);
+            entity.HasIndex("SingletonKey").IsUnique();
+        });
+
+        modelBuilder.Entity<SystemSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AutoFetchLinkPreview).HasDefaultValue(true);
+            entity.Property(e => e.UpdatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.HasData(new SystemSettings
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                AutoFetchLinkPreview = true,
+                UpdatedAt = DateTimeOffset.Parse("2026-04-19T00:00:00Z")
+            });
         });
     }
 }
