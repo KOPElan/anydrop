@@ -41,8 +41,19 @@ public partial class Home : IAsyncDisposable
     // 主题设置 Modal 状态
     private bool _showTopicSettingsModal;
     private string _topicSettingsName = string.Empty;
+    private string _topicSettingsIcon = "chat_bubble";
     private string? _topicSettingsError;
     private ElementReference _topicSettingsInputRef;
+
+    // 可选图标列表
+    private readonly string[] _availableIcons =
+    [
+        "chat_bubble", "bookmark", "work", "home", "favorite",
+        "school", "sports_esports", "code", "music_note", "restaurant",
+        "flight", "local_cafe", "shopping_cart", "cake", "pets",
+        "directions_car", "movie", "explore", "star", "lightbulb",
+        "beach_access", "fitness_center", "palette", "public", "emoji_events"
+    ];
 
     // 图片大图预览 Modal
     private string? _previewImageUrl;
@@ -205,8 +216,49 @@ public partial class Home : IAsyncDisposable
     private void OpenTopicSettingsModal()
     {
         _topicSettingsName = _selectedTopicName ?? string.Empty;
+        _topicSettingsIcon = "chat_bubble"; // Default icon, could be loaded from topic metadata
         _topicSettingsError = null;
         _showTopicSettingsModal = true;
+    }
+
+    /// <summary>选择图标。</summary>
+    private void SelectIcon(string icon)
+    {
+        _topicSettingsIcon = icon;
+    }
+
+    /// <summary>保存主题图标。</summary>
+    private async Task SaveTopicIconAsync()
+    {
+        // TODO: Implement icon saving to Topic model when Icon field is added
+        // For now, just show a success message
+        _topicSettingsError = null;
+        await Task.CompletedTask;
+        // 图标保存功能需要扩展 Topic 模型和数据库架构
+    }
+
+    /// <summary>切换当前主题的置顶状态。</summary>
+    private async Task TogglePinCurrentTopicAsync()
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            return;
+        }
+
+        var pinning = !_selectedTopicPinned;
+
+        try
+        {
+            await TopicService.PinTopicAsync(_selectedTopicId.Value, pinning);
+            _selectedTopicPinned = pinning;
+            await LoadSelectedTopicMetaAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to pin/unpin topic {TopicId}", _selectedTopicId);
+            _topicSettingsError = "操作失败，请重试。";
+        }
     }
 
     /// <summary>关闭主题设置 Modal。</summary>

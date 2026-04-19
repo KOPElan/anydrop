@@ -233,6 +233,8 @@
         @apply w-full max-w-sm rounded-2xl p-6 shadow-xl mx-4;
         background-color: var(--color-surface-container-lowest);
         animation: modal-slide-up 280ms var(--ease-bounce) both;
+        max-height: 90vh;
+        overflow-y: auto;
     }
 
     .modal-title {
@@ -252,23 +254,28 @@
 
     /* ─── 消息气泡 hover 高亮 ─── */
     .message-bubble:hover {
-        /* 轻微上移 + 阴影增强，给明确的 hover 焦点提示 */
-        transform: translateY(-1px);
-        transition: transform 150ms ease, box-shadow 150ms ease;
+        /* 漂浮效果：上移 2px + 阴影增强 */
+        transform: translateY(-2px);
+        transition: transform 200ms ease, box-shadow 200ms ease;
+    }
+
+    /* ─── 阅后即焚消息背景标识 ─── */
+    .burn-after-reading > div {
+        background: rgba(255, 218, 214, 0.5) !important;
     }
 
     /* 文本消息气泡 hover */
-    .bubble-text:hover {
+    .message-bubble:hover .bubble-text {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
 
     /* 链接卡片 hover */
-    .bubble-link:hover {
+    .message-bubble:hover .bubble-link {
         box-shadow: 0 6px 20px rgba(0, 80, 203, 0.12);
     }
 
     /* 文件/图片/视频气泡 hover */
-    .bubble-file:hover {
+    .message-bubble:hover .bubble-file {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
     }
 
@@ -276,7 +283,7 @@
     .chat-message-list {
         /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
         --chat-header-h: 72px;
-        --chat-footer-h: 110px;
+        --chat-footer-h: 140px;
         padding-top: var(--chat-header-h);
         padding-bottom: var(--chat-footer-h);
     }
