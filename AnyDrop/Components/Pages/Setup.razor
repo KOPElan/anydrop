@@ -8,7 +8,7 @@
     <h1 class="text-xl font-bold">首次配置</h1>
     <p class="mt-1 text-sm text-gray-500">创建唯一管理员账号。</p>
 
-    <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="setup" class="mt-6 space-y-4">
+    <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="setup" @onsubmit:preventDefault class="mt-6 space-y-4">
         <DataAnnotationsValidator />
         <div>
             <label class="mb-1 block text-sm font-medium">昵称</label>
@@ -26,6 +26,6 @@
         {
             <p class="text-sm text-red-600">@_error</p>
         }
-        <button type="submit" class="w-full rounded-xl bg-blue-600 px-4 py-2 font-medium text-white" disabled="@_submitting">创建并登录</button>
+        <button type="submit" class="w-full rounded-xl bg-blue-600 px-4 py-2 font-medium text-white" disabled="@(_submitting || !_isInteractive)">创建并登录</button>
     </EditForm>
 </section>

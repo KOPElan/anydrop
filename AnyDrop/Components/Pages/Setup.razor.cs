@@ -15,6 +15,7 @@ public partial class Setup
 
     private readonly SetupFormModel _model = new();
     private bool _submitting;
+    private bool _isInteractive;
     private string? _error;
 
     protected override async Task OnInitializedAsync()
@@ -24,6 +25,18 @@ public partial class Setup
         {
             NavigationManager.NavigateTo("/login", forceLoad: true);
         }
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return Task.CompletedTask;
+        }
+
+        _isInteractive = true;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task HandleSubmitAsync()

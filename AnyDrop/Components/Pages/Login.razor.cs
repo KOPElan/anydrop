@@ -13,6 +13,7 @@ public partial class Login
 
     private readonly LoginFormModel _model = new();
     private bool _submitting;
+    private bool _isInteractive;
     private string? _error;
     private string _returnUrl = "/";
 
@@ -23,8 +24,16 @@ public partial class Login
         _returnUrl = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl!;
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _isInteractive = true;
+        StateHasChanged();
+
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/auth/me");
         if (result.ok)
         {
