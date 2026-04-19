@@ -107,11 +107,13 @@ AnyDropInterop.cleanupDropZone = function (element) {
 /**
  * 将滚动容器滚动到底部（用于聊天消息列表）。
  * 额外在 300ms 后再次滚动，确保图片等异步内容加载后仍然处于底部。
+ * 300ms 是实践中覆盖大多数网络图片首次渲染延迟的经验值（< 100ms 通常不够，> 500ms 用户感知明显）。
  * @param {HTMLElement} element - 需要滚动到底的容器
  */
 AnyDropInterop.scrollToBottom = function (element) {
   if (!element) return;
   element.scrollTop = element.scrollHeight;
   // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底
-  setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, 300);
+  const SCROLL_DELAY_MS = 300;
+  setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, SCROLL_DELAY_MS);
 };

@@ -247,7 +247,7 @@ public partial class Home : IAsyncDisposable
 
             await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
             await ShareService.SendFileAsync(stream, fileName, safeMimeType, _selectedTopicId.Value,
-                knownFileSize: fileSize > 0 ? fileSize : null);
+                knownFileSize: fileSize);
 
             await LoadSelectedTopicMessagesAsync();
         }
