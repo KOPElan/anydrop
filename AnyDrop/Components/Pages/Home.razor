@@ -58,7 +58,7 @@
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
-                            <div class="bubble-link bg-surface-container-low p-5 rounded-2xl max-w-full transition-all duration-150">
+                            <div class="bubble-link bg-surface-container-lowest p-5 rounded-2xl max-w-full transition-all duration-150">
                                 <div class="flex items-center gap-2 text-primary mb-3">
                                     <span class="material-symbols-outlined text-sm">link</span>
                                     <span class="text-xs font-semibold uppercase tracking-wide">链接</span>
@@ -168,7 +168,7 @@
                             break;
 
                         default:
-                            <div class="bubble-text bg-surface-container-low p-5 rounded-2xl transition-all duration-150">
+                            <div class="bubble-text bg-surface-container-lowest p-5 rounded-2xl transition-all duration-150">
                                 <p class="text-sm text-on-surface leading-relaxed whitespace-pre-wrap break-words">@message.Content</p>
                             </div>
                             break;

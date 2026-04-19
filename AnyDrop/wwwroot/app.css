@@ -265,17 +265,17 @@
     }
 
     /* 文本消息气泡 hover */
-    .bubble-text:hover {
+    .message-bubble:hover .bubble-text {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
 
     /* 链接卡片 hover */
-    .bubble-link:hover {
+    .message-bubble:hover .bubble-link {
         box-shadow: 0 6px 20px rgba(0, 80, 203, 0.12);
     }
 
     /* 文件/图片/视频气泡 hover */
-    .bubble-file:hover {
+    .message-bubble:hover .bubble-file {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
     }
 
