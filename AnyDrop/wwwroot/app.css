@@ -233,6 +233,8 @@
         @apply w-full max-w-sm rounded-2xl p-6 shadow-xl mx-4;
         background-color: var(--color-surface-container-lowest);
         animation: modal-slide-up 280ms var(--ease-bounce) both;
+        max-height: 90vh;
+        overflow-y: auto;
     }
 
     .modal-title {
