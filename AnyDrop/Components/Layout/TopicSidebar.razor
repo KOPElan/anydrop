@@ -31,7 +31,7 @@
                     class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
                     @onclick="() => SelectTopicAsync(topic.Id)">
                     <div class="sidebar-item__header">
-                        <span class="sidebar-item__name">@topic.Name</span>
+                        <span class="sidebar-item__name">@(topic.IsPinned ? "📌 " : string.Empty)@topic.Name</span>
                         @if (topic.LastMessageAt.HasValue)
                         {
                             <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>

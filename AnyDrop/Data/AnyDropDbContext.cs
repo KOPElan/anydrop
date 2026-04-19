@@ -6,9 +6,33 @@ namespace AnyDrop.Data;
 public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options) : DbContext(options)
 {
     public DbSet<ShareItem> ShareItems => Set<ShareItem>();
+    public DbSet<Topic> Topics => Set<Topic>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Topic>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.LastMessagePreview).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.LastMessageAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.Property(e => e.PinnedAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.IsBuiltIn);
+            entity.HasIndex(e => new { e.SortOrder, e.LastMessageAt });
+            entity.HasIndex(e => new { e.IsPinned, e.PinnedAt, e.LastMessageAt });
+        });
+
         modelBuilder.Entity<ShareItem>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -21,6 +45,11 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                     value => value.UtcDateTime,
                     value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
             entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => new { e.TopicId, e.CreatedAt });
+            entity.HasOne<Topic>()
+                .WithMany()
+                .HasForeignKey(e => e.TopicId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

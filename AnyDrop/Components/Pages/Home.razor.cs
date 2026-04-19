@@ -1,6 +1,8 @@
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 
@@ -8,8 +10,11 @@ namespace AnyDrop.Components.Pages;
 
 public partial class Home : IAsyncDisposable
 {
+    private const long DefaultMaxFileSizeBytes = 100L * 1024 * 1024;
+
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
+    [Inject] public required IConfiguration Configuration { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Home> Logger { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
@@ -21,7 +26,10 @@ public partial class Home : IAsyncDisposable
     private string _inputText = string.Empty;
     private string? _validationError;
     private bool _isSending;
+    private bool _isDragging;
     private Guid? _selectedTopicId;
+    private string? _selectedTopicName;
+    private bool _selectedTopicPinned;
 
     protected override async Task OnInitializedAsync()
     {
@@ -34,6 +42,7 @@ public partial class Home : IAsyncDisposable
         {
             _selectedTopicId = SelectedTopicId;
             await LoadSelectedTopicMessagesAsync();
+            await LoadSelectedTopicMetaAsync();
         }
     }
 
@@ -109,6 +118,55 @@ public partial class Home : IAsyncDisposable
         }
     }
 
+    private async Task TogglePinAsync()
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            return;
+        }
+
+        await TopicService.PinTopicAsync(_selectedTopicId.Value, !_selectedTopicPinned);
+        await LoadSelectedTopicMetaAsync();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey && string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
+        {
+            await SendAsync();
+        }
+    }
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs args)
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            _validationError = "请先选择主题。";
+            return;
+        }
+
+        _validationError = null;
+
+        foreach (var file in args.GetMultipleFiles())
+        {
+            var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
+            await using var stream = file.OpenReadStream(maxAllowedSize: maxFileSize);
+            await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value);
+        }
+
+        await LoadSelectedTopicMessagesAsync();
+    }
+
+    private void OnDragEnter(DragEventArgs _)
+    {
+        _isDragging = true;
+    }
+
+    private void OnDragLeave(DragEventArgs _)
+    {
+        _isDragging = false;
+    }
+
     public async ValueTask DisposeAsync()
     {
         _pollingCts?.Cancel();
@@ -163,4 +221,24 @@ public partial class Home : IAsyncDisposable
 
         _messages.AddRange(response.Messages);
     }
+
+    private async Task LoadSelectedTopicMetaAsync(CancellationToken ct = default)
+    {
+        _selectedTopicName = null;
+        _selectedTopicPinned = false;
+        if (!_selectedTopicId.HasValue)
+        {
+            return;
+        }
+
+        var topics = await TopicService.GetAllTopicsAsync(ct);
+        var topic = topics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
+        _selectedTopicName = topic?.Name;
+        _selectedTopicPinned = topic?.IsPinned == true;
+    }
+
+    private static string GetFileUrl(Guid itemId, bool download = false)
+        => download
+            ? $"/api/v1/share-items/{itemId}/file?download=true"
+            : $"/api/v1/share-items/{itemId}/file";
 }

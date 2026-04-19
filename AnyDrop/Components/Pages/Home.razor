@@ -4,7 +4,17 @@
 
 <section class="flex h-full flex-col">
     <header class="border-b border-gray-200 px-6 py-4">
-        <h1 class="text-lg font-semibold text-gray-900">Shared Text Feed</h1>
+        <div class="flex items-center justify-between gap-3">
+            <h1 class="text-lg font-semibold text-gray-900">@(_selectedTopicName ?? "请选择主题")</h1>
+            @if (_selectedTopicId.HasValue)
+            {
+                <button type="button"
+                        class="rounded-md border px-2 py-1 text-xs font-medium transition hover:bg-gray-50"
+                        @onclick="TogglePinAsync">
+                    @(_selectedTopicPinned ? "取消置顶" : "置顶主题")
+                </button>
+            }
+        </div>
     </header>
 
     <div class="flex-1 overflow-y-auto px-6 py-4" id="timeline">
@@ -23,7 +33,33 @@
                 {
                     <li class="rounded-lg bg-white p-3 shadow-sm ring-1 ring-gray-200">
                         <div class="mb-1 text-xs text-gray-500">@message.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</div>
-                        <div class="whitespace-pre-wrap break-words text-sm text-gray-900">@message.Content</div>
+                        @switch (message.ContentType)
+                        {
+                            case ShareContentType.Link:
+                                <a class="break-all text-sm text-blue-600 underline" href="@message.Content" target="_blank" rel="noopener noreferrer">@message.Content</a>
+                                break;
+                            case ShareContentType.Image:
+                                <div class="space-y-2">
+                                    <img class="max-h-80 rounded-md" src="@GetFileUrl(message.Id)" alt="@message.FileName" />
+                                    <a class="text-xs text-blue-600 underline" href="@GetFileUrl(message.Id, true)">下载图片</a>
+                                </div>
+                                break;
+                            case ShareContentType.Video:
+                                <div class="space-y-2">
+                                    <video class="max-h-80 w-full rounded-md" controls src="@GetFileUrl(message.Id)"></video>
+                                    <a class="text-xs text-blue-600 underline" href="@GetFileUrl(message.Id, true)">下载视频</a>
+                                </div>
+                                break;
+                            case ShareContentType.File:
+                                <div class="space-y-1 text-sm text-gray-900">
+                                    <div>📎 @(message.FileName ?? "附件")</div>
+                                    <a class="text-xs text-blue-600 underline" href="@GetFileUrl(message.Id, true)">下载附件</a>
+                                </div>
+                                break;
+                            default:
+                                <div class="whitespace-pre-wrap break-words text-sm text-gray-900">@message.Content</div>
+                                break;
+                        }
                     </li>
                 }
             </ul>
@@ -32,18 +68,49 @@
 
     <footer class="border-t border-gray-200 px-6 py-4">
         <div class="space-y-2">
+            <div class="relative rounded-lg border border-dashed border-gray-300 p-3 text-xs text-gray-500 @(_isDragging ? "ring-2 ring-indigo-300" : string.Empty)"
+                 role="region"
+                 aria-label="文件上传区域"
+                 tabindex="0"
+                 @ondragenter="OnDragEnter"
+                 @ondragleave="OnDragLeave"
+                 @ondragover:preventDefault
+                 @ondrop="OnDragLeave">
+                拖拽文件到此处可自动发送
+                <InputFile class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                           aria-label="拖拽或选择文件上传"
+                           multiple
+                           OnChange="OnFilesSelected" />
+            </div>
+
             <textarea
                 class="h-28 w-full rounded-lg border border-gray-300 p-3 text-sm outline-none ring-indigo-200 transition focus:ring"
                 placeholder="Type a message..."
                 maxlength="10000"
-                @bind="_inputText" />
+                @bind="_inputText"
+                @onkeydown="HandleKeyDown" />
 
             @if (!string.IsNullOrWhiteSpace(_validationError))
             {
                 <p class="text-sm text-red-600">@_validationError</p>
             }
 
-            <div class="flex justify-end">
+            <div class="flex justify-end gap-2">
+                <label class="inline-flex cursor-pointer items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+                       aria-label="上传图片或视频">
+                    📷/🎬
+                    <InputFile class="hidden"
+                               multiple
+                               accept="image/*,video/*"
+                               OnChange="OnFilesSelected" />
+                </label>
+                <label class="inline-flex cursor-pointer items-center rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+                       aria-label="上传附件">
+                    📎
+                    <InputFile class="hidden"
+                               multiple
+                               OnChange="OnFilesSelected" />
+                </label>
                 <button type="button" class="btn-primary" disabled="@_isSending" @onclick="SendAsync">Send</button>
             </div>
         </div>

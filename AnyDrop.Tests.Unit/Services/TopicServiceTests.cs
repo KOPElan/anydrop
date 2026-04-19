@@ -135,6 +135,59 @@ public class TopicServiceTests
             Times.AtLeast(3));
     }
 
+    [Fact]
+    public async Task PinTopicAsync_WhenPinned_SetsPinnedFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var topic = new Topic { Name = "Pin me" };
+        dbContext.Topics.Add(topic);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _);
+        var result = await service.PinTopicAsync(topic.Id, true);
+
+        result.IsPinned.Should().BeTrue();
+        result.PinnedAt.Should().NotBeNull();
+
+        var entity = await dbContext.Topics.SingleAsync();
+        entity.IsPinned.Should().BeTrue();
+        entity.PinnedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetAllTopicsAsync_WhenPinned_ReturnsPinnedFirst()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTimeOffset.UtcNow;
+        dbContext.Topics.AddRange(
+            new Topic { Name = "Normal", SortOrder = 0, CreatedAt = now, LastMessageAt = now },
+            new Topic { Name = "Pinned", SortOrder = 99, CreatedAt = now, LastMessageAt = now.AddMinutes(-10), IsPinned = true, PinnedAt = now.AddMinutes(-20) });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _);
+        var topics = await service.GetAllTopicsAsync();
+
+        topics[0].Name.Should().Be("Pinned");
+        topics[0].IsPinned.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetAllTopicsAsync_MultiplePinned_SortsByPinnedAtAscending()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTimeOffset.UtcNow;
+        dbContext.Topics.AddRange(
+            new Topic { Name = "Pinned-Late", SortOrder = 0, IsPinned = true, PinnedAt = now.AddMinutes(-1) },
+            new Topic { Name = "Pinned-Early", SortOrder = 0, IsPinned = true, PinnedAt = now.AddMinutes(-10) },
+            new Topic { Name = "Normal", SortOrder = 0 });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _);
+        var topics = await service.GetAllTopicsAsync();
+
+        topics.Select(x => x.Name).Take(2).Should().Equal("Pinned-Early", "Pinned-Late");
+    }
+
     private static AnyDropDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()

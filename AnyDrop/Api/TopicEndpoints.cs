@@ -14,6 +14,7 @@ public static class TopicEndpoints
         group.MapPut("/reorder", ReorderTopicsAsync);
         group.MapGet("/{id:guid}/messages", GetTopicMessagesAsync);
         group.MapPut("/{id:guid}", UpdateTopicAsync);
+        group.MapPut("/{id:guid}/pin", PinTopicAsync);
         group.MapDelete("/{id:guid}", DeleteTopicAsync);
 
         return app;
@@ -76,6 +77,23 @@ public static class TopicEndpoints
         return deleted
             ? Results.NoContent()
             : Results.NotFound(ApiEnvelope<object>.Fail("主题不存在"));
+    }
+
+    private static async Task<IResult> PinTopicAsync(
+        Guid id,
+        PinTopicRequest request,
+        ITopicService topicService,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await topicService.PinTopicAsync(id, request.IsPinned, ct);
+            return Results.Ok(ApiEnvelope<TopicDto>.Ok(result));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"));
+        }
     }
 
     private static async Task<IResult> ReorderTopicsAsync(ReorderTopicsRequest request, ITopicService topicService, CancellationToken ct)

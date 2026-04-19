@@ -31,7 +31,9 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
                 t.LastMessageAt,
                 counts.GetValueOrDefault(t.Id, 0),
                 t.IsBuiltIn,
-                t.LastMessagePreview))
+                t.LastMessagePreview,
+                t.IsPinned,
+                t.PinnedAt))
             .ToList();
     }
 
@@ -50,7 +52,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
         await BroadcastTopicsUpdatedAsync(ct);
 
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, 0, topic.IsBuiltIn, topic.LastMessagePreview);
+        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, 0, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt);
     }
 
     public async Task<TopicDto?> UpdateTopicAsync(Guid topicId, UpdateTopicRequest request, CancellationToken ct = default)
@@ -66,7 +68,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview);
+        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt);
     }
 
     public async Task<bool> DeleteTopicAsync(Guid topicId, CancellationToken ct = default)
@@ -161,6 +163,21 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
     }
 
+    public async Task<TopicDto> PinTopicAsync(Guid topicId, bool isPinned, CancellationToken ct = default)
+    {
+        var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct)
+            ?? throw new KeyNotFoundException("主题不存在");
+
+        topic.IsPinned = isPinned;
+        topic.PinnedAt = isPinned ? DateTimeOffset.UtcNow : null;
+
+        await dbContext.SaveChangesAsync(ct);
+        await BroadcastTopicsUpdatedAsync(ct);
+
+        var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
+        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt);
+    }
+
     public async Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, CancellationToken ct = default)
     {
         var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
@@ -211,7 +228,10 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
     private IQueryable<Topic> BuildOrderedTopicsQuery()
     {
         return dbContext.Topics
-            .OrderBy(x => x.SortOrder)
+            .OrderByDescending(x => x.IsPinned)
+            .ThenBy(x => x.PinnedAt.HasValue ? 0 : 1)
+            .ThenBy(x => x.PinnedAt)
+            .ThenBy(x => x.SortOrder)
             .ThenByDescending(x => x.LastMessageAt ?? DateTimeOffset.MinValue)
             .ThenByDescending(x => x.CreatedAt);
     }

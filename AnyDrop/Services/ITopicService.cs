@@ -14,5 +14,7 @@ public interface ITopicService
 
     Task ReorderTopicsAsync(ReorderTopicsRequest request, CancellationToken ct = default);
 
+    Task<TopicDto> PinTopicAsync(Guid topicId, bool isPinned, CancellationToken ct = default);
+
     Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, CancellationToken ct = default);
 }

@@ -1,30 +1,56 @@
 using AnyDrop.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 
 namespace AnyDrop.Tests.Unit.Services;
 
-public class LocalFileStorageServiceTests
+public class LocalFileStorageServiceTests : IDisposable
 {
-    private readonly LocalFileStorageService _service = new();
+    private readonly string _basePath = Path.Combine(AppContext.BaseDirectory, "test-storage", Guid.NewGuid().ToString("N"));
+    private readonly LocalFileStorageService _service;
 
-    [Fact]
-    public async Task SaveFileAsync_WhenCalled_ThrowsNotImplementedException()
+    public LocalFileStorageServiceTests()
     {
-        var act = () => _service.SaveFileAsync(Stream.Null, "file.txt", "text/plain");
-        await act.Should().ThrowAsync<NotImplementedException>();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Storage:BasePath"] = _basePath
+            })
+            .Build();
+
+        _service = new LocalFileStorageService(configuration);
     }
 
     [Fact]
-    public async Task GetFileAsync_WhenCalled_ThrowsNotImplementedException()
+    public async Task SaveAndGetFileAsync_ShouldRoundTrip()
     {
-        var act = () => _service.GetFileAsync("missing/path");
-        await act.Should().ThrowAsync<NotImplementedException>();
+        await using var source = new MemoryStream([1, 2, 3, 4]);
+        var savedPath = await _service.SaveFileAsync(source, "demo.bin", "application/octet-stream");
+
+        await using var readStream = await _service.GetFileAsync(savedPath);
+        using var reader = new MemoryStream();
+        await readStream.CopyToAsync(reader);
+
+        reader.ToArray().Should().Equal([1, 2, 3, 4]);
     }
 
     [Fact]
-    public async Task DeleteFileAsync_WhenCalled_ThrowsNotImplementedException()
+    public async Task DeleteFileAsync_ShouldRemoveFile()
     {
-        var act = () => _service.DeleteFileAsync("missing/path");
-        await act.Should().ThrowAsync<NotImplementedException>();
+        await using var source = new MemoryStream([8, 9]);
+        var savedPath = await _service.SaveFileAsync(source, "demo.bin", "application/octet-stream");
+
+        await _service.DeleteFileAsync(savedPath);
+
+        var act = () => _service.GetFileAsync(savedPath);
+        await act.Should().ThrowAsync<FileNotFoundException>();
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_basePath))
+        {
+            Directory.Delete(_basePath, true);
+        }
     }
 }
