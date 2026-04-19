@@ -26,4 +26,10 @@ public sealed class Topic
 
     /// <summary>置顶时间（用于置顶主题内排序）。</summary>
     public DateTimeOffset? PinnedAt { get; set; }
+
+    /// <summary>是否已归档（归档后不参与主题排序，不在普通列表中显示）。</summary>
+    public bool IsArchived { get; set; }
+
+    /// <summary>归档时间。</summary>
+    public DateTimeOffset? ArchivedAt { get; set; }
 }

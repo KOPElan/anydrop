@@ -2,12 +2,17 @@
 
 <PageTitle>@(_selectedTopicName ?? "AnyDrop")</PageTitle>
 
+@*
+    聊天主区域：使用 relative + absolute 定位让顶部标题栏和底部输入框
+    始终悬浮于消息列表之上，实现真正的磨砂玻璃遮罩效果。
+    消息列表 absolute inset-0 overflow-y-auto，通过 padding-top/bottom 留出空间。
+*@
 <section @ref="_chatSectionRef"
-         class="flex h-full flex-col relative bg-surface"
+         class="relative h-full overflow-hidden bg-surface"
          @ondragover:preventDefault>
 
-    @* ─────────── 顶部标题栏（磨砂玻璃效果）─────────── *@
-    <header class="sticky top-0 z-40 flex items-center justify-between px-6 py-4 chat-header-glass">
+    @* ─────────── 顶部标题栏（磨砂玻璃效果，absolute 定位覆盖消息列表）─────────── *@
+    <header class="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-4 chat-header-glass">
         <div class="flex items-center gap-3">
             <h2 class="font-headline font-bold text-on-surface text-lg leading-tight">
                 @(_selectedTopicName ?? "选择主题")
@@ -16,18 +21,19 @@
         @if (_selectedTopicId.HasValue)
         {
             <button type="button"
-                    class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors @(_selectedTopicPinned ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container")"
-                    @onclick="TogglePinAsync">
-                <span class="material-symbols-outlined" style="font-size: 16px; font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
-                @(_selectedTopicPinned ? "已置顶" : "置顶")
+                    class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                    title="主题设置"
+                    @onclick="OpenTopicSettingsModal">
+                <span class="material-symbols-outlined" style="font-size: 20px;">build</span>
             </button>
         }
     </header>
 
-    @* ─────────── 消息列表（最新在下，此区域也是拖放目标）─────────── *@
+    @* ─────────── 消息列表（覆盖整个 section，顶/底留出玻璃栏高度）─────────── *@
     <div @ref="_messageListRef"
          id="message-list"
-         class="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+         class="absolute inset-0 overflow-y-auto px-6 space-y-6"
+         style="padding-top: 80px; padding-bottom: 120px;">
         @if (!_selectedTopicId.HasValue)
         {
             <div class="flex h-full flex-col items-center justify-center text-center">
@@ -176,10 +182,10 @@
         }
     </div>
 
-    @* ─────────── 拖放覆盖层（纯视觉提示，pointer-events-none 确保 drop 事件透传到聊天区域）─────────── *@
+    @* ─────────── 拖放覆盖层（纯视觉提示）─────────── *@
     @if (_isDragging)
     {
-        <div class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 pointer-events-none"
+        <div class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 pointer-events-none"
              style="background: rgba(0,80,203,0.08); backdrop-filter: blur(4px);">
             <div class="flex flex-col items-center gap-3 text-primary">
                 <span class="material-symbols-outlined text-6xl" style="font-variation-settings: 'FILL' 1;">upload_file</span>
@@ -206,8 +212,74 @@
         </div>
     }
 
-    @* ─────────── 输入区（磨砂玻璃效果）─────────── *@
-    <footer class="p-4 chat-footer-glass">
+    @* ─────────── 主题设置 Modal ─────────── *@
+    @if (_showTopicSettingsModal)
+    {
+        <div class="modal-overlay" @onclick="CloseTopicSettingsModal">
+            <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-topic-settings-title" @onclick:stopPropagation>
+                <h3 id="modal-topic-settings-title" class="modal-title">主题设置</h3>
+
+                @* 改名 *@
+                <div class="mt-4">
+                    <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题名称</label>
+                    <div class="flex gap-2">
+                        <input class="flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                               style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
+                               maxlength="100"
+                               @bind="_topicSettingsName"
+                               @ref="_topicSettingsInputRef" />
+                        <button type="button" class="btn-primary shrink-0" @onclick="SaveTopicNameAsync">保存</button>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_topicSettingsError))
+                    {
+                        <p class="mt-1 text-xs" style="color: var(--color-error);">@_topicSettingsError</p>
+                    }
+                </div>
+
+                @* 分隔线 *@
+                <div class="my-4 border-t" style="border-color: var(--color-outline-variant);"></div>
+
+                @* 操作按钮 *@
+                <div class="space-y-2">
+                    @* 归档 / 取消归档 *@
+                    <button type="button"
+                            class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-surface-container"
+                            style="color: var(--color-on-surface-variant);"
+                            @onclick="ArchiveCurrentTopicAsync">
+                        <span class="material-symbols-outlined text-base">@(_selectedTopicArchived ? "unarchive" : "archive")</span>
+                        @(_selectedTopicArchived ? "取消归档" : "归档主题")
+                    </button>
+
+                    @* 删除（仅在无内容时可操作）*@
+                    @if (_selectedTopicMessageCount == 0 && !_selectedTopicIsBuiltIn)
+                    {
+                        <button type="button"
+                                class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-error-container/20"
+                                style="color: var(--color-error);"
+                                @onclick="DeleteCurrentTopicAsync">
+                            <span class="material-symbols-outlined text-base">delete</span>
+                            删除主题
+                        </button>
+                    }
+                    else if (!_selectedTopicIsBuiltIn && _selectedTopicMessageCount > 0)
+                    {
+                        <div class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm opacity-40 cursor-not-allowed"
+                             style="color: var(--color-error);" title="主题有消息时无法删除，请先归档">
+                            <span class="material-symbols-outlined text-base">delete</span>
+                            删除主题（有内容，不可删除）
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-actions mt-4">
+                    <button type="button" class="btn-secondary" @onclick="CloseTopicSettingsModal">关闭</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ─────────── 输入区（磨砂玻璃效果，absolute 定位覆盖消息列表底部）─────────── *@
+    <footer class="absolute inset-x-0 bottom-0 z-40 p-4 chat-footer-glass">
         <div class="flex items-end gap-3 bg-surface-container-lowest p-3 rounded-[2rem]"
              style="box-shadow: 0 8px 32px rgba(25,28,29,0.06);">
             @* 附件按钮 *@
@@ -258,4 +330,5 @@
     </footer>
 
 </section>
+
 

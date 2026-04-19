@@ -31,6 +31,10 @@ public partial class TopicSidebar : IAsyncDisposable
     private string? _modalError;
     private ElementReference _modalInputRef;
 
+    // 已归档主题下拉状态
+    private bool _showArchivedDropdown;
+    private readonly List<TopicDto> _archivedTopics = [];
+
     protected override async Task OnInitializedAsync()
     {
         await LoadTopicsAsync();
@@ -183,6 +187,16 @@ public partial class TopicSidebar : IAsyncDisposable
             var defaultTopic = _topics.FirstOrDefault(t => t.IsBuiltIn) ?? _topics[0];
             _selectedTopicId = defaultTopic.Id;
             await OnTopicSelected.InvokeAsync(_selectedTopicId);
+        }
+    }
+
+    private async Task ToggleArchivedDropdownAsync()
+    {
+        _showArchivedDropdown = !_showArchivedDropdown;
+        if (_showArchivedDropdown)
+        {
+            _archivedTopics.Clear();
+            _archivedTopics.AddRange(await TopicService.GetArchivedTopicsAsync());
         }
     }
 

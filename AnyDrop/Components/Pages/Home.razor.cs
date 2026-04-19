@@ -34,6 +34,15 @@ public partial class Home : IAsyncDisposable
     private Guid? _selectedTopicId;
     private string? _selectedTopicName;
     private bool _selectedTopicPinned;
+    private bool _selectedTopicArchived;
+    private bool _selectedTopicIsBuiltIn;
+    private int _selectedTopicMessageCount;
+
+    // 主题设置 Modal 状态
+    private bool _showTopicSettingsModal;
+    private string _topicSettingsName = string.Empty;
+    private string? _topicSettingsError;
+    private ElementReference _topicSettingsInputRef;
 
     // 图片大图预览 Modal
     private string? _previewImageUrl;
@@ -181,22 +190,111 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    private async Task TogglePinAsync()
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey && string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
+        {
+            await SendAsync();
+        }
+    }
+
+    /// <summary>打开主题设置 Modal。</summary>
+    private void OpenTopicSettingsModal()
+    {
+        _topicSettingsName = _selectedTopicName ?? string.Empty;
+        _topicSettingsError = null;
+        _showTopicSettingsModal = true;
+    }
+
+    /// <summary>关闭主题设置 Modal。</summary>
+    private void CloseTopicSettingsModal()
+    {
+        _showTopicSettingsModal = false;
+        _topicSettingsError = null;
+    }
+
+    /// <summary>保存主题名称更改。</summary>
+    private async Task SaveTopicNameAsync()
     {
         if (!_selectedTopicId.HasValue)
         {
             return;
         }
 
-        await TopicService.PinTopicAsync(_selectedTopicId.Value, !_selectedTopicPinned);
-        await LoadSelectedTopicMetaAsync();
+        var name = _topicSettingsName.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            _topicSettingsError = "主题名称不能为空。";
+            return;
+        }
+
+        _topicSettingsError = null;
+        try
+        {
+            await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(name));
+            await LoadSelectedTopicMetaAsync();
+            _topicSettingsName = _selectedTopicName ?? name;
+            _showTopicSettingsModal = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to rename topic {TopicId}", _selectedTopicId);
+            _topicSettingsError = "保存失败，请重试。";
+        }
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
+    /// <summary>归档或取消归档当前主题。</summary>
+    private async Task ArchiveCurrentTopicAsync()
     {
-        if (e.CtrlKey && string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
+        if (!_selectedTopicId.HasValue)
         {
-            await SendAsync();
+            return;
+        }
+
+        try
+        {
+            await TopicService.ArchiveTopicAsync(_selectedTopicId.Value, !_selectedTopicArchived);
+            CloseTopicSettingsModal();
+
+            // 归档后清空聊天区（主题不再显示在普通列表）
+            _selectedTopicId = null;
+            _selectedTopicName = null;
+            _selectedTopicPinned = false;
+            _selectedTopicArchived = false;
+            _selectedTopicIsBuiltIn = false;
+            _selectedTopicMessageCount = 0;
+            _messages.Clear();
+            _messageIds.Clear();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to archive topic {TopicId}", _selectedTopicId);
+            _topicSettingsError = "操作失败，请重试。";
+        }
+    }
+
+    /// <summary>删除当前主题（仅限无内容时）。</summary>
+    private async Task DeleteCurrentTopicAsync()
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await TopicService.DeleteTopicAsync(_selectedTopicId.Value);
+            CloseTopicSettingsModal();
+
+            _selectedTopicId = null;
+            _selectedTopicName = null;
+            _messages.Clear();
+            _messageIds.Clear();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete topic {TopicId}", _selectedTopicId);
+            _topicSettingsError = "删除失败，请重试。";
         }
     }
 
@@ -377,15 +475,30 @@ public partial class Home : IAsyncDisposable
     {
         _selectedTopicName = null;
         _selectedTopicPinned = false;
+        _selectedTopicArchived = false;
+        _selectedTopicIsBuiltIn = false;
+        _selectedTopicMessageCount = 0;
         if (!_selectedTopicId.HasValue)
         {
             return;
         }
 
-        var topics = await TopicService.GetAllTopicsAsync(ct);
-        var topic = topics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
+        // 检索所有主题（含归档）以获取完整元数据
+        var allTopics = await TopicService.GetAllTopicsAsync(ct);
+        var topic = allTopics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
+
+        // 若在普通列表中找不到，再检索归档列表
+        if (topic is null)
+        {
+            var archivedTopics = await TopicService.GetArchivedTopicsAsync(ct);
+            topic = archivedTopics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
+        }
+
         _selectedTopicName = topic?.Name;
         _selectedTopicPinned = topic?.IsPinned == true;
+        _selectedTopicArchived = topic?.IsArchived == true;
+        _selectedTopicIsBuiltIn = topic?.IsBuiltIn == true;
+        _selectedTopicMessageCount = topic?.MessageCount ?? 0;
     }
 
     private static string GetFileUrl(Guid itemId, bool download = false)

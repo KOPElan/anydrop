@@ -10,11 +10,13 @@ public static class TopicEndpoints
         var group = app.MapGroup("/api/v1/topics").WithTags("Topics");
 
         group.MapGet("/", GetAllTopicsAsync);
+        group.MapGet("/archived", GetArchivedTopicsAsync);
         group.MapPost("/", CreateTopicAsync);
         group.MapPut("/reorder", ReorderTopicsAsync);
         group.MapGet("/{id:guid}/messages", GetTopicMessagesAsync);
         group.MapPut("/{id:guid}", UpdateTopicAsync);
         group.MapPut("/{id:guid}/pin", PinTopicAsync);
+        group.MapPut("/{id:guid}/archive", ArchiveTopicAsync);
         group.MapDelete("/{id:guid}", DeleteTopicAsync);
 
         return app;
@@ -23,6 +25,12 @@ public static class TopicEndpoints
     private static async Task<IResult> GetAllTopicsAsync(ITopicService topicService, CancellationToken ct)
     {
         var topics = await topicService.GetAllTopicsAsync(ct);
+        return Results.Ok(ApiEnvelope<IReadOnlyList<TopicDto>>.Ok(topics));
+    }
+
+    private static async Task<IResult> GetArchivedTopicsAsync(ITopicService topicService, CancellationToken ct)
+    {
+        var topics = await topicService.GetArchivedTopicsAsync(ct);
         return Results.Ok(ApiEnvelope<IReadOnlyList<TopicDto>>.Ok(topics));
     }
 
@@ -88,6 +96,23 @@ public static class TopicEndpoints
         try
         {
             var result = await topicService.PinTopicAsync(id, request.IsPinned, ct);
+            return Results.Ok(ApiEnvelope<TopicDto>.Ok(result));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"));
+        }
+    }
+
+    private static async Task<IResult> ArchiveTopicAsync(
+        Guid id,
+        ArchiveTopicRequest request,
+        ITopicService topicService,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await topicService.ArchiveTopicAsync(id, request.IsArchived, ct);
             return Results.Ok(ApiEnvelope<TopicDto>.Ok(result));
         }
         catch (KeyNotFoundException)

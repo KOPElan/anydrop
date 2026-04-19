@@ -10,11 +10,19 @@
     </div>
 
     @* ── 会话主题 ─────────────────────────── *@
-    <div class="px-5 pb-2">
+    <div class="px-5 pb-2 flex items-center justify-between">
         <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">会话主题</p>
+        @* 新建主题按钮（仅图标，移至标题右侧）*@
+        <button type="button"
+                aria-label="新建主题"
+                class="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-surface-container"
+                style="color: var(--color-on-surface-variant);"
+                @onclick="OpenCreateModal">
+            <span class="material-symbols-outlined" style="font-size: 18px;">add</span>
+        </button>
     </div>
 
-    @* 主题列表 + 新建主题按钮（紧跟在列表后面）*@
+    @* 主题列表 *@
     <div class="flex-1 overflow-y-auto px-3 pb-2">
         @if (_topics.Count == 0)
         {
@@ -51,19 +59,44 @@
             </div>
         }
 
-        @* 新建主题按钮（紧跟在主题列表后面）*@
-        <button type="button"
-                aria-label="新建主题"
-                class="flex w-full items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
-                style="border-color: var(--color-outline-variant); color: var(--color-on-surface-variant);"
-                @onclick="OpenCreateModal">
-            <span class="material-symbols-outlined text-base">add</span>
-            新建主题
-        </button>
-
         @if (!string.IsNullOrWhiteSpace(_error))
         {
             <p class="px-2 py-1 mt-1 text-xs" style="color: var(--color-error);">@_error</p>
+        }
+
+        @* ── 已归档入口（不参与排序，固定在列表末尾）─────── *@
+        <button type="button"
+                class="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium transition-colors hover:bg-surface-container mt-1"
+                style="color: var(--color-on-surface-variant);"
+                @onclick="ToggleArchivedDropdownAsync">
+            <span class="material-symbols-outlined text-base">archive</span>
+            <span class="flex-1 text-left">已归档</span>
+            <span class="material-symbols-outlined text-sm transition-transform @(_showArchivedDropdown ? "rotate-180" : "")">expand_more</span>
+        </button>
+
+        @* 归档主题下拉列表 *@
+        @if (_showArchivedDropdown)
+        {
+            <div class="mt-0.5 space-y-0.5 pl-4">
+                @if (_archivedTopics.Count == 0)
+                {
+                    <div class="px-3 py-2 text-xs" style="color: var(--color-outline);">暂无归档主题</div>
+                }
+                else
+                {
+                    @foreach (var topic in _archivedTopics)
+                    {
+                        var isActive = _selectedTopicId == topic.Id;
+                        <button
+                            type="button"
+                            class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item") opacity-70"
+                            @onclick="() => SelectTopicAsync(topic.Id)">
+                            <span class="material-symbols-outlined text-base" style="font-size: 14px;">archive</span>
+                            <span class="sidebar-item__name text-xs">@topic.Name</span>
+                        </button>
+                    }
+                }
+            </div>
         }
     </div>
 
@@ -131,3 +164,4 @@
         </div>
     </div>
 }
+
