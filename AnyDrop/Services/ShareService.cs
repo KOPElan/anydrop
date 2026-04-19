@@ -13,7 +13,7 @@ public sealed class ShareService(
     IFileStorageService fileStorageService,
     LinkMetadataService linkMetadataService) : IShareService
 {
-    public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, CancellationToken ct = default)
+    public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
     {
         var normalizedContent = content.Trim();
 
@@ -44,6 +44,7 @@ public sealed class ShareService(
             ContentType = isLink ? ShareContentType.Link : ShareContentType.Text,
             Content = normalizedContent,
             CreatedAt = now,
+            ExpiresAt = burnAfterReading ? now.AddMinutes(10) : null,
             TopicId = topicId
         };
 
@@ -116,6 +117,7 @@ public sealed class ShareService(
         string mimeType,
         Guid? topicId = null,
         long? knownFileSize = null,
+        bool burnAfterReading = false,
         CancellationToken ct = default)
     {
         if (fileStream is null)
@@ -158,6 +160,7 @@ public sealed class ShareService(
             FileSize = fileSize,
             MimeType = mimeType,
             CreatedAt = now,
+            ExpiresAt = burnAfterReading ? now.AddMinutes(10) : null,
             TopicId = topicId
         };
 

@@ -49,7 +49,12 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 .HasConversion(
                     value => value.UtcDateTime,
                     value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.ExpiresAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
             entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.ExpiresAt);
             entity.HasIndex(e => new { e.TopicId, e.CreatedAt });
             entity.HasOne<Topic>()
                 .WithMany()

@@ -47,6 +47,9 @@ public partial class Home : IAsyncDisposable
     // 图片大图预览 Modal
     private string? _previewImageUrl;
 
+    // 阅后即焚模式
+    private bool _burnAfterReading;
+
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
     private DotNetObjectReference<Home>? _dotNetRef;
@@ -179,7 +182,7 @@ public partial class Home : IAsyncDisposable
         _isSending = true;
         try
         {
-            await ShareService.SendTextAsync(trimmedText, _selectedTopicId);
+            await ShareService.SendTextAsync(trimmedText, _selectedTopicId, burnAfterReading: _burnAfterReading);
             _inputText = string.Empty;
             // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示
             await LoadSelectedTopicMessagesAsync();
@@ -322,7 +325,8 @@ public partial class Home : IAsyncDisposable
         {
             var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
             await using var stream = file.OpenReadStream(maxAllowedSize: maxFileSize);
-            await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value);
+            await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value,
+                burnAfterReading: _burnAfterReading);
         }
 
         // 主动刷新，确保在 SignalR 降级场景下也能立即呈现
@@ -363,7 +367,7 @@ public partial class Home : IAsyncDisposable
 
             await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
             await ShareService.SendFileAsync(stream, fileName, safeMimeType, _selectedTopicId.Value,
-                knownFileSize: fileSize);
+                knownFileSize: fileSize, burnAfterReading: _burnAfterReading);
 
             await LoadSelectedTopicMessagesAsync();
         }
@@ -378,6 +382,12 @@ public partial class Home : IAsyncDisposable
         }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>切换阅后即焚模式。</summary>
+    private void ToggleBurnAfterReading()
+    {
+        _burnAfterReading = !_burnAfterReading;
     }
 
     /// <summary>打开图片大图预览 Modal。</summary>
@@ -533,6 +543,20 @@ public partial class Home : IAsyncDisposable
     {
         var local = time.ToLocalTime();
         return local.ToString("yyyy/MM/dd HH:mm");
+    }
+
+    /// <summary>将阅后即焚到期时间格式化为倒计时或已到期标记。</summary>
+    private static string FormatExpiry(DateTimeOffset expiresAt)
+    {
+        var remaining = expiresAt - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return "即将删除";
+        }
+
+        return remaining.TotalMinutes >= 1
+            ? $"{(int)remaining.TotalMinutes}分钟后删除"
+            : $"{(int)remaining.TotalSeconds}秒后删除";
     }
 }
 

@@ -10,5 +10,6 @@ public sealed record ShareItemDto(
     string? LinkTitle,
     string? LinkDescription,
     DateTimeOffset CreatedAt,
+    DateTimeOffset? ExpiresAt,
     Guid? TopicId
 );

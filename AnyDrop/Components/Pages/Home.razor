@@ -171,10 +171,18 @@
                             </div>
                             break;
                     }
-                    @* 消息时间：显示完整日期 + 时间 *@
-                    <div class="mt-2 ml-1 flex items-center gap-1.5 text-[11px] font-bold text-primary">
+                    @* 消息时间：显示完整日期 + 时间，阅后即焚时额外显示倒计时 *@
+                    <div class="mt-2 ml-1 flex items-center gap-2 text-[11px] font-bold text-primary">
                         <span class="material-symbols-outlined" style="font-size: 12px;">schedule</span>
                         @FormatMessageTime(message.CreatedAt)
+                        @if (message.ExpiresAt.HasValue)
+                        {
+                            <span class="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style="background: var(--color-error-container, #ffdad6); color: var(--color-error, #ba1a1a);">
+                                <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
+                                @FormatExpiry(message.ExpiresAt.Value)
+                            </span>
+                        }
                     </div>
                 </div>
             }
@@ -293,6 +301,17 @@
                     <span class="material-symbols-outlined">attachment</span>
                     <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
                 </label>
+                @* 阅后即焚切换按钮 *@
+                <button type="button"
+                        class="flex items-center justify-center rounded-full p-2 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "text-on-surface-variant hover:bg-surface-container")"
+                        style="@(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
+                        title="@(_burnAfterReading ? "阅后即焚已开启（10分钟后自动删除）" : "开启阅后即焚")"
+                        @onclick="ToggleBurnAfterReading">
+                    <span class="material-symbols-outlined"
+                          style="font-variation-settings: '@(_burnAfterReading ? "FILL' 1" : "FILL' 0")';">
+                        @(_burnAfterReading ? "timer" : "timer")
+                    </span>
+                </button>
             </div>
 
             @* 文本输入 *@
