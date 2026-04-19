@@ -54,7 +54,7 @@ app.MapRazorComponents<App>()
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
-    await db.Database.MigrateAsync();
+    await db.MigrateWithCompatibilityAsync();
 }
 
 app.Run();

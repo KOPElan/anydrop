@@ -18,8 +18,8 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             entity.Property(e => e.MimeType).HasMaxLength(127);
             entity.Property(e => e.CreatedAt)
                 .HasConversion(
-                    value => value.UtcDateTime,
-                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+                    value => value.ToString("O"),
+                    value => DateTimeOffset.Parse(value));
             entity.HasIndex(e => e.CreatedAt);
         });
     }
