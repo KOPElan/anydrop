@@ -3,7 +3,6 @@ using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
-using Microsoft.JSInterop;
 
 namespace AnyDrop.Components.Pages;
 
@@ -11,7 +10,6 @@ public partial class Home : IAsyncDisposable
 {
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
-    [Inject] public required IJSRuntime JsRuntime { get; set; }
     [Inject] public required ILogger<Home> Logger { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
@@ -42,7 +40,7 @@ public partial class Home : IAsyncDisposable
 
         _hubConnection.On<ShareItemDto>("ReceiveShareItem", dto =>
         {
-            _messages.Add(dto);
+            _messages.Insert(0, dto);
             return InvokeAsync(StateHasChanged);
         });
 
@@ -80,7 +78,6 @@ public partial class Home : IAsyncDisposable
         {
             await ShareService.SendTextAsync(trimmedText);
             _inputText = string.Empty;
-            await JsRuntime.InvokeVoidAsync("scrollTo", 0, int.MaxValue);
         }
         finally
         {
@@ -119,7 +116,7 @@ public partial class Home : IAsyncDisposable
         {
             var latest = await ShareService.GetRecentAsync(ct: ct);
             _messages.Clear();
-            _messages.AddRange(latest.OrderByDescending(x => x.CreatedAt));
+            _messages.AddRange(latest);
             await InvokeAsync(StateHasChanged);
         }
     }

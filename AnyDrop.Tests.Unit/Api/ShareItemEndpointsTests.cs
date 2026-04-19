@@ -25,6 +25,7 @@ public class ShareItemEndpointsTests
         var result = await ShareItemEndpoints.GetRecentAsync(null, shareServiceMock.Object, CancellationToken.None);
 
         result.Should().BeOfType<Ok<ApiEnvelope<IReadOnlyList<ShareItemDto>>>>();
+        result.Value.Should().NotBeNull();
         result.Value.Success.Should().BeTrue();
         result.Value.Data.Should().ContainSingle(x => x.Content == "hello");
         shareServiceMock.Verify(x => x.GetRecentAsync(50, It.IsAny<CancellationToken>()), Times.Once);
@@ -42,6 +43,7 @@ public class ShareItemEndpointsTests
 
         result.Result.Should().BeOfType<BadRequest<ApiEnvelope<ShareItemDto>>>();
         var badRequest = (BadRequest<ApiEnvelope<ShareItemDto>>)result.Result;
+        badRequest.Value.Should().NotBeNull();
         badRequest.Value.Success.Should().BeFalse();
         badRequest.Value.Error.Should().Be("Content is required.");
         shareServiceMock.Verify(x => x.SendTextAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -64,6 +66,7 @@ public class ShareItemEndpointsTests
 
         result.Result.Should().BeOfType<Ok<ApiEnvelope<ShareItemDto>>>();
         var ok = (Ok<ApiEnvelope<ShareItemDto>>)result.Result;
+        ok.Value.Should().NotBeNull();
         ok.Value.Success.Should().BeTrue();
         ok.Value.Data.Should().NotBeNull();
         ok.Value.Data!.Content.Should().Be("hello");

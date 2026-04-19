@@ -69,6 +69,19 @@ public class ShareServiceTests
     }
 
     [Fact]
+    public async Task SendTextAsync_ContentWithin10000CharsAfterTrim_PersistsTrimmedContent()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _);
+        var content = $"   {new string('a', 10_000)}   ";
+
+        var dto = await service.SendTextAsync(content);
+
+        dto.Content.Length.Should().Be(10_000);
+        dto.Content.Should().Be(new string('a', 10_000));
+    }
+
+    [Fact]
     public async Task GetRecentAsync_ReturnsTopNOrderedByCreatedAtDesc()
     {
         await using var dbContext = CreateDbContext();

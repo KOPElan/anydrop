@@ -10,12 +10,14 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
 {
     public async Task<ShareItemDto> SendTextAsync(string content, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(content))
+        var normalizedContent = content.Trim();
+
+        if (string.IsNullOrWhiteSpace(normalizedContent))
         {
             throw new ArgumentException("Content is required", nameof(content));
         }
 
-        if (content.Length > 10_000)
+        if (normalizedContent.Length > 10_000)
         {
             throw new ArgumentException("Content length must be less than or equal to 10000 characters", nameof(content));
         }
@@ -23,7 +25,7 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
         var item = new ShareItem
         {
             ContentType = ShareContentType.Text,
-            Content = content.Trim(),
+            Content = normalizedContent,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -31,7 +33,7 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await dbContext.SaveChangesAsync(ct);
 
         var dto = item.ToDto();
-        await hubContext.Clients.All.SendAsync("ReceiveShareItem", dto, ct);
+        await hubContext.Clients.All.SendAsync("ReceiveShareItem", dto, CancellationToken.None);
         return dto;
     }
 
@@ -40,22 +42,10 @@ public sealed class ShareService(AnyDropDbContext dbContext, IHubContext<ShareHu
         var normalizedCount = count <= 0 ? 50 : count;
         var safeCount = Math.Clamp(normalizedCount, 1, 200);
 
-        if (string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.InMemory", StringComparison.Ordinal))
-        {
-            var inMemoryItems = await dbContext.ShareItems
-                .AsNoTracking()
-                .ToListAsync(ct);
-
-            return inMemoryItems
-                .OrderByDescending(x => x.CreatedAt)
-                .Take(safeCount)
-                .Select(x => x.ToDto())
-                .ToList();
-        }
-
         return await dbContext.ShareItems
-            .FromSqlInterpolated($"SELECT * FROM ShareItems ORDER BY CreatedAt DESC LIMIT {safeCount}")
             .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(safeCount)
             .Select(x => x.ToDto())
             .ToListAsync(ct);
     }

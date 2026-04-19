@@ -8,7 +8,7 @@ namespace AnyDrop.Tests.E2E.Tests;
 public class ShareFlowTests(E2ETestFixture fixture)
 {
     [Fact]
-    public async Task SendingTextFromOneContext_ShouldAppearInAnotherContext()
+    public async Task ShareText_SecondBrowserContext_ShouldReceiveMessage()
     {
         await using var contextA = await fixture.Browser.NewContextAsync();
         await using var contextB = await fixture.Browser.NewContextAsync();
