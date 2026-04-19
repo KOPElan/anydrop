@@ -15,7 +15,7 @@ public class ShareItemEndpointsTests
         var shareServiceMock = new Mock<IShareService>();
         var items = new List<ShareItemDto>
         {
-            new(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow, null)
+            new(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, null, null, DateTimeOffset.UtcNow, null)
         };
 
         shareServiceMock
@@ -53,7 +53,7 @@ public class ShareItemEndpointsTests
     public async Task SendTextAsync_ValidRequest_ReturnsOkEnvelope()
     {
         var shareServiceMock = new Mock<IShareService>();
-        var dto = new ShareItemDto(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow, null);
+        var dto = new ShareItemDto(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, null, null, DateTimeOffset.UtcNow, null);
 
         shareServiceMock
             .Setup(x => x.SendTextAsync("hello", null, It.IsAny<CancellationToken>()))

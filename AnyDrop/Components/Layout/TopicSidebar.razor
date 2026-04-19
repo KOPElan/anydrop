@@ -9,54 +9,49 @@
         <span class="font-headline text-base font-extrabold" style="color: var(--color-on-surface);">AnyDrop</span>
     </div>
 
-    @* 分区标题 *@
+    @* ── 会话主题 ─────────────────────────── *@
     <div class="px-5 pb-2">
         <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">会话主题</p>
     </div>
 
-    @* 主题列表 *@
-    @if (_topics.Count == 0)
-    {
-        <div class="sidebar-empty-state mx-3">暂无主题</div>
-    }
-    else
-    {
-        <div id="topic-list" class="flex-1 overflow-y-auto space-y-0.5 px-3 pb-2">
-            @foreach (var topic in _topics)
-            {
-                var isActive = _selectedTopicId == topic.Id;
-                <button
-                    type="button"
-                    data-id="@topic.Id"
-                    class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
-                    @onclick="() => SelectTopicAsync(topic.Id)">
-                    <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(isActive ? "1" : "0"); color: @(topic.IsPinned ? "var(--color-primary)" : "inherit");">
-                        @(topic.IsPinned ? "bookmark" : "chat_bubble")
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-1">
-                            <span class="sidebar-item__name">@topic.Name</span>
-                            @if (topic.LastMessageAt.HasValue)
-                            {
-                                <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
-                            }
+    @* 主题列表 + 新建主题按钮（紧跟在列表后面）*@
+    <div class="flex-1 overflow-y-auto px-3 pb-2">
+        @if (_topics.Count == 0)
+        {
+            <div class="sidebar-empty-state mx-1">暂无主题</div>
+        }
+        else
+        {
+            <div id="topic-list" class="space-y-0.5 mb-2">
+                @foreach (var topic in _topics)
+                {
+                    var isActive = _selectedTopicId == topic.Id;
+                    <button
+                        type="button"
+                        data-id="@topic.Id"
+                        class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
+                        @onclick="() => SelectTopicAsync(topic.Id)">
+                        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(isActive ? "1" : "0"); color: @(topic.IsPinned ? "var(--color-primary)" : "inherit");">
+                            @(topic.IsPinned ? "bookmark" : "chat_bubble")
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1">
+                                <span class="sidebar-item__name">@topic.Name</span>
+                                @if (topic.LastMessageAt.HasValue)
+                                {
+                                    <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
+                                }
+                            </div>
+                            <div class="sidebar-item__preview">
+                                @(topic.LastMessagePreview ?? "暂无消息")
+                            </div>
                         </div>
-                        <div class="sidebar-item__preview">
-                            @(topic.LastMessagePreview ?? "暂无消息")
-                        </div>
-                    </div>
-                </button>
-            }
-        </div>
-    }
+                    </button>
+                }
+            </div>
+        }
 
-    @if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <p class="px-4 py-2 text-xs" style="color: var(--color-error);">@_error</p>
-    }
-
-    @* 新建主题按钮 *@
-    <div class="p-3 border-t" style="border-color: var(--color-outline-variant);">
+        @* 新建主题按钮（紧跟在主题列表后面）*@
         <button type="button"
                 aria-label="新建主题"
                 class="flex w-full items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
@@ -64,6 +59,48 @@
                 @onclick="OpenCreateModal">
             <span class="material-symbols-outlined text-base">add</span>
             新建主题
+        </button>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <p class="px-2 py-1 mt-1 text-xs" style="color: var(--color-error);">@_error</p>
+        }
+    </div>
+
+    @* ── 在线设备（占位，无实际实现）──────────────── *@
+    <div class="px-5 pt-4 pb-2">
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">在线设备</p>
+    </div>
+    <div class="px-3 pb-4 space-y-0.5">
+        <div class="flex items-center gap-3 px-2 py-2 text-on-surface-variant">
+            <span class="material-symbols-outlined text-lg" style="color: #22c55e;">laptop_mac</span>
+            <div class="flex flex-col min-w-0">
+                <span class="text-sm font-medium leading-none text-on-surface truncate">当前设备</span>
+                <span class="text-[10px] font-bold" style="color: #22c55e;">在线</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 px-2 py-2 text-on-surface-variant opacity-50">
+            <span class="material-symbols-outlined text-lg">smartphone</span>
+            <div class="flex flex-col min-w-0">
+                <span class="text-sm font-medium leading-none truncate">手机</span>
+                <span class="text-[10px] font-bold">离线</span>
+            </div>
+        </div>
+    </div>
+
+    @* ── 底部功能按钮 ────────────────────────── *@
+    <div class="px-3 pb-4 pt-2 mt-auto space-y-0.5" style="border-top: 1px solid var(--color-outline-variant);">
+        <button type="button"
+                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
+                style="color: var(--color-on-surface-variant);">
+            <span class="material-symbols-outlined text-base">settings</span>
+            设置
+        </button>
+        <button type="button"
+                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
+                style="color: var(--color-error);">
+            <span class="material-symbols-outlined text-base">logout</span>
+            登出
         </button>
     </div>
 </div>

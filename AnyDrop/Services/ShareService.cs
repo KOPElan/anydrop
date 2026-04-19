@@ -10,7 +10,8 @@ public sealed class ShareService(
     AnyDropDbContext dbContext,
     IHubContext<ShareHub> hubContext,
     ITopicService topicService,
-    IFileStorageService fileStorageService) : IShareService
+    IFileStorageService fileStorageService,
+    LinkMetadataService linkMetadataService) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, CancellationToken ct = default)
     {
@@ -36,10 +37,11 @@ public sealed class ShareService(
             }
         }
 
+        var isLink = IsLink(normalizedContent);
         var now = DateTimeOffset.UtcNow;
         var item = new ShareItem
         {
-            ContentType = IsLink(normalizedContent) ? ShareContentType.Link : ShareContentType.Text,
+            ContentType = isLink ? ShareContentType.Link : ShareContentType.Text,
             Content = normalizedContent,
             CreatedAt = now,
             TopicId = topicId
@@ -54,6 +56,7 @@ public sealed class ShareService(
         dbContext.ShareItems.Add(item);
         await dbContext.SaveChangesAsync(ct);
 
+        // 先广播消息（让用户立即看到），再后台补全链接元数据
         var dto = item.ToDto();
         await hubContext.Clients.All.SendAsync("ReceiveShareItem", dto, CancellationToken.None);
 
@@ -63,7 +66,48 @@ public sealed class ShareService(
             await hubContext.Clients.All.SendAsync("TopicsUpdated", topics, CancellationToken.None);
         }
 
+        // 异步抓取 OGP 元数据并更新，不阻塞本次返回
+        if (isLink)
+        {
+            _ = FetchAndUpdateLinkMetadataAsync(item.Id, normalizedContent);
+        }
+
         return dto;
+    }
+
+    /// <summary>
+    /// 后台抓取链接元数据，更新数据库并推送更新后的 DTO 给所有客户端。
+    /// 此方法独立于请求生命周期运行，失败时静默忽略。
+    /// </summary>
+    private async Task FetchAndUpdateLinkMetadataAsync(Guid itemId, string url)
+    {
+        try
+        {
+            var (title, description) = await linkMetadataService.FetchAsync(url);
+
+            if (title is null && description is null)
+            {
+                return;
+            }
+
+            // 使用新的 DbContext 以避免并发冲突（原 Scoped context 可能已释放）
+            var item = await dbContext.ShareItems.FindAsync(itemId);
+            if (item is null)
+            {
+                return;
+            }
+
+            item.LinkTitle = title;
+            item.LinkDescription = description;
+            await dbContext.SaveChangesAsync();
+
+            // 推送补全后的消息，让客户端更新气泡内容
+            await hubContext.Clients.All.SendAsync("ReceiveShareItem", item.ToDto());
+        }
+        catch (Exception)
+        {
+            // 后台任务失败不影响主流程
+        }
     }
 
     public async Task<ShareItemDto> SendFileAsync(

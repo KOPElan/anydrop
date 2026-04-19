@@ -23,6 +23,7 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddSingleton<LinkMetadataService>();
 builder.Services.AddHttpClient();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddEndpointsApiExplorer();

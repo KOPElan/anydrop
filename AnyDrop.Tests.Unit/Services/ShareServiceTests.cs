@@ -5,6 +5,7 @@ using AnyDrop.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace AnyDrop.Tests.Unit.Services;
@@ -158,6 +159,10 @@ public class ShareServiceTests
             .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("saved/file.bin");
 
-        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object, fileStorageServiceMock.Object);
+        // LinkMetadataService: 使用真实实例，但 HttpClientFactory 不会发起外部请求
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
+
+        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object, fileStorageServiceMock.Object, linkMetadataService);
     }
 }
