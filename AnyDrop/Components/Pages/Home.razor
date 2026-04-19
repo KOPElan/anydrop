@@ -6,9 +6,8 @@
          class="flex h-full flex-col relative bg-surface"
          @ondragover:preventDefault>
 
-    @* ─────────── 顶部标题栏 ─────────── *@
-    <header class="sticky top-0 z-40 flex items-center justify-between px-6 py-4"
-            style="background: rgba(255,255,255,0.85); backdrop-filter: blur(16px);">
+    @* ─────────── 顶部标题栏（磨砂玻璃效果）─────────── *@
+    <header class="sticky top-0 z-40 flex items-center justify-between px-6 py-4 chat-header-glass">
         <div class="flex items-center gap-3">
             <h2 class="font-headline font-bold text-on-surface text-lg leading-tight">
                 @(_selectedTopicName ?? "选择主题")
@@ -48,11 +47,11 @@
             @* 消息按时间升序排列，最新的在最底部 *@
             @foreach (var message in _messages)
             {
-                <div class="flex flex-col items-start max-w-2xl">
+                <div class="flex flex-col items-start max-w-2xl message-bubble" @key="message.Id">
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
-                            <div class="bg-surface-container-low p-5 rounded-2xl border-l-4 border-primary max-w-full">
+                            <div class="bubble-link bg-surface-container-low p-5 rounded-2xl border-l-4 border-primary max-w-full transition-all duration-150">
                                 <div class="flex items-center gap-2 text-primary mb-3">
                                     <span class="material-symbols-outlined text-sm">link</span>
                                     <span class="text-xs font-semibold uppercase tracking-wide">链接</span>
@@ -83,11 +82,11 @@
                             break;
 
                         case ShareContentType.Image:
-                            <div class="bg-surface-container-lowest p-3 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                            <div class="bubble-file bg-surface-container-lowest p-3 rounded-2xl shadow-sm transition-all duration-150">
                                 @* 点击图片在 Modal 中预览原图 *@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
-                                    <img class="max-h-72 w-full object-contain"
+                                    <img class="max-h-72 w-full object-contain transition-transform duration-200 hover:scale-[1.02]"
                                          src="@GetFileUrl(message.Id)"
                                          alt="@message.FileName" />
                                 </div>
@@ -113,7 +112,7 @@
                             break;
 
                         case ShareContentType.Video:
-                            <div class="bg-surface-container-lowest p-3 rounded-2xl shadow-sm w-full max-w-lg">
+                            <div class="bubble-file bg-surface-container-lowest p-3 rounded-2xl shadow-sm w-full max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
                                     <video class="w-full max-h-64 rounded-xl bg-on-surface"
                                            controls
@@ -141,7 +140,7 @@
                             break;
 
                         case ShareContentType.File:
-                            <div class="bg-surface-container-lowest p-4 rounded-2xl shadow-sm flex items-center justify-between gap-4 w-full max-w-md">
+                            <div class="bubble-file bg-surface-container-lowest p-4 rounded-2xl shadow-sm flex items-center justify-between gap-4 w-full max-w-md transition-all duration-150">
                                 <div class="flex items-center gap-4">
                                     <div class="w-12 h-12 bg-error-container/30 flex items-center justify-center rounded-xl text-error">
                                         <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
@@ -162,7 +161,7 @@
                             break;
 
                         default:
-                            <div class="bg-surface-container-low p-5 rounded-2xl border-l-4 border-primary">
+                            <div class="bubble-text bg-surface-container-low p-5 rounded-2xl border-l-4 border-primary transition-all duration-150">
                                 <p class="text-sm text-on-surface leading-relaxed whitespace-pre-wrap break-words">@message.Content</p>
                             </div>
                             break;
@@ -207,8 +206,8 @@
         </div>
     }
 
-    @* ─────────── 输入区 ─────────── *@
-    <footer class="p-4 bg-surface-container-low">
+    @* ─────────── 输入区（磨砂玻璃效果）─────────── *@
+    <footer class="p-4 chat-footer-glass">
         <div class="flex items-end gap-3 bg-surface-container-lowest p-3 rounded-[2rem]"
              style="box-shadow: 0 8px 32px rgba(25,28,29,0.06);">
             @* 附件按钮 *@

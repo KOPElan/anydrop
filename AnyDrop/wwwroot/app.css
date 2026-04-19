@@ -57,6 +57,16 @@
     --color-brand: #0050cb;
     --color-brand-hover: #0040a0;
     --color-sidebar: #f3f4f5;
+
+    /* ── 磨砂玻璃共用变量 ── */
+    --glass-blur: blur(20px) saturate(180%);
+    --glass-border-color: rgba(194, 198, 216, 0.35);
+    --glass-header-bg: rgba(248, 249, 250, 0.75);
+    --glass-footer-bg: rgba(243, 244, 245, 0.80);
+
+    /* ── 共用缓动曲线 ── */
+    --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);       /* 弹簧感：用于消息入场、modal 弹出 */
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);    /* 轻微过冲：用于 pill 指示条扩展 */
 }
 
 /* Blazor 错误 UI — 默认隐藏，发生错误时由 Blazor JS 显示 */
@@ -85,6 +95,45 @@
 ::-webkit-scrollbar-thumb { background: #e1e3e4; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #c2c6d8; }
 
+/* ═══════════════════════════════════════
+   动画关键帧定义
+═══════════════════════════════════════ */
+
+/* 消息气泡入场：从下方淡入上移 */
+@keyframes message-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Modal 背景淡入 */
+@keyframes overlay-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Modal 内容弹入（从下方缩放弹出） */
+@keyframes modal-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 侧边栏激活指示条扩展 */
+@keyframes pill-expand {
+    from { height: 0; opacity: 0; }
+    to   { height: 60%; opacity: 1; }
+}
 @layer base {
     html,
     body {
@@ -102,32 +151,45 @@
 
     .btn-primary:hover:not(:disabled) {
         filter: brightness(1.1);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 80, 203, 0.3);
+    }
+
+    .btn-primary:active:not(:disabled) {
+        transform: translateY(0) scale(0.97);
+        box-shadow: none;
     }
 
     .btn-secondary {
-        @apply rounded-full px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+        @apply rounded-full px-5 py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60;
         color: var(--color-on-surface-variant);
     }
 
     .btn-secondary:hover:not(:disabled) {
         background-color: var(--color-surface-container);
+        transform: translateY(-1px);
     }
 
-    /* 侧边栏主题项 */
+    /* ─── 侧边栏主题项 ─── */
     .sidebar-item {
-        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-colors;
+        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-left;
         color: var(--color-on-surface-variant);
+        /* 过渡：背景色 + 颜色 + 轻微位移 */
+        transition: background-color 200ms ease, color 200ms ease, transform 150ms ease;
     }
 
     .sidebar-item:hover {
         background-color: var(--color-surface-container);
+        transform: translateX(2px);
     }
 
     .sidebar-item--active {
         color: var(--color-primary);
         font-weight: 600;
+        background-color: var(--color-primary-fixed);
     }
 
+    /* 激活时的左侧指示条，带弹入动画 */
     .sidebar-item--active::before {
         content: "";
         position: absolute;
@@ -138,6 +200,7 @@
         height: 60%;
         background-color: var(--color-primary);
         border-radius: 0 4px 4px 0;
+        animation: pill-expand 250ms var(--ease-bounce) both;
     }
 
     .sidebar-item__name {
@@ -160,14 +223,16 @@
         color: var(--color-on-surface-variant);
     }
 
-    /* Modal */
+    /* ─── Modal 动画 ─── */
     .modal-overlay {
         @apply fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm;
+        animation: overlay-in 200ms ease both;
     }
 
     .modal-content {
         @apply w-full max-w-sm rounded-2xl p-6 shadow-xl mx-4;
         background-color: var(--color-surface-container-lowest);
+        animation: modal-slide-up 280ms var(--ease-bounce) both;
     }
 
     .modal-title {
@@ -178,6 +243,49 @@
 
     .modal-actions {
         @apply flex justify-end gap-2;
+    }
+
+    /* ─── 消息气泡出现动画 ─── */
+    .message-bubble {
+        animation: message-in 320ms var(--ease-spring) both;
+    }
+
+    /* ─── 消息气泡 hover 高亮 ─── */
+    .message-bubble:hover {
+        /* 轻微上移 + 阴影增强，给明确的 hover 焦点提示 */
+        transform: translateY(-1px);
+        transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+
+    /* 文本消息气泡 hover */
+    .bubble-text:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    /* 链接卡片 hover */
+    .bubble-link:hover {
+        box-shadow: 0 6px 20px rgba(0, 80, 203, 0.12);
+    }
+
+    /* 文件/图片/视频气泡 hover */
+    .bubble-file:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+    }
+
+    /* ─── 磨砂玻璃顶栏 ─── */
+    .chat-header-glass {
+        background: var(--glass-header-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border-bottom: 1px solid var(--glass-border-color);
+    }
+
+    /* ─── 磨砂玻璃底部输入区 ─── */
+    .chat-footer-glass {
+        background: var(--glass-footer-bg);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border-top: 1px solid var(--glass-border-color);
     }
 
     /* 整体布局 */
