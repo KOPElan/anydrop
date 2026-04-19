@@ -1,7 +1,47 @@
-﻿@page "/"
+@page "/"
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="flex h-full flex-col">
+    <header class="border-b border-gray-200 px-6 py-4">
+        <h1 class="text-lg font-semibold text-gray-900">Shared Text Feed</h1>
+    </header>
 
-Welcome to your new Fluent Blazor app.
+    <div class="flex-1 overflow-y-auto px-6 py-4" id="timeline">
+        @if (_messages.Count == 0)
+        {
+            <p class="text-sm text-gray-500">No messages yet.</p>
+        }
+        else
+        {
+            <ul class="space-y-3">
+                @foreach (var message in _messages)
+                {
+                    <li class="rounded-lg bg-white p-3 shadow-sm ring-1 ring-gray-200">
+                        <div class="mb-1 text-xs text-gray-500">@message.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</div>
+                        <div class="whitespace-pre-wrap break-words text-sm text-gray-900">@message.Content</div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    <footer class="border-t border-gray-200 px-6 py-4">
+        <div class="space-y-2">
+            <textarea
+                class="h-28 w-full rounded-lg border border-gray-300 p-3 text-sm outline-none ring-indigo-200 transition focus:ring"
+                placeholder="Type a message..."
+                maxlength="10000"
+                @bind="_inputText" />
+
+            @if (!string.IsNullOrWhiteSpace(_validationError))
+            {
+                <p class="text-sm text-red-600">@_validationError</p>
+            }
+
+            <div class="flex justify-end">
+                <button type="button" class="btn-primary" disabled="@_isSending" @onclick="SendAsync">Send</button>
+            </div>
+        </div>
+    </footer>
+</section>

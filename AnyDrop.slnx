@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="AnyDrop.Tests.E2E/AnyDrop.Tests.E2E.csproj" />
+  <Project Path="AnyDrop.Tests.Unit/AnyDrop.Tests.Unit.csproj" />
   <Project Path="AnyDrop/AnyDrop.csproj" />
 </Solution>

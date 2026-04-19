@@ -17,11 +17,11 @@
 
 **Purpose**: 清理旧依赖、初始化测试项目、安装 Tailwind CSS v4 CLI 构建链
 
-- [ ] T001 更新 AnyDrop/AnyDrop.csproj — 移除 Microsoft.FluentUI.AspNetCore.Components 包引用，添加 Microsoft.EntityFrameworkCore.Sqlite 和 Microsoft.EntityFrameworkCore.Design（版本 10.x）
-- [ ] T002 [P] 初始化 AnyDrop.Tests.Unit 测试项目 — dotnet new xunit，添加 FluentAssertions、Moq、Microsoft.EntityFrameworkCore.InMemory 包，并项目引用 AnyDrop 主项目（AnyDrop.Tests.Unit/AnyDrop.Tests.Unit.csproj）
-- [ ] T003 [P] 初始化 AnyDrop.Tests.E2E 测试项目 — dotnet new xunit，添加 Microsoft.Playwright 包，并项目引用 AnyDrop 主项目（AnyDrop.Tests.E2E/AnyDrop.Tests.E2E.csproj）
-- [ ] T004 配置 Tailwind CSS v4 构建链 — 仓库根执行 npm init -y 并 npm install -D @tailwindcss/cli，确认 node_modules/@tailwindcss/cli 存在（package.json）
-- [ ] T005 [P] 更新配置文件 — AnyDrop/appsettings.json 添加 Storage 配置节（DatabasePath: data/anydrop.db，BasePath: data/files）；AnyDrop/appsettings.Development.json 同步（含 EF Core SQL 日志 LogLevel: Information）
+- [X] T001 更新 AnyDrop/AnyDrop.csproj — 移除 Microsoft.FluentUI.AspNetCore.Components 包引用，添加 Microsoft.EntityFrameworkCore.Sqlite 和 Microsoft.EntityFrameworkCore.Design（版本 10.x）
+- [X] T002 [P] 初始化 AnyDrop.Tests.Unit 测试项目 — dotnet new xunit，添加 FluentAssertions、Moq、Microsoft.EntityFrameworkCore.InMemory 包，并项目引用 AnyDrop 主项目（AnyDrop.Tests.Unit/AnyDrop.Tests.Unit.csproj）
+- [X] T003 [P] 初始化 AnyDrop.Tests.E2E 测试项目 — dotnet new xunit，添加 Microsoft.Playwright 包，并项目引用 AnyDrop 主项目（AnyDrop.Tests.E2E/AnyDrop.Tests.E2E.csproj）
+- [X] T004 配置 Tailwind CSS v4 构建链 — 仓库根执行 npm init -y 并 npm install -D @tailwindcss/cli，确认 node_modules/@tailwindcss/cli 存在（package.json）
+- [X] T005 [P] 更新配置文件 — AnyDrop/appsettings.json 添加 Storage 配置节（DatabasePath: data/anydrop.db，BasePath: data/files）；AnyDrop/appsettings.Development.json 同步（含 EF Core SQL 日志 LogLevel: Information）
 
 **Checkpoint**: csproj 已更新、两个测试项目已创建、Tailwind CLI 已安装 ✅
 
@@ -34,15 +34,15 @@
 
 > **US3 说明**：T006–T009（实体 + DbContext）同时交付 User Story 3「ShareItem 核心数据模型」的实现需求（FR-001、FR-002）；US3 接受场景（发送后 DB 记录字段正确性）通过 Phase 3 的 ShareServiceTests 验证。
 
-- [ ] T006 [P] 创建 ShareContentType 枚举（AnyDrop/Models/ShareContentType.cs）— 显式赋值：Text=0、File=1、Image=2、Video=3、Link=4
-- [ ] T007 [P] 创建 ShareItem 实体（AnyDrop/Models/ShareItem.cs）— 字段：Id(Guid/NewGuid)、ContentType、Content(string.Empty)、FileName?(string?)、FileSize?(long?)、MimeType?(string?)、CreatedAt(DateTimeOffset.UtcNow)；含 ToDto() 方法
-- [ ] T008 [P] 创建 ShareItemDto 传输对象（AnyDrop/Models/ShareItemDto.cs）— sealed record，参数列表与 ShareItem 公开字段一一对应，不含导航属性
-- [ ] T009 创建 AnyDropDbContext（AnyDrop/Data/AnyDropDbContext.cs）— Primary Constructor（DbContextOptions<AnyDropDbContext>），OnModelCreating 配置：HasConversion<int>()、Content.HasMaxLength(10_000)、FileName.HasMaxLength(260)、MimeType.HasMaxLength(127)、HasIndex(e => e.CreatedAt)
-- [ ] T010 [P] 定义 IShareService 接口（AnyDrop/Services/IShareService.cs）— Task<ShareItemDto> SendTextAsync(string content, CancellationToken ct = default)、Task<IReadOnlyList<ShareItemDto>> GetRecentAsync(int count = 50, CancellationToken ct = default)
-- [ ] T011 [P] 定义 IFileStorageService 接口（AnyDrop/Services/IFileStorageService.cs）— SaveFileAsync、GetFileAsync、DeleteFileAsync（含 CancellationToken 参数）
-- [ ] T012 [P] 创建 ShareHub 空类（AnyDrop/Hubs/ShareHub.cs）— 仅继承 Hub，无业务逻辑，无方法
-- [ ] T013 [P] 更新 AnyDrop/Components/_Imports.razor — 移除 @using Microsoft.FluentUI.AspNetCore.Components（及其子命名空间）；添加 @using AnyDrop.Models 和 @using AnyDrop.Services
-- [ ] T014 更新 AnyDrop/Program.cs — 全量 DI 注册：AddDbContext<AnyDropDbContext>（从 IConfiguration 读取 DatabasePath）、AddSignalR()、AddScoped<IShareService, ShareService>()、AddScoped<IFileStorageService, LocalFileStorageService>()、AddRazorComponents().AddInteractiveServerComponents()；中间件：UseStatusCodePagesWithReExecute("/not-found")、MapHub<ShareHub>("/hubs/share")、MapRazorComponents<App>().AddInteractiveServerRenderMode()；启动时 MigrateAsync（CreateScope）
+- [X] T006 [P] 创建 ShareContentType 枚举（AnyDrop/Models/ShareContentType.cs）— 显式赋值：Text=0、File=1、Image=2、Video=3、Link=4
+- [X] T007 [P] 创建 ShareItem 实体（AnyDrop/Models/ShareItem.cs）— 字段：Id(Guid/NewGuid)、ContentType、Content(string.Empty)、FileName?(string?)、FileSize?(long?)、MimeType?(string?)、CreatedAt(DateTimeOffset.UtcNow)；含 ToDto() 方法
+- [X] T008 [P] 创建 ShareItemDto 传输对象（AnyDrop/Models/ShareItemDto.cs）— sealed record，参数列表与 ShareItem 公开字段一一对应，不含导航属性
+- [X] T009 创建 AnyDropDbContext（AnyDrop/Data/AnyDropDbContext.cs）— Primary Constructor（DbContextOptions<AnyDropDbContext>），OnModelCreating 配置：HasConversion<int>()、Content.HasMaxLength(10_000)、FileName.HasMaxLength(260)、MimeType.HasMaxLength(127)、HasIndex(e => e.CreatedAt)
+- [X] T010 [P] 定义 IShareService 接口（AnyDrop/Services/IShareService.cs）— Task<ShareItemDto> SendTextAsync(string content, CancellationToken ct = default)、Task<IReadOnlyList<ShareItemDto>> GetRecentAsync(int count = 50, CancellationToken ct = default)
+- [X] T011 [P] 定义 IFileStorageService 接口（AnyDrop/Services/IFileStorageService.cs）— SaveFileAsync、GetFileAsync、DeleteFileAsync（含 CancellationToken 参数）
+- [X] T012 [P] 创建 ShareHub 空类（AnyDrop/Hubs/ShareHub.cs）— 仅继承 Hub，无业务逻辑，无方法
+- [X] T013 [P] 更新 AnyDrop/Components/_Imports.razor — 移除 @using Microsoft.FluentUI.AspNetCore.Components（及其子命名空间）；添加 @using AnyDrop.Models 和 @using AnyDrop.Services
+- [X] T014 更新 AnyDrop/Program.cs — 全量 DI 注册：AddDbContext<AnyDropDbContext>（从 IConfiguration 读取 DatabasePath）、AddSignalR()、AddScoped<IShareService, ShareService>()、AddScoped<IFileStorageService, LocalFileStorageService>()、AddRazorComponents().AddInteractiveServerComponents()；中间件：UseStatusCodePagesWithReExecute("/not-found")、MapHub<ShareHub>("/hubs/share")、MapRazorComponents<App>().AddInteractiveServerRenderMode()；启动时 MigrateAsync（CreateScope）
 
 **Checkpoint**: 实体 / 接口 / DbContext / Program.cs 全部到位，`dotnet build` 应无错误 ✅
 
@@ -56,17 +56,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] 编写 ShareServiceTests 单元测试（AnyDrop.Tests.Unit/Services/ShareServiceTests.cs）— 覆盖：SendTextAsync_ValidContent_PersistsToDatabase（验证 DB 记录 ContentType=Text、Content 正确）、SendTextAsync_ValidContent_BroadcastsViaSignalR（Moq 验证 IHubContext.Clients.All.SendAsync 被调用、dto 参数正确）、SendTextAsync_EmptyContent_ThrowsArgumentException、SendTextAsync_ContentExceeds10000Chars_ThrowsArgumentException、GetRecentAsync_ReturnsTopNOrderedByCreatedAtDesc
-- [ ] T016 [P] [US1] 编写 LocalFileStorageServiceTests 单元测试（AnyDrop.Tests.Unit/Services/LocalFileStorageServiceTests.cs）— 验证 SaveFileAsync / GetFileAsync / DeleteFileAsync 均抛出 NotImplementedException
-- [ ] T017 [US1] 编写 ShareFlowTests Playwright E2E 测试（AnyDrop.Tests.E2E/Tests/ShareFlowTests.cs）— 启动两个浏览器上下文（Browser.NewContextAsync × 2）、双方均导航到 /、上下文 A 输入文本并点击发送、断言上下文 B 页面在 2000ms 内可见该文本内容（验证跨端推送链路 SC-004）
+- [X] T015 [P] [US1] 编写 ShareServiceTests 单元测试（AnyDrop.Tests.Unit/Services/ShareServiceTests.cs）— 覆盖：SendTextAsync_ValidContent_PersistsToDatabase（验证 DB 记录 ContentType=Text、Content 正确）、SendTextAsync_ValidContent_BroadcastsViaSignalR（Moq 验证 IHubContext.Clients.All.SendAsync 被调用、dto 参数正确）、SendTextAsync_EmptyContent_ThrowsArgumentException、SendTextAsync_ContentExceeds10000Chars_ThrowsArgumentException、GetRecentAsync_ReturnsTopNOrderedByCreatedAtDesc
+- [X] T016 [P] [US1] 编写 LocalFileStorageServiceTests 单元测试（AnyDrop.Tests.Unit/Services/LocalFileStorageServiceTests.cs）— 验证 SaveFileAsync / GetFileAsync / DeleteFileAsync 均抛出 NotImplementedException
+- [X] T017 [US1] 编写 ShareFlowTests Playwright E2E 测试（AnyDrop.Tests.E2E/Tests/ShareFlowTests.cs）— 启动两个浏览器上下文（Browser.NewContextAsync × 2）、双方均导航到 /、上下文 A 输入文本并点击发送、断言上下文 B 页面在 2000ms 内可见该文本内容（验证跨端推送链路 SC-004）
 
 ### Implementation for User Story 1
 
-- [ ] T018 [P] [US1] 实现 LocalFileStorageService 空实现（AnyDrop/Services/LocalFileStorageService.cs）— 三个接口方法均抛出 NotImplementedException（"File storage not implemented in MVP"）
-- [ ] T019 [US1] 实现 ShareService（AnyDrop/Services/ShareService.cs）— 注入 AnyDropDbContext 和 IHubContext<ShareHub>；SendTextAsync：验证 content 非空非空白且长度 ≤ 10,000（否则抛 ArgumentException）→ 创建 ShareItem（ContentType=Text、服务端 CreatedAt）→ SaveChangesAsync → ToDto → hub.Clients.All.SendAsync("ReceiveShareItem", dto) → return dto；GetRecentAsync：按 CreatedAt DESC 取 count 条，Select(x => x.ToDto()).ToListAsync()
-- [ ] T020 [US1] 创建 EF Core Migration InitialCreate — 在仓库根执行 `dotnet ef migrations add InitialCreate -p AnyDrop -s AnyDrop`，确认 AnyDrop/Migrations/ 目录及迁移文件已生成
-- [ ] T021 [US1] 实现 Home.razor.cs code-behind（AnyDrop/Components/Pages/Home.razor.cs）— 实现 IAsyncDisposable；@inject IShareService 和 NavigationManager；OnInitializedAsync 加载历史消息（GetRecentAsync）；在 OnAfterRenderAsync(firstRender) 建立 HubConnection（连接 /hubs/share）、注册 On("ReceiveShareItem", (ShareItemDto dto) => { _messages.Add(dto); InvokeAsync(StateHasChanged); })；DisposeAsync 停止并释放 HubConnection
-- [ ] T022 [US1] 实现 Home.razor UI（AnyDrop/Components/Pages/Home.razor）— @page "/"、消息时间线列表（@foreach，显示 CreatedAt 格式化时间 + Content）、文本 textarea（@bind）、发送按钮（调用 SendAsync → 清空输入框 → 滚动至底部）；禁止内联 style；所有样式使用 Tailwind CSS 工具类；客户端侧验证（空内容禁止提交、超长提示）
+- [X] T018 [P] [US1] 实现 LocalFileStorageService 空实现（AnyDrop/Services/LocalFileStorageService.cs）— 三个接口方法均抛出 NotImplementedException（"File storage not implemented in MVP"）
+- [X] T019 [US1] 实现 ShareService（AnyDrop/Services/ShareService.cs）— 注入 AnyDropDbContext 和 IHubContext<ShareHub>；SendTextAsync：验证 content 非空非空白且长度 ≤ 10,000（否则抛 ArgumentException）→ 创建 ShareItem（ContentType=Text、服务端 CreatedAt）→ SaveChangesAsync → ToDto → hub.Clients.All.SendAsync("ReceiveShareItem", dto) → return dto；GetRecentAsync：按 CreatedAt DESC 取 count 条，Select(x => x.ToDto()).ToListAsync()
+- [X] T020 [US1] 创建 EF Core Migration InitialCreate — 在仓库根执行 `dotnet ef migrations add InitialCreate -p AnyDrop -s AnyDrop`，确认 AnyDrop/Migrations/ 目录及迁移文件已生成
+- [X] T021 [US1] 实现 Home.razor.cs code-behind（AnyDrop/Components/Pages/Home.razor.cs）— 实现 IAsyncDisposable；@inject IShareService 和 NavigationManager；OnInitializedAsync 加载历史消息（GetRecentAsync）；在 OnAfterRenderAsync(firstRender) 建立 HubConnection（连接 /hubs/share）、注册 On("ReceiveShareItem", (ShareItemDto dto) => { _messages.Add(dto); InvokeAsync(StateHasChanged); })；DisposeAsync 停止并释放 HubConnection
+- [X] T022 [US1] 实现 Home.razor UI（AnyDrop/Components/Pages/Home.razor）— @page "/"、消息时间线列表（@foreach，显示 CreatedAt 格式化时间 + Content）、文本 textarea（@bind）、发送按钮（调用 SendAsync → 清空输入框 → 滚动至底部）；禁止内联 style；所有样式使用 Tailwind CSS 工具类；客户端侧验证（空内容禁止提交、超长提示）
 
 **Checkpoint**: 两标签页实时文本共享链路可用；`dotnet test AnyDrop.Tests.Unit` 全通过 ✅
 
@@ -80,15 +80,15 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] 编写 LayoutTests Playwright E2E 响应式测试（AnyDrop.Tests.E2E/Tests/LayoutTests.cs）— 三个断言：①桌面端（1280×800）aside 元素 IsVisible()、②移动端（375×667）aside 元素 Not.IsVisible()、③document.body.scrollWidth ≤ window.innerWidth（无水平滚动条）
+- [X] T023 [P] [US2] 编写 LayoutTests Playwright E2E 响应式测试（AnyDrop.Tests.E2E/Tests/LayoutTests.cs）— 三个断言：①桌面端（1280×800）aside 元素 IsVisible()、②移动端（375×667）aside 元素 Not.IsVisible()、③document.body.scrollWidth ≤ window.innerWidth（无水平滚动条）
 
 ### Implementation for User Story 2
 
-- [ ] T024 [P] [US2] 配置 AnyDrop/wwwroot/app.css 完整内容 — @import "tailwindcss"；@theme 定义 --color-brand（#6366f1）、--color-brand-hover（#4f46e5）、--color-surface（#f9fafb）、--color-sidebar（#f3f4f6）；@layer base（html body h-full antialiased bg-[--color-surface]）；@layer components（.btn-primary、.app-shell 使用 grid h-screen grid-template-columns: 16rem 1fr、.sidebar、移动端 @media max-width:768px 规则隐藏 .sidebar 并设 .app-shell 为 1fr）
-- [ ] T025 [P] [US2] 构建 tailwind.css — 执行 npx @tailwindcss/cli -i ./AnyDrop/wwwroot/app.css -o ./AnyDrop/wwwroot/tailwind.css，确认文件生成且大小 > 0（AnyDrop/wwwroot/tailwind.css）
-- [ ] T026 [P] [US2] 更新 AnyDrop/Components/App.razor — 在 <head> 中添加 <link rel="stylesheet" href="tailwind.css" />；移除所有 FluentUI 组件标签（如 <FluentDesignTheme>、<FluentToastProvider> 等）
-- [ ] T027 [US2] 实现 AnyDrop/Components/Layout/MainLayout.razor — 外层 <div class="app-shell">；<aside class="sidebar bg-[--color-sidebar] p-4">（静态文字占位"AnyDrop"）；<main class="flex flex-col overflow-hidden">（@Body）；所有类名使用 Tailwind 工具类，禁止硬编码颜色值
-- [ ] T028 [US2] 更新 AnyDrop/Components/Layout/MainLayout.razor.css — 可为空文件或仅补充 Tailwind 无法表达的样式（CSS Grid 布局已在 app.css @layer components 中定义，此文件作为预留扩展点）
+- [X] T024 [P] [US2] 配置 AnyDrop/wwwroot/app.css 完整内容 — @import "tailwindcss"；@theme 定义 --color-brand（#6366f1）、--color-brand-hover（#4f46e5）、--color-surface（#f9fafb）、--color-sidebar（#f3f4f6）；@layer base（html body h-full antialiased bg-[--color-surface]）；@layer components（.btn-primary、.app-shell 使用 grid h-screen grid-template-columns: 16rem 1fr、.sidebar、移动端 @media max-width:768px 规则隐藏 .sidebar 并设 .app-shell 为 1fr）
+- [X] T025 [P] [US2] 构建 tailwind.css — 执行 npx @tailwindcss/cli -i ./AnyDrop/wwwroot/app.css -o ./AnyDrop/wwwroot/tailwind.css，确认文件生成且大小 > 0（AnyDrop/wwwroot/tailwind.css）
+- [X] T026 [P] [US2] 更新 AnyDrop/Components/App.razor — 在 <head> 中添加 <link rel="stylesheet" href="tailwind.css" />；移除所有 FluentUI 组件标签（如 <FluentDesignTheme>、<FluentToastProvider> 等）
+- [X] T027 [US2] 实现 AnyDrop/Components/Layout/MainLayout.razor — 外层 <div class="app-shell">；<aside class="sidebar bg-[--color-sidebar] p-4">（静态文字占位"AnyDrop"）；<main class="flex flex-col overflow-hidden">（@Body）；所有类名使用 Tailwind 工具类，禁止硬编码颜色值
+- [X] T028 [US2] 更新 AnyDrop/Components/Layout/MainLayout.razor.css — 可为空文件或仅补充 Tailwind 无法表达的样式（CSS Grid 布局已在 app.css @layer components 中定义，此文件作为预留扩展点）
 
 **Checkpoint**: UI 骨架完整，LayoutTests E2E 通过，移动端响应式正确 ✅
 
@@ -98,10 +98,10 @@
 
 **Purpose**: 构建验证、全量测试、端到端完整流程确认、安全合规复查
 
-- [ ] T029 [P] 运行 dotnet build AnyDrop.slnx — 确认零警告、零错误（重点检查 FluentUI 残留引用已清除）
-- [ ] T030 [P] 运行 dotnet test — 确认 AnyDrop.Tests.Unit 和 AnyDrop.Tests.E2E 全部通过（SC-003、SC-004）
-- [ ] T031 按 specs/main/quickstart.md 步骤 1–7 验证完整本地开发流程 — Tailwind CLI 构建正常、dotnet run 启动正常、两标签页发送 / 接收文本测试通过（SC-001、SC-002）
-- [ ] T032 [P] 安全合规复查 — 确认 appsettings.json 无硬编码路径以外的敏感信息；数据库路径 / 文件路径通过 IConfiguration 读取（Constitution V）；无任何 FluentUI 残留 using 或组件标签（Constitution II）
+- [X] T029 [P] 运行 dotnet build AnyDrop.slnx — 确认零警告、零错误（重点检查 FluentUI 残留引用已清除）
+- [X] T030 [P] 运行 dotnet test — 确认 AnyDrop.Tests.Unit 和 AnyDrop.Tests.E2E 全部通过（SC-003、SC-004）
+- [X] T031 按 specs/main/quickstart.md 步骤 1–7 验证完整本地开发流程 — Tailwind CLI 构建正常、dotnet run 启动正常、两标签页发送 / 接收文本测试通过（SC-001、SC-002）
+- [X] T032 [P] 安全合规复查 — 确认 appsettings.json 无硬编码路径以外的敏感信息；数据库路径 / 文件路径通过 IConfiguration 读取（Constitution V）；无任何 FluentUI 残留 using 或组件标签（Constitution II）
 
 **Checkpoint**: SC-001 至 SC-006 全部满足 ✅
 
