@@ -44,7 +44,30 @@ public partial class TopicSidebar : IAsyncDisposable
         if (_topics.Count == 0) return;
 
         _dotNetRef ??= DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("initSortable", "topic-list", _dotNetRef);
+        try
+        {
+            await JS.InvokeVoidAsync("initSortable", "topic-list", _dotNetRef);
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogDebug("JS interop disconnected during initSortable — component is being disposed.");
+        }
+        catch (TaskCanceledException)
+        {
+            Logger.LogDebug("initSortable was cancelled — component is being disposed.");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Logger.LogDebug(ex, "JS runtime disposed during initSortable.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop not available during initSortable.");
+        }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "JavaScript error during initSortable.");
+        }
     }
 
     private void OpenCreateModal()

@@ -133,6 +133,14 @@ public partial class Home : IAsyncDisposable
             {
                 Logger.LogDebug("scrollToBottom was cancelled — component is being disposed.");
             }
+            catch (ObjectDisposedException ex)
+            {
+                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottom.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogDebug(ex, "JS interop not available during scrollToBottom.");
+            }
         }
     }
 
@@ -290,6 +298,14 @@ public partial class Home : IAsyncDisposable
         catch (TaskCanceledException)
         {
             Logger.LogDebug("cleanupDropZone was cancelled — component is being disposed.");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Logger.LogDebug(ex, "JS runtime disposed during cleanupDropZone.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop not available during cleanupDropZone.");
         }
 
         _dotNetRef?.Dispose();
