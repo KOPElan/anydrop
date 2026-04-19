@@ -155,6 +155,30 @@ public class TopicServiceTests
     }
 
     [Fact]
+    public async Task PinTopicAsync_WhenUnpinned_ClearsPinnedFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var topic = new Topic
+        {
+            Name = "Unpin me",
+            IsPinned = true,
+            PinnedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        };
+        dbContext.Topics.Add(topic);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _);
+        var result = await service.PinTopicAsync(topic.Id, false);
+
+        result.IsPinned.Should().BeFalse();
+        result.PinnedAt.Should().BeNull();
+
+        var entity = await dbContext.Topics.SingleAsync();
+        entity.IsPinned.Should().BeFalse();
+        entity.PinnedAt.Should().BeNull();
+    }
+
+    [Fact]
     public async Task GetAllTopicsAsync_WhenPinned_ReturnsPinnedFirst()
     {
         await using var dbContext = CreateDbContext();

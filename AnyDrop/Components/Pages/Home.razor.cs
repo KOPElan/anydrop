@@ -201,6 +201,27 @@ public partial class Home : IAsyncDisposable
         }
     }
 
+    private async Task TogglePinCurrentTopicAsync()
+    {
+        if (!_selectedTopicId.HasValue || _selectedTopicArchived)
+        {
+            return;
+        }
+
+        _validationError = null;
+
+        try
+        {
+            var result = await TopicService.PinTopicAsync(_selectedTopicId.Value, !_selectedTopicPinned);
+            _selectedTopicPinned = result.IsPinned;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to toggle pin for topic {TopicId}", _selectedTopicId);
+            _validationError = "置顶状态更新失败，请重试。";
+        }
+    }
+
     /// <summary>打开主题设置 Modal。</summary>
     private void OpenTopicSettingsModal()
     {
@@ -572,4 +593,3 @@ public partial class Home : IAsyncDisposable
             : $"{(int)remaining.TotalSeconds}秒后删除";
     }
 }
-
