@@ -8,7 +8,7 @@
     <h1 class="text-xl font-bold">登录</h1>
     <p class="mt-1 text-sm text-gray-500">请输入密码继续使用 AnyDrop。</p>
 
-    <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" class="mt-6 space-y-4">
+    <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="login" class="mt-6 space-y-4">
         <DataAnnotationsValidator />
         <div>
             <label class="mb-1 block text-sm font-medium">密码</label>

@@ -149,7 +149,9 @@ app.UseAuthentication();
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value ?? string.Empty;
+    var isStaticAssetRequest = Path.HasExtension(path);
     if (path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/js", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/images", StringComparison.OrdinalIgnoreCase) ||
@@ -157,7 +159,8 @@ app.Use(async (context, next) =>
         path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/hubs", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/api", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase))
+        path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase) ||
+        isStaticAssetRequest)
     {
         await next();
         return;
@@ -192,7 +195,7 @@ app.Use(async (context, next) =>
 
 app.UseAuthorization();
 
-app.MapStaticAssets();
+app.MapStaticAssets().AllowAnonymous();
 app.MapHub<ShareHub>("/hubs/share");
 app.MapShareItemEndpoints();
 app.MapTopicEndpoints();

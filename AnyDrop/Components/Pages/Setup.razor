@@ -8,7 +8,7 @@
     <h1 class="text-xl font-bold">首次配置</h1>
     <p class="mt-1 text-sm text-gray-500">创建唯一管理员账号。</p>
 
-    <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" class="mt-6 space-y-4">
+    <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="setup" class="mt-6 space-y-4">
         <DataAnnotationsValidator />
         <div>
             <label class="mb-1 block text-sm font-medium">昵称</label>

@@ -29,9 +29,16 @@ window.authInterop = {
 async function toResult(response) {
     let body = null;
     try {
-        body = await response.json();
-    } catch {
-        body = null;
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            body = await response.json();
+        } else {
+            // not JSON (likely HTML error page or redirect), capture as text for diagnostics
+            const text = await response.text();
+            body = { error: `Unexpected non-JSON response: ${text.slice(0, 200)}` };
+        }
+    } catch (e) {
+        body = { error: e?.message ?? 'Failed to parse response' };
     }
 
     return {

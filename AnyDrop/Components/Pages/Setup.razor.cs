@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.Extensions.Logging;
+using AnyDrop.Services;
 
 namespace AnyDrop.Components.Pages;
 
@@ -10,6 +11,7 @@ public partial class Setup
     [Inject] public required IJSRuntime JSRuntime { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Setup> Logger { get; set; }
+    [Inject] public required IUserService UserService { get; set; }
 
     private readonly SetupFormModel _model = new();
     private bool _submitting;
@@ -17,10 +19,8 @@ public partial class Setup
 
     protected override async Task OnInitializedAsync()
     {
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/auth/setup-status");
-        if (result.ok && result.body?.data.ValueKind == System.Text.Json.JsonValueKind.Object &&
-            result.body.data.TryGetProperty("requiresSetup", out var requiresSetup) &&
-            !requiresSetup.GetBoolean())
+        var hasUser = await UserService.HasUserAsync();
+        if (hasUser)
         {
             NavigationManager.NavigateTo("/login", forceLoad: true);
         }
