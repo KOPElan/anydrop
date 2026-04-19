@@ -203,6 +203,7 @@ public partial class Home : IAsyncDisposable
 
     private async Task TogglePinCurrentTopicAsync()
     {
+        // 防御性检查：确保在未选中主题或主题已归档时不执行置顶请求。
         if (!_selectedTopicId.HasValue || _selectedTopicArchived)
         {
             return;

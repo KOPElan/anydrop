@@ -26,9 +26,7 @@
                         title="@(_selectedTopicPinned ? "取消置顶" : "置顶主题")"
                         disabled="@_selectedTopicArchived"
                         @onclick="TogglePinCurrentTopicAsync">
-                    <span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' @(_selectedTopicPinned ? 1 : 0);">
-                        push_pin
-                    </span>
+                    <span class="material-symbols-outlined text-[20px]">push_pin</span>
                 </button>
                 <button type="button"
                         class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
@@ -359,4 +357,3 @@
     </footer>
 
 </section>
-
