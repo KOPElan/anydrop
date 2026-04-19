@@ -148,10 +148,11 @@ public partial class TopicSidebar : IAsyncDisposable
             _selectedTopicId = null;
         }
 
-        // 若尚未选中任何主题，自动选中第一个（通常为内置"默认"主题）
+        // 若尚未选中任何主题，优先选中内置默认主题，否则选第一个
         if (!_selectedTopicId.HasValue && _topics.Count > 0)
         {
-            _selectedTopicId = _topics[0].Id;
+            var defaultTopic = _topics.FirstOrDefault(t => t.IsBuiltIn) ?? _topics[0];
+            _selectedTopicId = defaultTopic.Id;
             await OnTopicSelected.InvokeAsync(_selectedTopicId);
         }
     }

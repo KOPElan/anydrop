@@ -81,6 +81,6 @@ public sealed class ShareService(
     private static string BuildPreview(string content)
     {
         const int maxLen = 80;
-        return content.Length > maxLen ? string.Concat(content.AsSpan(0, maxLen), "…") : content;
+        return content.Length > maxLen ? content[..maxLen] + "…" : content;
     }
 }

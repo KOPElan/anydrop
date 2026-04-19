@@ -55,9 +55,11 @@
 @if (_showCreateModal)
 {
     <div class="modal-overlay" @onclick="CloseCreateModal">
-        <div class="modal-content" @onclick:stopPropagation>
-            <h3 class="modal-title">新建主题</h3>
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-create-topic-title" @onclick:stopPropagation>
+            <h3 id="modal-create-topic-title" class="modal-title">新建主题</h3>
             <input
+                id="topic-name-input"
+                aria-label="主题名称"
                 class="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
                 placeholder="输入主题名称（最多100字）"
                 maxlength="100"

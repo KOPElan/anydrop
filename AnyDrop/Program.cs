@@ -64,7 +64,7 @@ using (var scope = app.Services.CreateScope())
     {
         db.Topics.Add(new Topic
         {
-            Id = new Guid("00000000-0000-0000-0000-000000000001"),
+            Id = Topic.BuiltInDefaultId,
             Name = "默认",
             IsBuiltIn = true,
             SortOrder = -1,
