@@ -2,7 +2,6 @@ using AnyDrop.Components;
 using AnyDrop.Api;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
-using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +21,6 @@ builder.Services.AddDbContext<AnyDropDbContext>(options =>
     options.UseSqlite($"Data Source={fullDbPath}"));
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IShareService, ShareService>();
-builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddEndpointsApiExplorer();
@@ -50,28 +48,13 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapHub<ShareHub>("/hubs/share");
 app.MapShareItemEndpoints();
-app.MapTopicEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
-    await db.MigrateWithCompatibilityAsync();
-
-    // 保障内置"默认"主题始终存在
-    if (!await db.Topics.AnyAsync(t => t.IsBuiltIn))
-    {
-        db.Topics.Add(new Topic
-        {
-            Id = Topic.BuiltInDefaultId,
-            Name = "默认",
-            IsBuiltIn = true,
-            SortOrder = -1,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await db.SaveChangesAsync();
-    }
+    await db.Database.MigrateAsync();
 }
 
 app.Run();
