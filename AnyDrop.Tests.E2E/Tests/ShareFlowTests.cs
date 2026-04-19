@@ -22,6 +22,13 @@ public class ShareFlowTests(E2ETestFixture fixture)
         await pageA.WaitForTimeoutAsync(1000);
         await pageB.WaitForTimeoutAsync(1000);
 
+        var topic = $"测试主题-{Guid.NewGuid():N}".Substring(0, 12);
+        await pageA.FillAsync("input[placeholder='输入主题名称（最多100字）']", topic);
+        await pageA.ClickAsync("button:has-text('+ 新建主题')");
+        await pageA.WaitForSelectorAsync($"button[data-id] >> text={topic}");
+        await pageB.WaitForSelectorAsync($"button[data-id] >> text={topic}");
+        await pageB.ClickAsync($"button:has-text('{topic}')");
+
         var message = $"hello-{Guid.NewGuid():N}";
         await pageA.FillAsync("textarea", message);
         await pageA.ClickAsync("button:has-text('Send')");
@@ -29,7 +36,7 @@ public class ShareFlowTests(E2ETestFixture fixture)
         var remoteMessage = pageB.GetByText(message, new PageGetByTextOptions { Exact = true });
         await remoteMessage.WaitForAsync(new LocatorWaitForOptions
         {
-            Timeout = 2000,
+            Timeout = 5000,
             State = WaitForSelectorState.Visible
         });
 

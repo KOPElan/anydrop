@@ -16,5 +16,7 @@ public sealed class ShareItem
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    public ShareItemDto ToDto() => new(Id, ContentType, Content, FileName, FileSize, MimeType, CreatedAt);
+    public Guid? TopicId { get; set; }
+
+    public ShareItemDto ToDto() => new(Id, ContentType, Content, FileName, FileSize, MimeType, CreatedAt, TopicId);
 }

@@ -15,7 +15,7 @@ public class ShareItemEndpointsTests
         var shareServiceMock = new Mock<IShareService>();
         var items = new List<ShareItemDto>
         {
-            new(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow)
+            new(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow, null)
         };
 
         shareServiceMock
@@ -37,7 +37,7 @@ public class ShareItemEndpointsTests
         var shareServiceMock = new Mock<IShareService>();
 
         var result = await ShareItemEndpoints.SendTextAsync(
-            new CreateTextShareItemRequest("  "),
+            new CreateTextShareItemRequest("  ", null),
             shareServiceMock.Object,
             CancellationToken.None);
 
@@ -46,21 +46,21 @@ public class ShareItemEndpointsTests
         badRequest.Value.Should().NotBeNull();
         badRequest.Value.Success.Should().BeFalse();
         badRequest.Value.Error.Should().Be("Content is required.");
-        shareServiceMock.Verify(x => x.SendTextAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        shareServiceMock.Verify(x => x.SendTextAsync(It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task SendTextAsync_ValidRequest_ReturnsOkEnvelope()
     {
         var shareServiceMock = new Mock<IShareService>();
-        var dto = new ShareItemDto(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow);
+        var dto = new ShareItemDto(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow, null);
 
         shareServiceMock
-            .Setup(x => x.SendTextAsync("hello", It.IsAny<CancellationToken>()))
+            .Setup(x => x.SendTextAsync("hello", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(dto);
 
         var result = await ShareItemEndpoints.SendTextAsync(
-            new CreateTextShareItemRequest("hello"),
+            new CreateTextShareItemRequest("hello", null),
             shareServiceMock.Object,
             CancellationToken.None);
 

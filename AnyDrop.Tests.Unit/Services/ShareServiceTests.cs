@@ -122,6 +122,11 @@ public class ShareServiceTests
         var hubContextMock = new Mock<IHubContext<ShareHub>>();
         hubContextMock.Setup(context => context.Clients).Returns(hubClientsMock.Object);
 
-        return new ShareService(dbContext, hubContextMock.Object);
+        var topicServiceMock = new Mock<ITopicService>();
+        topicServiceMock
+            .Setup(x => x.GetAllTopicsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TopicDto>());
+
+        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object);
     }
 }

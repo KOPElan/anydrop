@@ -9,8 +9,10 @@ namespace AnyDrop.Components.Pages;
 public partial class Home : IAsyncDisposable
 {
     [Inject] public required IShareService ShareService { get; set; }
+    [Inject] public required ITopicService TopicService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Home> Logger { get; set; }
+    [CascadingParameter] public Guid? SelectedTopicId { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
     private HubConnection? _hubConnection;
@@ -19,11 +21,20 @@ public partial class Home : IAsyncDisposable
     private string _inputText = string.Empty;
     private string? _validationError;
     private bool _isSending;
+    private Guid? _selectedTopicId;
 
     protected override async Task OnInitializedAsync()
     {
-        var recentItems = await ShareService.GetRecentAsync();
-        _messages.AddRange(recentItems);
+        await LoadSelectedTopicMessagesAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SelectedTopicId != _selectedTopicId)
+        {
+            _selectedTopicId = SelectedTopicId;
+            await LoadSelectedTopicMessagesAsync();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -40,8 +51,14 @@ public partial class Home : IAsyncDisposable
 
         _hubConnection.On<ShareItemDto>("ReceiveShareItem", dto =>
         {
-            _messages.Insert(0, dto);
-            return InvokeAsync(StateHasChanged);
+            return InvokeAsync(async () =>
+            {
+                if (_selectedTopicId.HasValue && dto.TopicId == _selectedTopicId)
+                {
+                    _messages.Insert(0, dto);
+                    StateHasChanged();
+                }
+            });
         });
 
         try
@@ -67,6 +84,12 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
+        if (!_selectedTopicId.HasValue)
+        {
+            _validationError = "请先选择主题。";
+            return;
+        }
+
         if (trimmedText.Length > 10_000)
         {
             _validationError = "Message cannot exceed 10,000 characters.";
@@ -76,8 +99,9 @@ public partial class Home : IAsyncDisposable
         _isSending = true;
         try
         {
-            await ShareService.SendTextAsync(trimmedText);
+            await ShareService.SendTextAsync(trimmedText, _selectedTopicId);
             _inputText = string.Empty;
+            await LoadSelectedTopicMessagesAsync();
         }
         finally
         {
@@ -114,10 +138,29 @@ public partial class Home : IAsyncDisposable
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
         while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
-            var latest = await ShareService.GetRecentAsync(ct: ct);
-            _messages.Clear();
-            _messages.AddRange(latest);
-            await InvokeAsync(StateHasChanged);
+            if (_selectedTopicId.HasValue)
+            {
+                await LoadSelectedTopicMessagesAsync(ct);
+                await InvokeAsync(StateHasChanged);
+            }
         }
+    }
+
+    private async Task LoadSelectedTopicMessagesAsync(CancellationToken ct = default)
+    {
+        _messages.Clear();
+        if (!_selectedTopicId.HasValue)
+        {
+            return;
+        }
+
+        var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
+        if (response is null)
+        {
+            _selectedTopicId = null;
+            return;
+        }
+
+        _messages.AddRange(response.Messages);
     }
 }
