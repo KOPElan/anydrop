@@ -25,8 +25,8 @@ description: "Task list for Feature 003-rich-media-chat: 富媒体聊天增强"
 - [ ] T001 [P] 在 `AnyDrop/AnyDrop.csproj` 中添加 `HtmlAgilityPack` NuGet 依赖（`dotnet add package HtmlAgilityPack`）
 - [ ] T002 [P] 在 `AnyDrop/AnyDrop.csproj` 中添加 `SkiaSharp` + `SkiaSharp.NativeAssets.Linux` NuGet 依赖
 - [ ] T003 [P] 在 `AnyDrop/appsettings.json` 和 `AnyDrop/appsettings.Development.json` 中新增 `Storage:MaxFileSizeBytes`（100MB）、`Storage:ThumbnailWidth`（320）、`LinkPreview:TimeoutSeconds`（5）、`LinkPreview:MaxResponseSizeBytes`（524288）配置节
-- [ ] T004 [P] 在 `Program.cs` 中注册 `builder.Services.AddHttpClient()` 供 `LinkPreviewService` 使用
-- [ ] T005 [P] 创建 `AnyDrop/wwwroot/js/dragdrop-interop.js` 骨架文件（空的 `window.AnyDropInterop` 对象，包含占位函数注释）
+- [X] T004 [P] 在 `Program.cs` 中注册 `builder.Services.AddHttpClient()` 供 `LinkPreviewService` 使用
+- [X] T005 [P] 创建 `AnyDrop/wwwroot/js/dragdrop-interop.js` 骨架文件（空的 `window.AnyDropInterop` 对象，包含占位函数注释）
 
 ---
 
@@ -44,9 +44,9 @@ description: "Task list for Feature 003-rich-media-chat: 富媒体聊天增强"
 
 ### 2b. 扩展现有模型
 
-- [ ] T009 修改 `AnyDrop/Models/Topic.cs`：新增 `IsPinned bool`（默认 false）和 `PinnedAt DateTimeOffset?` 字段
+- [X] T009 修改 `AnyDrop/Models/Topic.cs`：新增 `IsPinned bool`（默认 false）和 `PinnedAt DateTimeOffset?` 字段
 - [ ] T010 修改 `AnyDrop/Models/ShareItem.cs`：新增 `UploadStatus UploadStatus`（默认 `Completed`）、`ThumbnailPath string?`、`OriginalFileName string?` 字段及 `LinkPreview?`、`MediaMetadata?` 导航属性
-- [ ] T011 修改 `AnyDrop/Models/TopicDto.cs`：在 `TopicDto` record 末尾添加 `bool IsPinned` 和 `DateTimeOffset? PinnedAt` 参数；更新 `Topic.ToDto()` 映射
+- [X] T011 修改 `AnyDrop/Models/TopicDto.cs`：在 `TopicDto` record 末尾添加 `bool IsPinned` 和 `DateTimeOffset? PinnedAt` 参数；更新 `Topic.ToDto()` 映射
 - [ ] T012 修改 `AnyDrop/Models/ShareItemDto.cs`：在 `ShareItemDto` record 末尾添加 `UploadStatus UploadStatus`、`string? ThumbnailPath`、`string? OriginalFileName`、`LinkPreviewDto? LinkPreview`、`MediaMetadataDto? MediaMetadata`；更新 `ShareItem.ToDto()` 映射（需 Include 导航属性）
 
 ### 2c. DbContext 与 Migration
@@ -61,7 +61,7 @@ description: "Task list for Feature 003-rich-media-chat: 富媒体聊天增强"
 - [ ] T017 [P] 创建 `AnyDrop/Services/ILinkPreviewService.cs`（`Task<LinkMetaResult?> FetchMetaAsync(string url, CancellationToken ct)`）
 - [ ] T018 [P] 创建 `AnyDrop/Services/IThumbnailService.cs`（`Task<string?> GenerateImageThumbnailAsync(string storagePath, Guid itemId, CancellationToken ct)`；`Task<string?> GenerateVideoThumbnailAsync(string storagePath, Guid itemId, CancellationToken ct)`）
 - [ ] T019 修改 `AnyDrop/Services/IShareService.cs`：新增 `Task<ShareItemDto> SendMediaAsync(Stream fileStream, string originalFileName, string mimeType, ShareContentType contentType, Guid? topicId, CancellationToken ct)`、`Task<ShareItemDto> SendAttachmentAsync(Stream fileStream, string originalFileName, string mimeType, Guid? topicId, CancellationToken ct)`、`Task<ShareItemDto> RetryUploadAsync(Guid shareItemId, CancellationToken ct)` 方法签名
-- [ ] T020 修改 `AnyDrop/Services/ITopicService.cs`：新增 `Task<TopicDto> PinTopicAsync(Guid topicId, bool isPinned, CancellationToken ct)` 方法签名
+- [X] T020 修改 `AnyDrop/Services/ITopicService.cs`：新增 `Task<TopicDto> PinTopicAsync(Guid topicId, bool isPinned, CancellationToken ct)` 方法签名
 
 ### 2e. Hub 更新与 DI 注册
 
@@ -80,16 +80,16 @@ description: "Task list for Feature 003-rich-media-chat: 富媒体聊天增强"
 
 ### US1 单元测试
 
-- [ ] T023 [P] [US1] 在 `AnyDrop.Tests.Unit/Services/TopicServiceTests.cs` 中新增 `PinTopicAsync` 测试：`PinTopicAsync_WhenUnpinned_SetsPinnedTrue`、`PinTopicAsync_WhenAlreadyPinned_UnpinsAndClearsPinnedAt`、`PinTopicAsync_MultiplePinned_SortsByPinnedAtAscending`
-- [ ] T024 [P] [US1] 在 `AnyDrop.Tests.Unit/Services/TopicServiceTests.cs` 中新增 `GetAllTopicsAsync_WithMixedPinnedState_ReturnsPinnedFirst` 测试（验证 `IsPinned DESC, PinnedAt ASC, LastMessageAt DESC` 排序）
+- [X] T023 [P] [US1] 在 `AnyDrop.Tests.Unit/Services/TopicServiceTests.cs` 中新增 `PinTopicAsync` 测试：`PinTopicAsync_WhenUnpinned_SetsPinnedTrue`、`PinTopicAsync_WhenAlreadyPinned_UnpinsAndClearsPinnedAt`、`PinTopicAsync_MultiplePinned_SortsByPinnedAtAscending`
+- [X] T024 [P] [US1] 在 `AnyDrop.Tests.Unit/Services/TopicServiceTests.cs` 中新增 `GetAllTopicsAsync_WithMixedPinnedState_ReturnsPinnedFirst` 测试（验证 `IsPinned DESC, PinnedAt ASC, LastMessageAt DESC` 排序）
 
 ### US1 实现
 
-- [ ] T025 [US1] 在 `AnyDrop/Services/TopicService.cs` 中实现 `PinTopicAsync`：更新 `IsPinned`（true 时同步设置 `PinnedAt=UtcNow`；false 时清空 `PinnedAt`），保存，调用 `SendTopicsUpdatedAsync` 广播
-- [ ] T026 [US1] 更新 `AnyDrop/Services/TopicService.cs` 的 `GetAllTopicsAsync` 排序逻辑：`OrderByDescending(IsPinned).ThenBy(PinnedAt).ThenByDescending(LastMessageAt)`
-- [ ] T027 [US1] 在 `AnyDrop/Api/TopicEndpoints.cs` 中新增 `PUT /api/v1/topics/{id}/pin` Minimal API 端点（解析 `PinTopicRequest { bool IsPinned }`，调用 `ITopicService.PinTopicAsync`，返回 `ApiEnvelope` 包装的 `TopicDto`）
-- [ ] T028 [P] [US1] 在聊天区顶部（`AnyDrop/Components/Pages/Home.razor` 或独立 Header 组件）新增主题标题栏：显示当前 `TopicDto.Name`，使用 Tailwind `font-semibold text-lg border-b` 样式
-- [ ] T029 [US1] 在主题标题栏新增置顶切换按钮（Heroicons `bookmark-slash` / `bookmark` inline SVG，`@onclick` 调用 `PinTopicAsync`，按 `IsPinned` 切换图标及 active 样式）；置顶后通过 `TopicsUpdated` SignalR 事件自动更新侧边栏排序
+- [X] T025 [US1] 在 `AnyDrop/Services/TopicService.cs` 中实现 `PinTopicAsync`：更新 `IsPinned`（true 时同步设置 `PinnedAt=UtcNow`；false 时清空 `PinnedAt`），保存，调用 `SendTopicsUpdatedAsync` 广播
+- [X] T026 [US1] 更新 `AnyDrop/Services/TopicService.cs` 的 `GetAllTopicsAsync` 排序逻辑：`OrderByDescending(IsPinned).ThenBy(PinnedAt).ThenByDescending(LastMessageAt)`
+- [X] T027 [US1] 在 `AnyDrop/Api/TopicEndpoints.cs` 中新增 `PUT /api/v1/topics/{id}/pin` Minimal API 端点（解析 `PinTopicRequest { bool IsPinned }`，调用 `ITopicService.PinTopicAsync`，返回 `ApiEnvelope` 包装的 `TopicDto`）
+- [X] T028 [P] [US1] 在聊天区顶部（`AnyDrop/Components/Pages/Home.razor` 或独立 Header 组件）新增主题标题栏：显示当前 `TopicDto.Name`，使用 Tailwind `font-semibold text-lg border-b` 样式
+- [X] T029 [US1] 在主题标题栏新增置顶切换按钮（Heroicons `bookmark-slash` / `bookmark` inline SVG，`@onclick` 调用 `PinTopicAsync`，按 `IsPinned` 切换图标及 active 样式）；置顶后通过 `TopicsUpdated` SignalR 事件自动更新侧边栏排序
 
 **Checkpoint**: US1 可独立测试 — 主题标题栏显示、置顶排序生效、刷新持久化
 
@@ -103,8 +103,8 @@ description: "Task list for Feature 003-rich-media-chat: 富媒体聊天增强"
 
 ### US2 实现
 
-- [ ] T030 [US2] 在 `AnyDrop/Components/Pages/Home.razor` 的消息输入 `<textarea>` 上添加 `@onkeydown="HandleKeyDown"` 处理器；在 `@code` 块中实现 `HandleKeyDown(KeyboardEventArgs e)` — 仅当 `e.CtrlKey && e.Key == "Enter"` 且输入框非空时调用现有发送逻辑；空输入时无副作用
-- [ ] T031 [P] [US2] 确认 Enter（不含 Ctrl）在 `<textarea>` 中保持默认换行行为（无需代码变更，验证后在此任务打勾）
+- [X] T030 [US2] 在 `AnyDrop/Components/Pages/Home.razor` 的消息输入 `<textarea>` 上添加 `@onkeydown="HandleKeyDown"` 处理器；在 `@code` 块中实现 `HandleKeyDown(KeyboardEventArgs e)` — 仅当 `e.CtrlKey && e.Key == "Enter"` 且输入框非空时调用现有发送逻辑；空输入时无副作用
+- [X] T031 [P] [US2] 确认 Enter（不含 Ctrl）在 `<textarea>` 中保持默认换行行为（无需代码变更，验证后在此任务打勾）
 
 **Checkpoint**: US2 可独立验证 — Ctrl+Enter 发送；Enter 换行；空输入不发送
 
@@ -164,8 +164,8 @@ description: "Task list for Feature 003-rich-media-chat: 富媒体聊天增强"
 ### US4 实现 — 前端
 
 - [ ] T048 [US4] 在 `AnyDrop/wwwroot/js/dragdrop-interop.js` 中实现 `getDroppedFiles(event)` 函数：从 `event.dataTransfer.files` 提取文件名、大小、类型，序列化后供 Blazor `@ondrop` 处理器使用（注意：实际文件流需通过 `InputFile` 桥接，JS 仅获取 meta 信息用于路由判断）
-- [ ] T049 [P] [US4] 在 `AnyDrop/Components/Pages/Home.razor` 消息输入区新增多媒体选择按钮（Heroicons `photo` + `video-camera` SVG；`<InputFile>` 隐藏，`accept="image/*,video/*"` + `multiple`；点击按钮触发 `InputFile` 的 `click()`）
-- [ ] T050 [US4] 在 `Home.razor` 的消息输入区容器上添加拖拽处理：`@ondragenter:preventDefault @ondragover:preventDefault @ondrop="HandleDrop"`；进入时添加 Tailwind `ring-2 ring-blue-400` 高亮类，离开/放置时移除；`HandleDrop` 从 `DragEventArgs` 获取信息后调用文件路由逻辑
+- [X] T049 [P] [US4] 在 `AnyDrop/Components/Pages/Home.razor` 消息输入区新增多媒体选择按钮（Heroicons `photo` + `video-camera` SVG；`<InputFile>` 隐藏，`accept="image/*,video/*"` + `multiple`；点击按钮触发 `InputFile` 的 `click()`）
+- [X] T050 [US4] 在 `Home.razor` 的消息输入区容器上添加拖拽处理：`@ondragenter:preventDefault @ondragover:preventDefault @ondrop="HandleDrop"`；进入时添加 Tailwind `ring-2 ring-blue-400` 高亮类，离开/放置时移除；`HandleDrop` 从 `DragEventArgs` 获取信息后调用文件路由逻辑
 - [ ] T051 [P] [US4] 创建 `AnyDrop/Components/Layout/UploadProgressBubble.razor`：接收 `ShareItemDto` 参数；`Uploading` 状态显示转圈动画 + 文件名 + 大小；`Failed` 状态显示错误图标 + "上传失败" + 重试按钮（`@onclick` 触发 `POST /retry`）
 - [ ] T052 [US4] 在 `Home.razor` 中处理文件选择/放置后的逻辑：循环文件列表 → 判断类型（MIME → Image/Video/File）→ 调用对应 API 端点（`/media` 或 `/attachment`）→ 收到 `201` 后将 `ShareItemDto`（`UploadStatus=Uploading`）插入消息列表（渲染 `UploadProgressBubble`）
 - [ ] T053 [US4] 在 `Home.razor` 的 SignalR 事件处理中扩展 `ShareItemUpdated` 处理器：更新已存在消息的 `UploadStatus`、`ThumbnailPath`、`MediaMetadata`；切换气泡渲染从 `UploadProgressBubble` 到正常气泡（显示缩略图 `<img src="/api/v1/share-items/{id}/thumbnail">`）

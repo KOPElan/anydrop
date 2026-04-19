@@ -21,7 +21,11 @@ builder.Services.AddDbContext<AnyDropDbContext>(options =>
     options.UseSqlite($"Data Source={fullDbPath}"));
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IShareService, ShareService>();
+builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddSingleton<LinkMetadataService>();
+builder.Services.AddHttpClient();
+builder.Services.AddHostedService<ExpiredMessageCleanupService>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -48,6 +52,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapHub<ShareHub>("/hubs/share");
 app.MapShareItemEndpoints();
+app.MapTopicEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

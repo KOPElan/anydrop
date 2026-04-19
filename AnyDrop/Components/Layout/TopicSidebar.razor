@@ -1,54 +1,141 @@
 @* 侧边栏主体 *@
-<div class="flex h-full flex-col">
-    @* 标题栏 *@
-    <div class="flex items-center justify-between px-4 py-3">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">主题会话</h2>
+<div class="flex h-full flex-col" style="background-color: var(--color-surface-container-low);">
+
+    @* 品牌标题 *@
+    <div class="flex items-center gap-2.5 px-5 py-5">
+        <div class="flex h-8 w-8 items-center justify-center rounded-xl" style="background: linear-gradient(135deg, #0050cb, #0066ff);">
+            <span class="material-symbols-outlined text-white" style="font-size: 18px; font-variation-settings: 'FILL' 1;">sync_alt</span>
+        </div>
+        <span class="font-headline text-base font-extrabold" style="color: var(--color-on-surface);">AnyDrop</span>
+    </div>
+
+    @* ── 会话主题 ─────────────────────────── *@
+    <div class="px-5 pb-2 flex items-center justify-between">
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">会话主题</p>
+        @* 新建主题按钮（仅图标，移至标题右侧）*@
         <button type="button"
                 aria-label="新建主题"
-                class="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-indigo-600"
+                class="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-surface-container"
+                style="color: var(--color-on-surface-variant);"
                 @onclick="OpenCreateModal">
-            @* Heroicon: plus-circle outline *@
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
-            </svg>
+            <span class="material-symbols-outlined" style="font-size: 18px;">add</span>
         </button>
     </div>
 
     @* 主题列表 *@
-    @if (_topics.Count == 0)
-    {
-        <div class="sidebar-empty-state mx-3">暂无主题</div>
-    }
-    else
-    {
-        <div id="topic-list" class="flex-1 overflow-y-auto space-y-0.5 px-2 pb-2">
-            @foreach (var topic in _topics)
-            {
-                var isActive = _selectedTopicId == topic.Id;
-                <button
-                    type="button"
-                    data-id="@topic.Id"
-                    class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
-                    @onclick="() => SelectTopicAsync(topic.Id)">
-                    <div class="sidebar-item__header">
-                        <span class="sidebar-item__name">@topic.Name</span>
-                        @if (topic.LastMessageAt.HasValue)
-                        {
-                            <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
-                        }
-                    </div>
-                    <div class="sidebar-item__preview">
-                        @(topic.LastMessagePreview ?? "暂无消息")
-                    </div>
-                </button>
-            }
-        </div>
-    }
+    <div class="flex-1 overflow-y-auto px-3 pb-2">
+        @if (_topics.Count == 0)
+        {
+            <div class="sidebar-empty-state mx-1">暂无主题</div>
+        }
+        else
+        {
+            <div id="topic-list" class="space-y-0.5 mb-2">
+                @foreach (var topic in _topics)
+                {
+                    var isActive = _selectedTopicId == topic.Id;
+                    <button
+                        type="button"
+                        data-id="@topic.Id"
+                        class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
+                        @onclick="() => SelectTopicAsync(topic.Id)">
+                        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(isActive ? "1" : "0"); color: @(topic.IsPinned ? "var(--color-primary)" : "inherit");">
+                            @(topic.IsPinned ? "bookmark" : "chat_bubble")
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1">
+                                <span class="sidebar-item__name">@topic.Name</span>
+                                @if (topic.LastMessageAt.HasValue)
+                                {
+                                    <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
+                                }
+                            </div>
+                            <div class="sidebar-item__preview">
+                                @(topic.LastMessagePreview ?? "暂无消息")
+                            </div>
+                        </div>
+                    </button>
+                }
+            </div>
+        }
 
-    @if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <p class="px-4 py-2 text-xs text-red-600">@_error</p>
-    }
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <p class="px-2 py-1 mt-1 text-xs" style="color: var(--color-error);">@_error</p>
+        }
+
+        @* ── 已归档入口（不参与排序，固定在列表末尾）─────── *@
+        <button type="button"
+                class="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium transition-colors hover:bg-surface-container mt-1"
+                style="color: var(--color-on-surface-variant);"
+                @onclick="ToggleArchivedDropdownAsync">
+            <span class="material-symbols-outlined text-base">archive</span>
+            <span class="flex-1 text-left">已归档</span>
+            <span class="material-symbols-outlined text-sm transition-transform @(_showArchivedDropdown ? "rotate-180" : "")">expand_more</span>
+        </button>
+
+        @* 归档主题下拉列表 *@
+        @if (_showArchivedDropdown)
+        {
+            <div class="mt-0.5 space-y-0.5 pl-4">
+                @if (_archivedTopics.Count == 0)
+                {
+                    <div class="px-3 py-2 text-xs" style="color: var(--color-outline);">暂无归档主题</div>
+                }
+                else
+                {
+                    @foreach (var topic in _archivedTopics)
+                    {
+                        var isActive = _selectedTopicId == topic.Id;
+                        <button
+                            type="button"
+                            class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item opacity-70")"
+                            @onclick="() => SelectTopicAsync(topic.Id)">
+                            <span class="material-symbols-outlined text-base" style="font-size: 14px;">archive</span>
+                            <span class="sidebar-item__name text-xs">@topic.Name</span>
+                        </button>
+                    }
+                }
+            </div>
+        }
+    </div>
+
+    @* ── 在线设备（占位，无实际实现）──────────────── *@
+    <div class="px-5 pt-4 pb-2">
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">在线设备</p>
+    </div>
+    <div class="px-3 pb-4 space-y-0.5">
+        <div class="flex items-center gap-3 px-2 py-2 text-on-surface-variant">
+            <span class="material-symbols-outlined text-lg" style="color: #22c55e;">laptop_mac</span>
+            <div class="flex flex-col min-w-0">
+                <span class="text-sm font-medium leading-none text-on-surface truncate">当前设备</span>
+                <span class="text-[10px] font-bold" style="color: #22c55e;">在线</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 px-2 py-2 text-on-surface-variant opacity-50">
+            <span class="material-symbols-outlined text-lg">smartphone</span>
+            <div class="flex flex-col min-w-0">
+                <span class="text-sm font-medium leading-none truncate">手机</span>
+                <span class="text-[10px] font-bold">离线</span>
+            </div>
+        </div>
+    </div>
+
+    @* ── 底部功能按钮 ────────────────────────── *@
+    <div class="px-3 pb-4 pt-2 mt-auto space-y-0.5" style="border-top: 1px solid var(--color-outline-variant);">
+        <button type="button"
+                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
+                style="color: var(--color-on-surface-variant);">
+            <span class="material-symbols-outlined text-base">settings</span>
+            设置
+        </button>
+        <button type="button"
+                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
+                style="color: var(--color-error);">
+            <span class="material-symbols-outlined text-base">logout</span>
+            登出
+        </button>
+    </div>
 </div>
 
 @* 新建主题 Modal *@
@@ -60,14 +147,15 @@
             <input
                 id="topic-name-input"
                 aria-label="主题名称"
-                class="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none ring-indigo-200 transition focus:ring"
+                class="mt-3 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
                 placeholder="输入主题名称（最多100字）"
                 maxlength="100"
                 @bind="_newTopicName"
                 @ref="_modalInputRef" />
             @if (!string.IsNullOrWhiteSpace(_modalError))
             {
-                <p class="mt-1 text-xs text-red-600">@_modalError</p>
+                <p class="mt-1 text-xs" style="color: var(--color-error);">@_modalError</p>
             }
             <div class="modal-actions mt-4">
                 <button type="button" class="btn-secondary" @onclick="CloseCreateModal">取消</button>
@@ -76,3 +164,4 @@
         </div>
     </div>
 }
+

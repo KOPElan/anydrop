@@ -20,4 +20,16 @@ public sealed class Topic
 
     /// <summary>最新一条消息的预览文本（数据库限制 100 字符，写入时截断至 80 字符），由 ShareService 在写入消息时同步更新。</summary>
     public string? LastMessagePreview { get; set; }
+
+    /// <summary>是否置顶。</summary>
+    public bool IsPinned { get; set; }
+
+    /// <summary>置顶时间（用于置顶主题内排序）。</summary>
+    public DateTimeOffset? PinnedAt { get; set; }
+
+    /// <summary>是否已归档（归档后不参与主题排序，不在普通列表中显示）。</summary>
+    public bool IsArchived { get; set; }
+
+    /// <summary>归档时间。</summary>
+    public DateTimeOffset? ArchivedAt { get; set; }
 }

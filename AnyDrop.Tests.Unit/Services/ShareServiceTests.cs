@@ -5,6 +5,8 @@ using AnyDrop.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace AnyDrop.Tests.Unit.Services;
@@ -15,7 +17,7 @@ public class ShareServiceTests
     public async Task SendTextAsync_ValidContent_PersistsToDatabase()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out _);
 
         var dto = await service.SendTextAsync("hello world");
 
@@ -30,7 +32,7 @@ public class ShareServiceTests
     public async Task SendTextAsync_ValidContent_BroadcastsViaSignalR()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out var clientProxyMock);
+        var service = CreateService(dbContext, out var clientProxyMock, out _);
 
         var dto = await service.SendTextAsync("broadcast me");
 
@@ -51,7 +53,7 @@ public class ShareServiceTests
     public async Task SendTextAsync_EmptyContent_ThrowsArgumentException()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out _);
 
         var act = () => service.SendTextAsync("   ");
         await act.Should().ThrowAsync<ArgumentException>();
@@ -61,7 +63,7 @@ public class ShareServiceTests
     public async Task SendTextAsync_ContentExceeds10000Chars_ThrowsArgumentException()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out _);
         var content = new string('a', 10_001);
 
         var act = () => service.SendTextAsync(content);
@@ -72,7 +74,7 @@ public class ShareServiceTests
     public async Task SendTextAsync_ContentWithin10000CharsAfterTrim_PersistsTrimmedContent()
     {
         await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out _);
         var content = $"   {new string('a', 10_000)}   ";
 
         var dto = await service.SendTextAsync(content);
@@ -91,10 +93,33 @@ public class ShareServiceTests
             new ShareItem { Content = "third", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1), ContentType = ShareContentType.Text });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(dbContext, out _, out _);
         var result = await service.GetRecentAsync(2);
 
         result.Select(x => x.Content).Should().Equal("third", "second");
+    }
+
+    [Fact]
+    public async Task SendFileAsync_ImageMimeType_PersistsAsImageAndBroadcasts()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out var clientProxyMock, out _);
+
+        await using var stream = new MemoryStream([1, 2, 3]);
+        var dto = await service.SendFileAsync(stream, "photo.png", "image/png");
+
+        dto.ContentType.Should().Be(ShareContentType.Image);
+        dto.FileName.Should().Be("photo.png");
+        var entity = await dbContext.ShareItems.SingleAsync();
+        entity.ContentType.Should().Be(ShareContentType.Image);
+        entity.Content.Should().StartWith("saved/");
+
+        clientProxyMock.Verify(
+            proxy => proxy.SendCoreAsync(
+                "ReceiveShareItem",
+                It.IsAny<object?[]>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     private static AnyDropDbContext CreateDbContext()
@@ -106,7 +131,10 @@ public class ShareServiceTests
         return new AnyDropDbContext(options);
     }
 
-    private static ShareService CreateService(AnyDropDbContext dbContext, out Mock<IClientProxy> clientProxyMock)
+    private static ShareService CreateService(
+        AnyDropDbContext dbContext,
+        out Mock<IClientProxy> clientProxyMock,
+        out Mock<IFileStorageService> fileStorageServiceMock)
     {
         clientProxyMock = new Mock<IClientProxy>();
         clientProxyMock
@@ -127,6 +155,18 @@ public class ShareServiceTests
             .Setup(x => x.GetAllTopicsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<TopicDto>());
 
-        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object);
+        fileStorageServiceMock = new Mock<IFileStorageService>();
+        fileStorageServiceMock
+            .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("saved/file.bin");
+
+        // LinkMetadataService: 使用真实实例，但 HttpClientFactory 不会发起外部请求
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
+
+        // IServiceScopeFactory: fire-and-forget 中使用，测试中不需要实际调用
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+
+        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object, fileStorageServiceMock.Object, linkMetadataService, scopeFactoryMock.Object);
     }
 }

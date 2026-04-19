@@ -2,82 +2,306 @@
 @source "../**/*.razor";
 
 @theme {
-    --color-brand: #6366f1;
-    --color-brand-hover: #4f46e5;
-    --color-surface: #f9fafb;
-    --color-sidebar: #f3f4f6;
+    /* The Fluid Archive Design System */
+    --font-headline: "Manrope", sans-serif;
+    --font-body: "Inter", sans-serif;
+    --font-label: "Inter", sans-serif;
+
+    /* Primary */
+    --color-primary: #0050cb;
+    --color-primary-container: #0066ff;
+    --color-primary-fixed: #dae1ff;
+    --color-primary-fixed-dim: #b3c5ff;
+    --color-on-primary: #ffffff;
+    --color-on-primary-fixed: #001849;
+
+    /* Secondary */
+    --color-secondary: #425ca0;
+    --color-secondary-container: #9bb4fe;
+    --color-on-secondary: #ffffff;
+
+    /* Tertiary */
+    --color-tertiary: #a33200;
+    --color-on-tertiary: #ffffff;
+
+    /* Error */
+    --color-error: #ba1a1a;
+    --color-error-container: #ffdad6;
+    --color-on-error: #ffffff;
+
+    /* Surfaces */
+    --color-surface: #f8f9fa;
+    --color-surface-dim: #d9dadb;
+    --color-surface-variant: #e1e3e4;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f3f4f5;
+    --color-surface-container: #edeeef;
+    --color-surface-container-high: #e7e8e9;
+    --color-surface-container-highest: #e1e3e4;
+
+    /* On-surfaces */
+    --color-on-surface: #191c1d;
+    --color-on-surface-variant: #424656;
+    --color-inverse-surface: #2e3132;
+    --color-inverse-on-surface: #f0f1f2;
+
+    /* Outline */
+    --color-outline: #727687;
+    --color-outline-variant: #c2c6d8;
+
+    /* Background */
+    --color-background: #f8f9fa;
+    --color-on-background: #191c1d;
+
+    /* Legacy compat */
+    --color-brand: #0050cb;
+    --color-brand-hover: #0040a0;
+    --color-sidebar: #f3f4f5;
+
+    /* ── 磨砂玻璃共用变量 ── */
+    --glass-blur: blur(20px) saturate(180%);
+    --glass-border-color: rgba(194, 198, 216, 0.35);
+    --glass-header-bg: rgba(248, 249, 250, 0.75);
+    --glass-footer-bg: rgba(243, 244, 245, 0.80);
+
+    /* ── 共用缓动曲线 ── */
+    --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);       /* 弹簧感：用于消息入场、modal 弹出 */
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);    /* 轻微过冲：用于 pill 指示条扩展 */
 }
 
+/* Blazor 错误 UI — 默认隐藏，发生错误时由 Blazor JS 显示 */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fef9c3;
+    border-top: 1px solid #ca8a04;
+    padding: 0.5rem 1.5rem;
+    z-index: 9999;
+    font-size: 0.875rem;
+    color: #1c1917;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    float: right;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e1e3e4; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #c2c6d8; }
+
+/* ═══════════════════════════════════════
+   动画关键帧定义
+═══════════════════════════════════════ */
+
+/* 消息气泡入场：从下方淡入上移 */
+@keyframes message-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Modal 背景淡入 */
+@keyframes overlay-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Modal 内容弹入（从下方缩放弹出） */
+@keyframes modal-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(24px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 侧边栏激活指示条扩展 */
+@keyframes pill-expand {
+    from { height: 0; opacity: 0; }
+    to   { height: 60%; opacity: 1; }
+}
 @layer base {
     html,
     body {
-        @apply h-full antialiased bg-[var(--color-surface)];
+        @apply h-full antialiased;
+        background-color: var(--color-surface);
+        font-family: var(--font-body);
     }
 }
 
 @layer components {
     .btn-primary {
-        @apply rounded-lg bg-[var(--color-brand)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-brand-hover)] disabled:cursor-not-allowed disabled:opacity-60;
+        @apply rounded-full px-5 py-2 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60;
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        filter: brightness(1.1);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 80, 203, 0.3);
+    }
+
+    .btn-primary:active:not(:disabled) {
+        transform: translateY(0) scale(0.97);
+        box-shadow: none;
     }
 
     .btn-secondary {
-        @apply rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60;
+        @apply rounded-full px-5 py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60;
+        color: var(--color-on-surface-variant);
     }
 
-    /* 侧边栏主题项 */
+    .btn-secondary:hover:not(:disabled) {
+        background-color: var(--color-surface-container);
+        transform: translateY(-1px);
+    }
+
+    /* ─── 侧边栏主题项 ─── */
     .sidebar-item {
-        @apply w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/80 cursor-pointer;
+        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-left;
+        color: var(--color-on-surface-variant);
+        /* 过渡：背景色 + 颜色 + 轻微位移 */
+        transition: background-color 200ms ease, color 200ms ease, transform 150ms ease;
+    }
+
+    .sidebar-item:hover {
+        background-color: var(--color-surface-container);
+        transform: translateX(2px);
     }
 
     .sidebar-item--active {
-        @apply bg-white shadow-sm ring-1 ring-indigo-200 hover:bg-white;
+        color: var(--color-primary);
+        font-weight: 600;
+        background-color: var(--color-primary-fixed);
     }
 
-    .sidebar-item__header {
-        @apply flex items-center gap-1;
+    /* 激活时的左侧指示条，带弹入动画 */
+    .sidebar-item--active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 60%;
+        background-color: var(--color-primary);
+        border-radius: 0 4px 4px 0;
+        animation: pill-expand 250ms var(--ease-bounce) both;
     }
 
     .sidebar-item__name {
-        @apply flex-1 truncate text-sm font-medium text-gray-800;
-    }
-
-    .sidebar-item--active .sidebar-item__name {
-        @apply text-indigo-700;
+        @apply flex-1 truncate text-sm;
     }
 
     .sidebar-item__time {
-        @apply shrink-0 text-[11px] text-gray-400;
+        @apply shrink-0 text-[11px];
+        color: var(--color-outline);
     }
 
     .sidebar-item__preview {
-        @apply mt-0.5 truncate text-xs text-gray-500;
+        @apply truncate text-xs;
+        color: var(--color-outline);
     }
 
     .sidebar-empty-state {
-        @apply rounded-lg border border-dashed border-gray-300 p-4 text-xs text-gray-500;
+        @apply rounded-xl border border-dashed p-4 text-xs;
+        border-color: var(--color-outline-variant);
+        color: var(--color-on-surface-variant);
     }
 
-    /* Modal */
+    /* ─── Modal 动画 ─── */
     .modal-overlay {
         @apply fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm;
+        animation: overlay-in 200ms ease both;
     }
 
     .modal-content {
-        @apply w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl mx-4;
+        @apply w-full max-w-sm rounded-2xl p-6 shadow-xl mx-4;
+        background-color: var(--color-surface-container-lowest);
+        animation: modal-slide-up 280ms var(--ease-bounce) both;
     }
 
     .modal-title {
-        @apply text-base font-semibold text-gray-800;
+        @apply text-base font-semibold;
+        color: var(--color-on-surface);
+        font-family: var(--font-headline);
     }
 
     .modal-actions {
         @apply flex justify-end gap-2;
     }
 
+    /* ─── 消息气泡出现动画 ─── */
+    .message-bubble {
+        animation: message-in 320ms var(--ease-spring) both;
+    }
+
+    /* ─── 消息气泡 hover 高亮 ─── */
+    .message-bubble:hover {
+        /* 轻微上移 + 阴影增强，给明确的 hover 焦点提示 */
+        transform: translateY(-1px);
+        transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+
+    /* 文本消息气泡 hover */
+    .bubble-text:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    /* 链接卡片 hover */
+    .bubble-link:hover {
+        box-shadow: 0 6px 20px rgba(0, 80, 203, 0.12);
+    }
+
+    /* 文件/图片/视频气泡 hover */
+    .bubble-file:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+    }
+
+    /* ─── 消息列表：使用 CSS 变量统一控制顶/底留白，与玻璃栏高度一致 ─── */
+    .chat-message-list {
+        /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
+        --chat-header-h: 72px;
+        --chat-footer-h: 110px;
+        padding-top: var(--chat-header-h);
+        padding-bottom: var(--chat-footer-h);
+    }
+
+    /* ─── 磨砂玻璃顶栏 ─── */
+    .chat-header-glass {
+        background: var(--glass-header-bg);
+        /* 直接内联值，避免 CSS 变量引用 backdrop-filter 函数时的浏览器兼容问题 */
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border-bottom: 1px solid var(--glass-border-color);
+    }
+
+    /* ─── 磨砂玻璃底部输入区 ─── */
+    .chat-footer-glass {
+        background: var(--glass-footer-bg);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border-top: 1px solid var(--glass-border-color);
+    }
+
     /* 整体布局 */
     .app-shell {
         @apply grid h-screen;
-        grid-template-columns: 15rem 1fr;
+        grid-template-columns: 16rem 1fr;
     }
 
     @media (max-width: 768px) {

@@ -8,12 +8,18 @@ public sealed record TopicDto(
     DateTimeOffset? LastMessageAt,
     int MessageCount,
     bool IsBuiltIn,
-    string? LastMessagePreview
+    string? LastMessagePreview,
+    bool IsPinned,
+    DateTimeOffset? PinnedAt,
+    bool IsArchived,
+    DateTimeOffset? ArchivedAt
 );
 
 public sealed record CreateTopicRequest(string Name);
 
 public sealed record UpdateTopicRequest(string Name);
+public sealed record PinTopicRequest(bool IsPinned);
+public sealed record ArchiveTopicRequest(bool IsArchived);
 
 public sealed record ReorderTopicsRequest(IReadOnlyList<TopicOrderItem> Items);
 

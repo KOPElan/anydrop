@@ -3,6 +3,7 @@ using System;
 using AnyDrop.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AnyDrop.Migrations
 {
     [DbContext(typeof(AnyDropDbContext))]
-    partial class AnyDropDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260419060502_AddTopicPinning")]
+    partial class AddTopicPinning
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -34,21 +37,12 @@ namespace AnyDrop.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("FileName")
                         .HasMaxLength(260)
                         .HasColumnType("TEXT");
 
                     b.Property<long?>("FileSize")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("LinkDescription")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LinkTitle")
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("MimeType")
                         .HasMaxLength(127)
@@ -61,8 +55,6 @@ namespace AnyDrop.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("ExpiresAt");
-
                     b.HasIndex("TopicId", "CreatedAt");
 
                     b.ToTable("ShareItems");
@@ -74,14 +66,8 @@ namespace AnyDrop.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("ArchivedAt")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsBuiltIn")
                         .HasColumnType("INTEGER");
@@ -112,8 +98,6 @@ namespace AnyDrop.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("IsBuiltIn");
-
-                    b.HasIndex("IsArchived", "ArchivedAt");
 
                     b.HasIndex("SortOrder", "LastMessageAt");
 

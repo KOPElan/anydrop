@@ -15,7 +15,7 @@ public class ShareItemEndpointsTests
         var shareServiceMock = new Mock<IShareService>();
         var items = new List<ShareItemDto>
         {
-            new(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow, null)
+            new(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, null, null, DateTimeOffset.UtcNow, null, null)
         };
 
         shareServiceMock
@@ -46,17 +46,17 @@ public class ShareItemEndpointsTests
         badRequest.Value.Should().NotBeNull();
         badRequest.Value.Success.Should().BeFalse();
         badRequest.Value.Error.Should().Be("Content is required.");
-        shareServiceMock.Verify(x => x.SendTextAsync(It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+        shareServiceMock.Verify(x => x.SendTextAsync(It.IsAny<string>(), It.IsAny<Guid?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task SendTextAsync_ValidRequest_ReturnsOkEnvelope()
     {
         var shareServiceMock = new Mock<IShareService>();
-        var dto = new ShareItemDto(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, DateTimeOffset.UtcNow, null);
+        var dto = new ShareItemDto(Guid.NewGuid(), ShareContentType.Text, "hello", null, null, null, null, null, DateTimeOffset.UtcNow, null, null);
 
         shareServiceMock
-            .Setup(x => x.SendTextAsync("hello", null, It.IsAny<CancellationToken>()))
+            .Setup(x => x.SendTextAsync("hello", null, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(dto);
 
         var result = await ShareItemEndpoints.SendTextAsync(

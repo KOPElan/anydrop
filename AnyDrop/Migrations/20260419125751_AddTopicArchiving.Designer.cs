@@ -3,6 +3,7 @@ using System;
 using AnyDrop.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AnyDrop.Migrations
 {
     [DbContext(typeof(AnyDropDbContext))]
-    partial class AnyDropDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260419125751_AddTopicArchiving")]
+    partial class AddTopicArchiving
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -32,9 +35,6 @@ namespace AnyDrop.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FileName")
@@ -60,8 +60,6 @@ namespace AnyDrop.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
-
-                    b.HasIndex("ExpiresAt");
 
                     b.HasIndex("TopicId", "CreatedAt");
 
