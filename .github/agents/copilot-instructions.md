@@ -30,10 +30,9 @@ tests/
 C# 13 / .NET 10.0: Follow standard conventions
 
 ## Recent Changes
+- main: Added [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION] + [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
 - 003-rich-media-chat: Added HtmlAgilityPack (链接 meta 解析) + SkiaSharp (图片缩略图) + IHostedService+Channel<T> 后台任务队列 + LinkPreview/MediaMetadata 新实体 + 文件上传异步状态机
 - main: Added [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION] + [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
-- speckit/002-topic-session-sidebar: Added C# 13 / .NET 10 + Blazor Server (Interactive Server), EF Core 10 + SQLite, SignalR, SortableJS (CDN), Tailwind CSS v4
-- main: Added C# 13 / .NET 10 + Blazor Server (Interactive Server), EF Core 10.x + SQLite, SignalR (built-in), Tailwind CSS v4 (CLI build)
 
 
 <!-- MANUAL ADDITIONS START -->
