@@ -20,9 +20,11 @@ AnyDropInterop.setupDropZone = function (element, dotNetRef) {
 
   let isDragging = false;
   let leaveTimer = null;
+  let dragCounter = 0; // Track dragenter/dragleave pairs to handle child elements
 
   function onDragEnter(e) {
     if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+    dragCounter++;
     clearTimeout(leaveTimer);
     if (!isDragging) {
       isDragging = true;
@@ -31,13 +33,17 @@ AnyDropInterop.setupDropZone = function (element, dotNetRef) {
   }
 
   function onDragLeave() {
+    dragCounter--;
     clearTimeout(leaveTimer);
-    leaveTimer = setTimeout(() => {
-      if (isDragging) {
-        isDragging = false;
-        dotNetRef.invokeMethodAsync('SetDragging', false);
-      }
-    }, 50);
+    // Only hide the overlay when all drag events have left
+    if (dragCounter === 0) {
+      leaveTimer = setTimeout(() => {
+        if (isDragging && dragCounter === 0) {
+          isDragging = false;
+          dotNetRef.invokeMethodAsync('SetDragging', false);
+        }
+      }, 50);
+    }
   }
 
   function onDragOver(e) {
@@ -49,6 +55,7 @@ AnyDropInterop.setupDropZone = function (element, dotNetRef) {
   function onDrop(e) {
     e.preventDefault();
     clearTimeout(leaveTimer);
+    dragCounter = 0; // Reset counter on drop
     if (isDragging) {
       isDragging = false;
       dotNetRef.invokeMethodAsync('SetDragging', false);

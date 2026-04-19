@@ -257,6 +257,11 @@
         transition: transform 150ms ease, box-shadow 150ms ease;
     }
 
+    /* ─── 阅后即焚消息背景标识 ─── */
+    .burn-after-reading > div {
+        background: linear-gradient(to right, rgba(255, 218, 214, 0.3), transparent 20%) !important;
+    }
+
     /* 文本消息气泡 hover */
     .bubble-text:hover {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -276,7 +281,7 @@
     .chat-message-list {
         /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
         --chat-header-h: 72px;
-        --chat-footer-h: 110px;
+        --chat-footer-h: 140px;
         padding-top: var(--chat-header-h);
         padding-bottom: var(--chat-footer-h);
     }
