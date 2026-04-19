@@ -115,6 +115,7 @@ public sealed class ShareService(
         string fileName,
         string mimeType,
         Guid? topicId = null,
+        long? knownFileSize = null,
         CancellationToken ct = default)
     {
         if (fileStream is null)
@@ -145,13 +146,16 @@ public sealed class ShareService(
             }
         }
 
+        // 优先使用调用方传入的已知大小，其次尝试从流读取（仅当流支持 Seek）
+        var fileSize = knownFileSize ?? (fileStream.CanSeek ? fileStream.Length : null);
+
         var now = DateTimeOffset.UtcNow;
         var item = new ShareItem
         {
             ContentType = contentType,
             Content = storagePath,
             FileName = fileName,
-            FileSize = fileStream.CanSeek ? fileStream.Length : null,
+            FileSize = fileSize,
             MimeType = mimeType,
             CreatedAt = now,
             TopicId = topicId

@@ -21,7 +21,6 @@ public partial class TopicSidebar : IAsyncDisposable
     private IDisposable? _topicsUpdatedSubscription;
     private DotNetObjectReference<TopicSidebar>? _dotNetRef;
     private Guid? _selectedTopicId;
-    private bool _sortableInitialized;
 
     // 排序错误提示
     private string? _error;
@@ -40,14 +39,12 @@ public partial class TopicSidebar : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_topics.Count == 0 || _sortableInitialized)
-        {
-            return;
-        }
+        // 每次渲染后重新初始化 SortableJS，确保拖拽排序在任何状态变化后仍能正确工作。
+        // initSortable 内部会先 destroy 旧实例再 create 新实例，避免重复绑定。
+        if (_topics.Count == 0) return;
 
         _dotNetRef ??= DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync("initSortable", "topic-list", _dotNetRef);
-        _sortableInitialized = true;
     }
 
     private void OpenCreateModal()
@@ -100,12 +97,21 @@ public partial class TopicSidebar : IAsyncDisposable
     }
 
     [JSInvokable]
-    public async Task OnSortEnd(Guid[] orderedIds)
+    public async Task OnSortEnd(string[] orderedIdStrings)
     {
-        if (orderedIds.Length == 0)
+        if (orderedIdStrings.Length == 0)
         {
             return;
         }
+
+        // 解析字符串 ID 为 Guid，过滤无效值
+        var orderedIds = orderedIdStrings
+            .Select(s => Guid.TryParse(s, out var g) ? g : (Guid?)null)
+            .Where(g => g.HasValue)
+            .Select(g => g!.Value)
+            .ToArray();
+
+        if (orderedIds.Length == 0) return;
 
         _error = null;
         var snapshot = _topics.ToList();
@@ -185,7 +191,7 @@ public partial class TopicSidebar : IAsyncDisposable
     {
         _topicsUpdatedSubscription?.Dispose();
 
-        if (_sortableInitialized)
+        if (_topics.Count > 0)
         {
             try
             {
@@ -206,3 +212,4 @@ public partial class TopicSidebar : IAsyncDisposable
         }
     }
 }
+

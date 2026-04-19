@@ -35,6 +35,9 @@ public partial class Home : IAsyncDisposable
     private string? _selectedTopicName;
     private bool _selectedTopicPinned;
 
+    // 图片大图预览 Modal
+    private string? _previewImageUrl;
+
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
     private DotNetObjectReference<Home>? _dotNetRef;
@@ -78,14 +81,25 @@ public partial class Home : IAsyncDisposable
 
             _hubConnection.On<ShareItemDto>("ReceiveShareItem", dto =>
             {
-                return InvokeAsync(async () =>
+                return InvokeAsync(() =>
                 {
-                    // 只处理当前主题的消息，且 O(1) 去重，避免与主动刷新产生重复
-                    if (_selectedTopicId.HasValue
-                        && dto.TopicId == _selectedTopicId
-                        && _messageIds.Add(dto.Id))
+                    // 只处理当前主题的消息
+                    if (!_selectedTopicId.HasValue || dto.TopicId != _selectedTopicId)
+                        return;
+
+                    // 若消息已存在（如链接元数据后台更新），就地替换气泡内容
+                    var existingIndex = _messages.FindIndex(m => m.Id == dto.Id);
+                    if (existingIndex >= 0)
                     {
-                        _messages.Add(dto); // 追加到末尾，保持时间升序（最新在底）
+                        _messages[existingIndex] = dto;
+                        StateHasChanged();
+                        return;
+                    }
+
+                    // 新消息：O(1) 去重后追加到末尾，保持时间升序
+                    if (_messageIds.Add(dto.Id))
+                    {
+                        _messages.Add(dto);
                         _shouldScrollToBottom = true;
                         StateHasChanged();
                     }
@@ -200,16 +214,6 @@ public partial class Home : IAsyncDisposable
     }
 
     /// <summary>
-    /// 文件拖放到聊天区域时触发（由覆盖层 InputFile 处理）。
-    /// 关闭拖放覆盖层后转交给 OnFilesSelected 处理。
-    /// </summary>
-    private async Task OnFilesDropped(InputFileChangeEventArgs args)
-    {
-        _isDragging = false;
-        await OnFilesSelected(args);
-    }
-
-    /// <summary>
     /// 由 JS 拖放处理逻辑回调，通知 .NET 端切换拖放覆盖层显示状态。
     /// </summary>
     [JSInvokable]
@@ -217,6 +221,59 @@ public partial class Home : IAsyncDisposable
     {
         _isDragging = isDragging;
         return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// 由 JS 拖放事件回调：将拖入的文件通过 IJSStreamReference 流式发送，不触发文件对话框。
+    /// </summary>
+    [JSInvokable]
+    public async Task ReceiveDroppedFile(string fileName, string mimeType, long fileSize, IJSStreamReference streamRef)
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            _validationError = "请先选择主题。";
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _validationError = null;
+        _isSending = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
+            var safeMimeType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType;
+
+            await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
+            await ShareService.SendFileAsync(stream, fileName, safeMimeType, _selectedTopicId.Value,
+                knownFileSize: fileSize > 0 ? fileSize : null);
+
+            await LoadSelectedTopicMessagesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to receive dropped file {FileName}", fileName);
+            _validationError = "文件上传失败，请重试。";
+        }
+        finally
+        {
+            _isSending = false;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>打开图片大图预览 Modal。</summary>
+    private void OpenImagePreview(string url)
+    {
+        _previewImageUrl = url;
+    }
+
+    /// <summary>关闭图片大图预览 Modal。</summary>
+    private void CloseImagePreview()
+    {
+        _previewImageUrl = null;
     }
 
     public async ValueTask DisposeAsync()
@@ -331,4 +388,12 @@ public partial class Home : IAsyncDisposable
             _ => $"{bytes / (1024.0 * 1024 * 1024):F1} GB"
         };
     }
+
+    /// <summary>将消息时间格式化为「日期 + 时间」字符串。</summary>
+    private static string FormatMessageTime(DateTimeOffset time)
+    {
+        var local = time.ToLocalTime();
+        return local.ToString("yyyy/MM/dd HH:mm");
+    }
 }
+

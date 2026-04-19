@@ -84,7 +84,9 @@
 
                         case ShareContentType.Image:
                             <div class="bg-surface-container-lowest p-3 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                                <div class="rounded-xl overflow-hidden mb-3">
+                                @* 点击图片在 Modal 中预览原图 *@
+                                <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
+                                     @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
                                     <img class="max-h-72 w-full object-contain"
                                          src="@GetFileUrl(message.Id)"
                                          alt="@message.FileName" />
@@ -165,27 +167,43 @@
                             </div>
                             break;
                     }
+                    @* 消息时间：显示完整日期 + 时间 *@
                     <div class="mt-2 ml-1 flex items-center gap-1.5 text-[11px] font-bold text-primary">
                         <span class="material-symbols-outlined" style="font-size: 12px;">schedule</span>
-                        @message.CreatedAt.ToLocalTime().ToString("HH:mm")
+                        @FormatMessageTime(message.CreatedAt)
                     </div>
                 </div>
             }
         }
     </div>
 
-    @* ─────────── 拖放覆盖层（整个聊天框作为拖放目标）─────────── *@
+    @* ─────────── 拖放覆盖层（纯视觉提示，pointer-events-none 确保 drop 事件透传到聊天区域）─────────── *@
     @if (_isDragging)
     {
-        <div class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
+        <div class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 pointer-events-none"
              style="background: rgba(0,80,203,0.08); backdrop-filter: blur(4px);">
-            <div class="pointer-events-none flex flex-col items-center gap-3 text-primary">
+            <div class="flex flex-col items-center gap-3 text-primary">
                 <span class="material-symbols-outlined text-6xl" style="font-variation-settings: 'FILL' 1;">upload_file</span>
-                <p class="text-lg font-bold font-headline">拖放文件到此处发送</p>
+                <p class="text-lg font-bold font-headline">松开即可发送文件</p>
             </div>
-            <InputFile class="absolute inset-0 h-full w-full cursor-copy opacity-0"
-                       multiple
-                       OnChange="OnFilesDropped" />
+        </div>
+    }
+
+    @* ─────────── 图片大图预览 Modal ─────────── *@
+    @if (_previewImageUrl is not null)
+    {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+             @onclick="CloseImagePreview">
+            <button type="button"
+                    class="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                    @onclick:stopPropagation
+                    @onclick="CloseImagePreview">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <img class="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
+                 src="@_previewImageUrl"
+                 alt="图片预览"
+                 @onclick:stopPropagation />
         </div>
     }
 
@@ -241,3 +259,4 @@
     </footer>
 
 </section>
+
