@@ -151,6 +151,7 @@ app.Use(async (context, next) =>
     var path = context.Request.Path.Value ?? string.Empty;
     var isStaticAssetRequest = Path.HasExtension(path);
     if (path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/js", StringComparison.OrdinalIgnoreCase) ||
@@ -202,7 +203,8 @@ app.MapTopicEndpoints();
 app.MapAuthEndpoints();
 app.MapSettingsEndpoints();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AllowAnonymous();
 
 await app.Services.MigrateAndSeedAsync();
 
