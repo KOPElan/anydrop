@@ -61,6 +61,10 @@ public partial class Home : IAsyncDisposable
     // 阅后即焚模式
     private bool _burnAfterReading;
 
+    // 从搜索页返回时，待高亮的消息 ID
+    private Guid? _pendingHighlightId;
+    private bool _shouldHighlight;
+
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
     private DotNetObjectReference<Home>? _dotNetRef;
@@ -68,7 +72,22 @@ public partial class Home : IAsyncDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        // 读取 highlight 查询参数（从搜索页跳转过来时定位消息）
+        var uri = new Uri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("highlight", out var h) && Guid.TryParse(h, out var gid))
+        {
+            _pendingHighlightId = gid;
+        }
+
         await LoadSelectedTopicMessagesAsync();
+
+        // 若有待高亮消息，不滚到底部，改为滚到目标消息
+        if (_pendingHighlightId.HasValue)
+        {
+            _shouldScrollToBottom = false;
+            _shouldHighlight = true;
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -163,6 +182,34 @@ public partial class Home : IAsyncDisposable
             catch (InvalidOperationException ex)
             {
                 Logger.LogDebug(ex, "JS interop not available during scrollToBottom.");
+            }
+        }
+
+        // 从搜索页跳转回来时，滚动并高亮目标消息
+        if (_shouldHighlight && _pendingHighlightId.HasValue)
+        {
+            _shouldHighlight = false;
+            var targetId = _pendingHighlightId.Value;
+            _pendingHighlightId = null;
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.scrollToMessage", targetId.ToString());
+            }
+            catch (JSDisconnectedException)
+            {
+                Logger.LogDebug("JS interop disconnected during scrollToMessage.");
+            }
+            catch (TaskCanceledException)
+            {
+                Logger.LogDebug("scrollToMessage was cancelled.");
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Logger.LogDebug(ex, "JS runtime disposed during scrollToMessage.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogDebug(ex, "JS interop not available during scrollToMessage.");
             }
         }
     }

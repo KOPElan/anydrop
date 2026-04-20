@@ -1,0 +1,534 @@
+@page "/search/{TopicId:guid}"
+@attribute [Authorize]
+
+<PageTitle>搜索 · @(_topicName ?? "主题") — AnyDrop</PageTitle>
+
+@*
+    主题搜索页：
+    顶部固定磨砂玻璃栏（返回按钮 + 主题名 + 搜索输入）
+    中部标签栏（文字 | 日期 | 图片 | 视频 | 文件 | 链接）
+    内容区（随标签页动态渲染）
+*@
+<section class="relative h-full overflow-hidden bg-surface">
+
+    @* ─── 顶部标题栏 ─── *@
+    <header class="absolute inset-x-0 top-0 z-40 flex items-center gap-3 px-4 py-3 chat-header-glass">
+        <a href="/"
+           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+           title="返回聊天">
+            <span class="material-symbols-outlined" style="font-size: 22px;">arrow_back</span>
+        </a>
+        <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 leading-none mb-0.5">搜索</p>
+            <h2 class="font-headline font-bold text-on-surface text-base leading-tight truncate">
+                @(_topicName ?? "主题")
+            </h2>
+        </div>
+    </header>
+
+    @* ─── 搜索区 + 标签栏 + 内容（均在可滚动容器内）─── *@
+    <div class="absolute inset-0 overflow-y-auto" style="padding-top: 72px;">
+
+        @* ─── 标签页选择栏 ─── *@
+        <div class="sticky top-0 z-30 bg-surface border-b px-4 py-2 flex gap-1 overflow-x-auto"
+             style="border-color: var(--color-outline-variant);">
+            @foreach (var tab in new[] {
+                ("text", "search", "文字"),
+                ("date", "calendar_today", "日期"),
+                ("image", "image", "图片"),
+                ("video", "videocam", "视频"),
+                ("file", "description", "文件"),
+                ("link", "link", "链接")
+            })
+            {
+                var isActive = _activeTab == tab.Item1;
+                <button type="button"
+                        class="flex items-center gap-1.5 shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+                        style="@(isActive
+                            ? "background: var(--color-primary-fixed); color: var(--color-primary);"
+                            : "color: var(--color-on-surface-variant);")"
+                        @onclick="() => SwitchTabAsync(tab.Item1)">
+                    <span class="material-symbols-outlined" style="font-size: 15px;">@tab.Item2</span>
+                    @tab.Item3
+                </button>
+            }
+        </div>
+
+        @* ═══════════════════ 文字搜索 ═══════════════════ *@
+        @if (_activeTab == "text")
+        {
+            <div class="px-4 pt-4 pb-2">
+                <div class="flex gap-2">
+                    <input class="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                           style="border-color: var(--color-outline-variant); background: var(--color-surface-container-lowest); color: var(--color-on-surface);"
+                           type="search"
+                           placeholder="搜索消息内容…"
+                           maxlength="200"
+                           @bind="_searchQuery"
+                           @bind:event="oninput"
+                           @onkeydown="HandleSearchKeyDown" />
+                    <button type="button"
+                            class="btn-primary shrink-0 flex items-center gap-1.5"
+                            disabled="@(_isSearching || string.IsNullOrWhiteSpace(_searchQuery))"
+                            @onclick="RunSearchAsync">
+                        @if (_isSearching)
+                        {
+                            <span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span>
+                        }
+                        else
+                        {
+                            <span class="material-symbols-outlined" style="font-size: 16px;">search</span>
+                        }
+                        搜索
+                    </button>
+                </div>
+            </div>
+
+            @if (!_searchPerformed)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">manage_search</span>
+                    <p class="text-sm text-on-surface-variant">输入关键词后按回车或点击搜索</p>
+                </div>
+            }
+            else if (_searchResults.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">search_off</span>
+                    <p class="text-sm text-on-surface-variant">未找到包含「@_searchQuery」的消息</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-2 space-y-2">
+                    <p class="text-xs text-on-surface-variant/60 px-1">共 @_searchResults.Count 条结果@(_searchHasMore ? "（显示最新部分）" : "")</p>
+                    @foreach (var msg in _searchResults)
+                    {
+                        <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
+                             @key="msg.Id"
+                             @onclick="() => NavigateToMessage(msg.Id)">
+                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                                 style="background: var(--color-primary-fixed);">
+                                <span class="material-symbols-outlined text-sm"
+                                      style="color: var(--color-primary);">
+                                    @GetContentTypeIcon(msg.ContentType)
+                                </span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-on-surface leading-relaxed line-clamp-2 break-words">
+                                    @(msg.FileName ?? msg.LinkTitle ?? msg.Content)
+                                </p>
+                                <p class="mt-1 text-[11px] font-medium" style="color: var(--color-primary);">
+                                    @FormatMessageTime(msg.CreatedAt)
+                                </p>
+                            </div>
+                            <span class="material-symbols-outlined shrink-0 self-center text-on-surface-variant/40 transition-colors group-hover:text-primary"
+                                  style="font-size: 18px;">
+                                open_in_new
+                            </span>
+                        </div>
+                    }
+                    @if (_searchHasMore)
+                    {
+                        <div class="py-3 text-center">
+                            <button type="button"
+                                    class="btn-secondary"
+                                    disabled="@_isSearching"
+                                    @onclick="LoadMoreSearchResultsAsync">
+                                加载更多
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* ═══════════════════ 日期查找 ═══════════════════ *@
+        else if (_activeTab == "date")
+        {
+            <div class="px-4 pt-4 pb-2">
+                <div class="flex items-center gap-3">
+                    <label class="text-sm font-semibold text-on-surface-variant shrink-0">选择日期</label>
+                    <input type="date"
+                           class="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                           style="border-color: var(--color-outline-variant); background: var(--color-surface-container-lowest); color: var(--color-on-surface);"
+                           value="@_selectedDate.ToString("yyyy-MM-dd")"
+                           max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
+                           @onchange="HandleDateChanged" />
+                    <button type="button"
+                            class="btn-primary shrink-0"
+                            disabled="@_isLoadingDate"
+                            @onclick="LoadDateResultsAsync">
+                        @if (_isLoadingDate)
+                        {
+                            <span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span>
+                        }
+                        else
+                        {
+                            <span>查看</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            @if (!_dateSearchPerformed)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">calendar_today</span>
+                    <p class="text-sm text-on-surface-variant">选择日期后点击「查看」，显示当天所有消息</p>
+                </div>
+            }
+            else if (_dateResults.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">event_busy</span>
+                    <p class="text-sm text-on-surface-variant">@_selectedDate.ToString("yyyy 年 M 月 d 日") 没有消息</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-2 space-y-2">
+                    <p class="text-xs text-on-surface-variant/60 px-1">@_selectedDate.ToString("yyyy 年 M 月 d 日") · 共 @_dateResults.Count 条消息</p>
+                    @foreach (var msg in _dateResults)
+                    {
+                        <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
+                             @key="msg.Id"
+                             @onclick="() => NavigateToMessage(msg.Id)">
+                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                                 style="background: var(--color-primary-fixed);">
+                                <span class="material-symbols-outlined text-sm"
+                                      style="color: var(--color-primary);">
+                                    @GetContentTypeIcon(msg.ContentType)
+                                </span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-on-surface leading-relaxed line-clamp-2 break-words">
+                                    @(msg.FileName ?? msg.LinkTitle ?? msg.Content)
+                                </p>
+                                <p class="mt-1 text-[11px] font-medium" style="color: var(--color-primary);">
+                                    @FormatMessageTime(msg.CreatedAt)
+                                </p>
+                            </div>
+                            <span class="material-symbols-outlined shrink-0 self-center text-on-surface-variant/40 transition-colors group-hover:text-primary"
+                                  style="font-size: 18px;">
+                                open_in_new
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* ═══════════════════ 图片 ═══════════════════ *@
+        else if (_activeTab == "image")
+        {
+            @if (_isLoadingType && _typeResults.Count == 0)
+            {
+                <div class="flex items-center justify-center gap-2 py-20 text-on-surface-variant/60">
+                    <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                    <span class="text-sm">加载中…</span>
+                </div>
+            }
+            else if (_typeResults.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">image_not_supported</span>
+                    <p class="text-sm text-on-surface-variant">该主题暂无图片</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-3">
+                    <p class="text-xs text-on-surface-variant/60 mb-3">@_typeResults.Count 张图片@(_typeHasMore ? "（加载了部分）" : "")</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        @foreach (var msg in _typeResults)
+                        {
+                            <div class="group relative rounded-2xl overflow-hidden bg-surface-container aspect-square shadow-sm cursor-zoom-in"
+                                 @key="msg.Id"
+                                 @onclick="() => OpenImagePreview(GetFileUrl(msg.Id))">
+                                <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                     src="@GetFileUrl(msg.Id)"
+                                     alt="@(msg.FileName ?? "图片")" />
+                                @* 悬浮操作条 *@
+                                <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+                                     style="background: linear-gradient(to top, rgba(25,28,29,0.75), transparent);"
+                                     @onclick:stopPropagation>
+                                    <span class="text-white text-[10px] truncate font-medium">@(msg.FileName ?? "图片")</span>
+                                    <button type="button"
+                                            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
+                                            title="在聊天中查看"
+                                            @onclick="() => NavigateToMessage(msg.Id)">
+                                        <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+                                    </button>
+                                    <a href="@GetFileUrl(msg.Id, true)"
+                                       class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
+                                       title="下载"
+                                       @onclick:stopPropagation>
+                                        <span class="material-symbols-outlined" style="font-size: 14px;">download</span>
+                                    </a>
+                                </div>
+                                @* 右下角时间 *@
+                                <div class="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                     style="background: rgba(0,0,0,0.5);">
+                                    @msg.CreatedAt.ToLocalTime().ToString("MM/dd")
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    @if (_typeHasMore)
+                    {
+                        <div class="py-4 text-center">
+                            <button type="button"
+                                    class="btn-secondary"
+                                    disabled="@_isLoadingType"
+                                    @onclick="() => LoadTypeResultsAsync(false)">
+                                加载更多
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* ═══════════════════ 视频 ═══════════════════ *@
+        else if (_activeTab == "video")
+        {
+            @if (_isLoadingType && _typeResults.Count == 0)
+            {
+                <div class="flex items-center justify-center gap-2 py-20 text-on-surface-variant/60">
+                    <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                    <span class="text-sm">加载中…</span>
+                </div>
+            }
+            else if (_typeResults.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">videocam_off</span>
+                    <p class="text-sm text-on-surface-variant">该主题暂无视频</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-3 space-y-4">
+                    <p class="text-xs text-on-surface-variant/60">@_typeResults.Count 个视频@(_typeHasMore ? "（加载了部分）" : "")</p>
+                    @foreach (var msg in _typeResults)
+                    {
+                        <div class="rounded-2xl overflow-hidden bg-surface-container-lowest shadow-sm" @key="msg.Id">
+                            <video class="w-full max-h-64 bg-on-surface/10"
+                                   controls
+                                   preload="metadata"
+                                   src="@GetFileUrl(msg.Id)"></video>
+                            <div class="flex items-center justify-between p-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? "视频")</p>
+                                    <p class="text-[11px] text-on-surface-variant">
+                                        @FormatMessageTime(msg.CreatedAt)
+                                        @if (msg.FileSize.HasValue)
+                                        {
+                                            <span> · @FormatFileSize(msg.FileSize.Value)</span>
+                                        }
+                                    </p>
+                                </div>
+                                <div class="flex gap-1 shrink-0">
+                                    <button type="button"
+                                            class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                            title="在聊天中查看"
+                                            @onclick="() => NavigateToMessage(msg.Id)">
+                                        <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
+                                    </button>
+                                    <a href="@GetFileUrl(msg.Id, true)"
+                                       class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                       title="下载">
+                                        <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    @if (_typeHasMore)
+                    {
+                        <div class="py-2 text-center">
+                            <button type="button"
+                                    class="btn-secondary"
+                                    disabled="@_isLoadingType"
+                                    @onclick="() => LoadTypeResultsAsync(false)">
+                                加载更多
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* ═══════════════════ 文件 ═══════════════════ *@
+        else if (_activeTab == "file")
+        {
+            @if (_isLoadingType && _typeResults.Count == 0)
+            {
+                <div class="flex items-center justify-center gap-2 py-20 text-on-surface-variant/60">
+                    <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                    <span class="text-sm">加载中…</span>
+                </div>
+            }
+            else if (_typeResults.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">folder_off</span>
+                    <p class="text-sm text-on-surface-variant">该主题暂无附件</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-3 space-y-2">
+                    <p class="text-xs text-on-surface-variant/60">@_typeResults.Count 个附件@(_typeHasMore ? "（加载了部分）" : "")</p>
+                    @foreach (var msg in _typeResults)
+                    {
+                        <div class="flex items-center gap-4 rounded-2xl bg-surface-container-lowest p-4 shadow-sm" @key="msg.Id">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                                 style="background: var(--color-error-container); color: var(--color-error);">
+                                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? "附件")</p>
+                                <p class="text-[11px] text-on-surface-variant">
+                                    @FormatMessageTime(msg.CreatedAt)
+                                    @if (msg.FileSize.HasValue)
+                                    {
+                                        <span> · @FormatFileSize(msg.FileSize.Value)</span>
+                                    }
+                                </p>
+                            </div>
+                            <div class="flex gap-1 shrink-0">
+                                <button type="button"
+                                        class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                        title="在聊天中查看"
+                                        @onclick="() => NavigateToMessage(msg.Id)">
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
+                                </button>
+                                <a href="@GetFileUrl(msg.Id, true)"
+                                   class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                   title="下载">
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
+                                </a>
+                            </div>
+                        </div>
+                    }
+                    @if (_typeHasMore)
+                    {
+                        <div class="py-2 text-center">
+                            <button type="button"
+                                    class="btn-secondary"
+                                    disabled="@_isLoadingType"
+                                    @onclick="() => LoadTypeResultsAsync(false)">
+                                加载更多
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* ═══════════════════ 链接 ═══════════════════ *@
+        else if (_activeTab == "link")
+        {
+            @if (_isLoadingType && _typeResults.Count == 0)
+            {
+                <div class="flex items-center justify-center gap-2 py-20 text-on-surface-variant/60">
+                    <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                    <span class="text-sm">加载中…</span>
+                </div>
+            }
+            else if (_typeResults.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                    <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">link_off</span>
+                    <p class="text-sm text-on-surface-variant">该主题暂无链接</p>
+                </div>
+            }
+            else
+            {
+                <div class="px-4 py-3 space-y-3">
+                    <p class="text-xs text-on-surface-variant/60">@_typeResults.Count 条链接@(_typeHasMore ? "（加载了部分）" : "")</p>
+                    @foreach (var msg in _typeResults)
+                    {
+                        <div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm" @key="msg.Id">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    @if (!string.IsNullOrWhiteSpace(msg.LinkTitle))
+                                    {
+                                        <p class="text-sm font-semibold text-on-surface mb-1 leading-snug">@msg.LinkTitle</p>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(msg.LinkDescription))
+                                    {
+                                        <p class="text-xs text-on-surface-variant mb-2 line-clamp-2">@msg.LinkDescription</p>
+                                    }
+                                    <a class="text-xs text-primary break-all underline underline-offset-2 truncate block"
+                                       href="@msg.Content"
+                                       target="_blank"
+                                       rel="noopener noreferrer">
+                                        @msg.Content
+                                    </a>
+                                    <p class="mt-2 text-[11px] text-on-surface-variant">@FormatMessageTime(msg.CreatedAt)</p>
+                                </div>
+                                <button type="button"
+                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                        title="在聊天中查看"
+                                        @onclick="() => NavigateToMessage(msg.Id)">
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    @if (_typeHasMore)
+                    {
+                        <div class="py-2 text-center">
+                            <button type="button"
+                                    class="btn-secondary"
+                                    disabled="@_isLoadingType"
+                                    @onclick="() => LoadTypeResultsAsync(false)">
+                                加载更多
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* 底部留白，避免内容被遮挡 *@
+        <div class="h-6"></div>
+    </div>
+
+    @* ─── 图片大图预览 Modal ─── *@
+    @if (_previewImageUrl is not null)
+    {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+             @onclick="CloseImagePreview">
+            <button type="button"
+                    class="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                    @onclick:stopPropagation
+                    @onclick="CloseImagePreview">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <img class="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
+                 src="@_previewImageUrl"
+                 alt="图片预览"
+                 @onclick:stopPropagation />
+        </div>
+    }
+
+</section>
+
+@code {
+    /// <summary>返回内容类型对应的 Material Symbol 图标名称。</summary>
+    private static string GetContentTypeIcon(ShareContentType type)
+    {
+        return type switch
+        {
+            ShareContentType.Image => "image",
+            ShareContentType.Video => "videocam",
+            ShareContentType.File  => "description",
+            ShareContentType.Link  => "link",
+            _                      => "chat_bubble"
+        };
+    }
+}

@@ -203,6 +203,124 @@ public sealed class ShareService(
             .ToListAsync(ct);
     }
 
+    public async Task<TopicMessagesResponse> SearchTopicMessagesAsync(
+        Guid topicId,
+        string query,
+        int limit = 50,
+        DateTimeOffset? before = null,
+        CancellationToken ct = default)
+    {
+        var normalized = query.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return new TopicMessagesResponse([], false, null);
+        }
+
+        var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
+        if (!exists)
+        {
+            return new TopicMessagesResponse([], false, null);
+        }
+
+        var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+
+        var queryable = dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.Content.Contains(normalized));
+
+        if (before.HasValue)
+        {
+            queryable = queryable.Where(x => x.CreatedAt < before.Value);
+        }
+
+        var messages = await queryable
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(safeLimit)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+
+        var hasMore = false;
+        string? nextCursor = null;
+        if (messages.Count == safeLimit)
+        {
+            var lastCreatedAt = messages[^1].CreatedAt;
+            hasMore = await dbContext.ShareItems
+                .AsNoTracking()
+                .AnyAsync(x => x.TopicId == topicId && x.Content.Contains(normalized) && x.CreatedAt < lastCreatedAt, ct);
+            if (hasMore)
+            {
+                nextCursor = lastCreatedAt.ToString("O");
+            }
+        }
+
+        return new TopicMessagesResponse(messages, hasMore, nextCursor);
+    }
+
+    public async Task<IReadOnlyList<ShareItemDto>> GetTopicMessagesByDateAsync(
+        Guid topicId,
+        DateOnly date,
+        CancellationToken ct = default)
+    {
+        // 使用服务器本地时区将日期转换为 UTC 范围，与消息时间显示保持一致
+        var localMidnight = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Local);
+        var startOffset = new DateTimeOffset(localMidnight);
+        var endOffset = startOffset.AddDays(1);
+
+        return await dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.CreatedAt >= startOffset && x.CreatedAt < endOffset)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+    }
+
+    public async Task<TopicMessagesResponse> GetTopicMessagesByTypeAsync(
+        Guid topicId,
+        ShareContentType contentType,
+        int limit = 50,
+        DateTimeOffset? before = null,
+        CancellationToken ct = default)
+    {
+        var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
+        if (!exists)
+        {
+            return new TopicMessagesResponse([], false, null);
+        }
+
+        var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+
+        var queryable = dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.ContentType == contentType);
+
+        if (before.HasValue)
+        {
+            queryable = queryable.Where(x => x.CreatedAt < before.Value);
+        }
+
+        var messages = await queryable
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(safeLimit)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+
+        var hasMore = false;
+        string? nextCursor = null;
+        if (messages.Count == safeLimit)
+        {
+            var lastCreatedAt = messages[^1].CreatedAt;
+            hasMore = await dbContext.ShareItems
+                .AsNoTracking()
+                .AnyAsync(x => x.TopicId == topicId && x.ContentType == contentType && x.CreatedAt < lastCreatedAt, ct);
+            if (hasMore)
+            {
+                nextCursor = lastCreatedAt.ToString("O");
+            }
+        }
+
+        return new TopicMessagesResponse(messages, hasMore, nextCursor);
+    }
+
     private static string BuildPreview(string content)
     {
         const int maxLen = 80;

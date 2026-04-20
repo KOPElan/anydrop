@@ -134,6 +134,14 @@
     from { height: 0; opacity: 0; }
     to   { height: 60%; opacity: 1; }
 }
+
+/* 消息高亮闪烁（从搜索页跳回聊天后定位消息时使用） */
+@keyframes highlight-flash {
+    0%   { background-color: transparent; }
+    20%  { background-color: rgba(0, 80, 203, 0.18); }
+    60%  { background-color: rgba(0, 80, 203, 0.12); }
+    100% { background-color: transparent; }
+}
 @layer base {
     html,
     body {
@@ -262,6 +270,12 @@
     /* ─── 阅后即焚消息背景标识 ─── */
     .burn-after-reading > div {
         background: rgba(255, 218, 214, 0.5) !important;
+    }
+
+    /* ─── 搜索跳转后消息高亮动画 ─── */
+    .message-highlight {
+        border-radius: 1rem;
+        animation: highlight-flash 2.5s ease both;
     }
 
     /* 文本消息气泡 hover */

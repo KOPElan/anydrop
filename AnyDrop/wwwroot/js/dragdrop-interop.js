@@ -124,3 +124,20 @@ AnyDropInterop.scrollToBottom = function (element) {
   const SCROLL_DELAY_MS = 300;
   setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, SCROLL_DELAY_MS);
 };
+
+/**
+ * 滚动到指定消息并触发高亮动画（从搜索页跳转回聊天时使用）。
+ * @param {string} messageId - 目标消息的 data-message-id 属性值
+ */
+AnyDropInterop.scrollToMessage = function (messageId) {
+  if (!messageId) return;
+  // rAF 确保 Blazor 已将元素渲染到 DOM
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 添加高亮动画类，2.5 秒后移除
+    el.classList.add('message-highlight');
+    setTimeout(() => el.classList.remove('message-highlight'), 2500);
+  });
+};

@@ -21,12 +21,21 @@
         </div>
         @if (_selectedTopicId.HasValue)
         {
-            <button type="button"
-                    class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
-                    title="主题设置"
-                    @onclick="OpenTopicSettingsModal">
-                <span class="material-symbols-outlined" style="font-size: 20px;">build</span>
-            </button>
+            <div class="flex items-center gap-1">
+                @* 搜索按钮 *@
+                <a href="/search/@_selectedTopicId"
+                   class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                   title="搜索此主题">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
+                </a>
+                @* 主题设置按钮 *@
+                <button type="button"
+                        class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                        title="主题设置"
+                        @onclick="OpenTopicSettingsModal">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">build</span>
+                </button>
+            </div>
         }
     </header>
 
@@ -55,7 +64,7 @@
             {
                 var isBurnMessage = message.ExpiresAt.HasValue;
                 var bubbleClass = isBurnMessage ? "burn-after-reading" : "";
-                <div class="flex flex-col items-start max-w-2xl message-bubble @bubbleClass" @key="message.Id">
+                <div class="flex flex-col items-start max-w-2xl message-bubble @bubbleClass" @key="message.Id" data-message-id="@message.Id">
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
