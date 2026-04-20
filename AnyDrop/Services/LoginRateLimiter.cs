@@ -21,10 +21,7 @@ public sealed class LoginRateLimiter(IMemoryCache memoryCache, IOptions<AuthOpti
         var now = DateTimeOffset.UtcNow;
         if (state.LockedUntil is null || state.LockedUntil <= now)
         {
-            if (state.LockedUntil is not null && state.LockedUntil <= now)
-            {
-                memoryCache.Remove(cacheKey);
-            }
+            memoryCache.Remove(cacheKey);
             return false;
         }
 

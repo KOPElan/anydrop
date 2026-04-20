@@ -25,13 +25,13 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
 
     public async Task<bool> IsAutoFetchLinkPreviewEnabledAsync(CancellationToken ct = default)
     {
-        var autoFetchLinkPreview = await dbContext.SystemSettings
+        var settingsProjection = await dbContext.SystemSettings
             .AsNoTracking()
-            .Select(x => (bool?)x.AutoFetchLinkPreview)
+            .Select(x => new { x.AutoFetchLinkPreview })
             .FirstOrDefaultAsync(ct);
-        if (autoFetchLinkPreview.HasValue)
+        if (settingsProjection is not null)
         {
-            return autoFetchLinkPreview.Value;
+            return settingsProjection.AutoFetchLinkPreview;
         }
 
         var settings = await EnsureSettingsAsync(ct);
