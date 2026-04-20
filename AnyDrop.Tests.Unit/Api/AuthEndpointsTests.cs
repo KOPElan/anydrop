@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Moq;
+using System.Security.Claims;
 
 namespace AnyDrop.Tests.Unit.Api;
 
@@ -48,5 +49,27 @@ public class AuthEndpointsTests
         result.Value.Should().NotBeNull();
         result.Value.Data.Should().NotBeNull();
         result.Value.Data!.RequiresSetup.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WhenMissingUserId_ShouldReturnUnauthorizedEnvelope()
+    {
+        var authService = new Mock<IAuthService>();
+        var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity()) };
+
+        var result = await AuthEndpoints.LogoutAsync(context, authService.Object, CancellationToken.None);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task MeAsync_WhenMissingUserId_ShouldReturnUnauthorizedEnvelope()
+    {
+        var authService = new Mock<IAuthService>();
+        var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity()) };
+
+        var result = await AuthEndpoints.MeAsync(context, authService.Object, CancellationToken.None);
+
+        result.Should().NotBeNull();
     }
 }

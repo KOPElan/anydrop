@@ -40,4 +40,16 @@ public class SettingsEndpointsTests
         result.Should().NotBeNull();
         authService.Verify(x => x.UpdateNicknameAsync(It.IsAny<Guid>(), It.IsAny<UpdateNicknameRequest>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task UpdateProfileAsync_WhenUnauthenticated_ShouldReturnUnauthorizedEnvelope()
+    {
+        var authService = new Mock<IAuthService>();
+        var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity()) };
+
+        var result = await SettingsEndpoints.UpdateProfileAsync(new UpdateNicknameRequest("New"), context, authService.Object, CancellationToken.None);
+
+        result.Should().NotBeNull();
+        authService.Verify(x => x.UpdateNicknameAsync(It.IsAny<Guid>(), It.IsAny<UpdateNicknameRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

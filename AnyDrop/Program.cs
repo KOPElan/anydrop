@@ -13,6 +13,7 @@ using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+const string appAuthenticationScheme = "AnyDrop";
 
 // Add services to the container.
 const string defaultDatabasePath = "data/anydrop.db";
@@ -62,9 +63,20 @@ if (authOptions.JwtSecret.Length < 32)
 var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.JwtSecret));
 builder.Services.AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultScheme = appAuthenticationScheme;
+        options.DefaultAuthenticateScheme = appAuthenticationScheme;
         options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = appAuthenticationScheme;
+    })
+    .AddPolicyScheme(appAuthenticationScheme, appAuthenticationScheme, options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            var authorization = context.Request.Headers.Authorization.ToString();
+            return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                ? JwtBearerDefaults.AuthenticationScheme
+                : CookieAuthenticationDefaults.AuthenticationScheme;
+        };
     })
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
@@ -76,7 +88,19 @@ builder.Services.AddAuthentication(options =>
             if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return Task.CompletedTask;
+                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("未授权。"));
+            }
+
+            var returnUrl = Uri.EscapeDataString($"{context.Request.Path}{context.Request.QueryString}");
+            context.Response.Redirect($"/login?returnUrl={returnUrl}");
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("无权限访问。"));
             }
 
             var returnUrl = Uri.EscapeDataString($"{context.Request.Path}{context.Request.QueryString}");
@@ -115,6 +139,17 @@ builder.Services.AddAuthentication(options =>
                 {
                     context.Fail("Session is no longer valid.");
                 }
+            },
+            OnChallenge = context =>
+            {
+                if (!context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.CompletedTask;
+                }
+
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("未授权。"));
             }
         };
     });

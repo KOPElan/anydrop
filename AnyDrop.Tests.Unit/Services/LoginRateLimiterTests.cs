@@ -35,4 +35,23 @@ public class LoginRateLimiterTests
         var locked = sut.IsLocked("k", out _);
         locked.Should().BeFalse();
     }
+
+    [Fact]
+    public void RegisterFailure_AfterCooldownExpired_ShouldResetFailureWindow()
+    {
+        var sut = new LoginRateLimiter(
+            new MemoryCache(new MemoryCacheOptions()),
+            Options.Create(new AuthOptions { LoginMaxFailures = 2, LoginCooldownSeconds = 1 }));
+
+        sut.RegisterFailure("k");
+        sut.RegisterFailure("k");
+        Thread.Sleep(TimeSpan.FromMilliseconds(1200));
+
+        var initiallyLocked = sut.IsLocked("k", out _);
+        initiallyLocked.Should().BeFalse();
+
+        sut.RegisterFailure("k");
+        var lockedAfterOneFailure = sut.IsLocked("k", out _);
+        lockedAfterOneFailure.Should().BeFalse();
+    }
 }

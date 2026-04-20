@@ -12,17 +12,23 @@ public sealed class LoginRateLimiter(IMemoryCache memoryCache, IOptions<AuthOpti
     public bool IsLocked(string key, out TimeSpan retryAfter)
     {
         retryAfter = TimeSpan.Zero;
-        if (!memoryCache.TryGetValue<LoginWindowState>(BuildKey(key), out var state) || state is null)
+        var cacheKey = BuildKey(key);
+        if (!memoryCache.TryGetValue<LoginWindowState>(cacheKey, out var state) || state is null)
         {
             return false;
         }
 
-        if (state.LockedUntil is null || state.LockedUntil <= DateTimeOffset.UtcNow)
+        var now = DateTimeOffset.UtcNow;
+        if (state.LockedUntil is null || state.LockedUntil <= now)
         {
+            if (state.LockedUntil is not null && state.LockedUntil <= now)
+            {
+                memoryCache.Remove(cacheKey);
+            }
             return false;
         }
 
-        retryAfter = state.LockedUntil.Value - DateTimeOffset.UtcNow;
+        retryAfter = state.LockedUntil.Value - now;
         return true;
     }
 
@@ -30,12 +36,18 @@ public sealed class LoginRateLimiter(IMemoryCache memoryCache, IOptions<AuthOpti
     {
         var cacheKey = BuildKey(key);
         var state = memoryCache.Get<LoginWindowState>(cacheKey) ?? new LoginWindowState();
+        var now = DateTimeOffset.UtcNow;
+        if (state.LockedUntil is not null && state.LockedUntil <= now)
+        {
+            state = new LoginWindowState();
+        }
+
         state.FailedCount++;
-        state.FirstFailedAt ??= DateTimeOffset.UtcNow;
+        state.FirstFailedAt ??= now;
 
         if (state.FailedCount >= _maxFailures)
         {
-            state.LockedUntil = DateTimeOffset.UtcNow.AddSeconds(_cooldownSeconds);
+            state.LockedUntil = now.AddSeconds(_cooldownSeconds);
         }
 
         memoryCache.Set(cacheKey, state, TimeSpan.FromSeconds(_cooldownSeconds * 2));

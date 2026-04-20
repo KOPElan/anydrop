@@ -29,7 +29,9 @@ public static class SettingsEndpoints
         var userId = GetUserId(httpContext.User);
         if (userId is null)
         {
-            return Results.Unauthorized();
+            return Results.Json(
+                ApiEnvelope<UserProfileDto>.Fail("未授权，无法更新个人资料。"),
+                statusCode: StatusCodes.Status401Unauthorized);
         }
 
         var result = await authService.UpdateNicknameAsync(userId.Value, request, ct);
@@ -48,11 +50,16 @@ public static class SettingsEndpoints
             claims.Add(new Claim("sessionVersion", sessionVersion));
 
             var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-            var requestServices = httpContext.RequestServices;
-            var authenticationService = requestServices is null ? null : requestServices.GetService<IAuthenticationService>();
-            if (authenticationService is not null)
+            var hasCookieIdentity = httpContext.User.Identities.Any(identity =>
+                identity.IsAuthenticated &&
+                string.Equals(identity.AuthenticationType, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal));
+            if (hasCookieIdentity)
             {
-                await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+                var authenticateResult = await httpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                await httpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    principal,
+                    authenticateResult.Properties ?? new AuthenticationProperties());
             }
         }
 

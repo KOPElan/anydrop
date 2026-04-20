@@ -59,7 +59,9 @@ public static class AuthEndpoints
         var userId = GetUserId(httpContext.User);
         if (userId is null)
         {
-            return Results.Unauthorized();
+            return Results.Json(
+                ApiEnvelope<LogoutResultDto>.Fail("未授权。"),
+                statusCode: StatusCodes.Status401Unauthorized);
         }
 
         var result = await authService.LogoutAsync(userId.Value, ct);
@@ -80,7 +82,9 @@ public static class AuthEndpoints
         var userId = GetUserId(httpContext.User);
         if (userId is null)
         {
-            return Results.Unauthorized();
+            return Results.Json(
+                ApiEnvelope<UserProfileDto>.Fail("未授权。"),
+                statusCode: StatusCodes.Status401Unauthorized);
         }
 
         var result = await authService.GetProfileAsync(userId.Value, ct);
