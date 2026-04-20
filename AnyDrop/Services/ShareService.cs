@@ -233,24 +233,20 @@ public sealed class ShareService(
             queryable = queryable.Where(x => x.CreatedAt < before.Value);
         }
 
-        var messages = await queryable
+        // 多取一条以判断是否有更多数据，避免额外的 COUNT/ANY 查询
+        var rawMessages = await queryable
             .OrderByDescending(x => x.CreatedAt)
-            .Take(safeLimit)
+            .Take(safeLimit + 1)
             .Select(x => x.ToDto())
             .ToListAsync(ct);
 
-        var hasMore = false;
+        var hasMore = rawMessages.Count > safeLimit;
+        var messages = hasMore ? rawMessages.Take(safeLimit).ToList() : rawMessages;
+
         string? nextCursor = null;
-        if (messages.Count == safeLimit)
+        if (hasMore)
         {
-            var lastCreatedAt = messages[^1].CreatedAt;
-            hasMore = await dbContext.ShareItems
-                .AsNoTracking()
-                .AnyAsync(x => x.TopicId == topicId && x.Content.Contains(normalized) && x.CreatedAt < lastCreatedAt, ct);
-            if (hasMore)
-            {
-                nextCursor = lastCreatedAt.ToString("O");
-            }
+            nextCursor = messages[^1].CreatedAt.ToString("O");
         }
 
         return new TopicMessagesResponse(messages, hasMore, nextCursor);
@@ -298,24 +294,20 @@ public sealed class ShareService(
             queryable = queryable.Where(x => x.CreatedAt < before.Value);
         }
 
-        var messages = await queryable
+        // 多取一条以判断是否有更多数据，避免额外的 COUNT/ANY 查询
+        var rawMessages = await queryable
             .OrderByDescending(x => x.CreatedAt)
-            .Take(safeLimit)
+            .Take(safeLimit + 1)
             .Select(x => x.ToDto())
             .ToListAsync(ct);
 
-        var hasMore = false;
+        var hasMore = rawMessages.Count > safeLimit;
+        var messages = hasMore ? rawMessages.Take(safeLimit).ToList() : rawMessages;
+
         string? nextCursor = null;
-        if (messages.Count == safeLimit)
+        if (hasMore)
         {
-            var lastCreatedAt = messages[^1].CreatedAt;
-            hasMore = await dbContext.ShareItems
-                .AsNoTracking()
-                .AnyAsync(x => x.TopicId == topicId && x.ContentType == contentType && x.CreatedAt < lastCreatedAt, ct);
-            if (hasMore)
-            {
-                nextCursor = lastCreatedAt.ToString("O");
-            }
+            nextCursor = messages[^1].CreatedAt.ToString("O");
         }
 
         return new TopicMessagesResponse(messages, hasMore, nextCursor);

@@ -57,15 +57,7 @@ public partial class TopicSearch
     {
         try
         {
-            var allTopics = await TopicService.GetAllTopicsAsync();
-            var topic = allTopics.FirstOrDefault(t => t.Id == TopicId);
-
-            if (topic is null)
-            {
-                var archived = await TopicService.GetArchivedTopicsAsync();
-                topic = archived.FirstOrDefault(t => t.Id == TopicId);
-            }
-
+            var topic = await TopicService.GetTopicByIdAsync(TopicId);
             _topicName = topic?.Name;
         }
         catch (Exception ex)
@@ -265,6 +257,9 @@ public partial class TopicSearch
         => download
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
+
+    /// <summary>日期选择器的最大可选值（今天，避免选择未来日期）。</summary>
+    private static string MaxDateString => DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
 
     private static string FormatFileSize(long bytes)
     {

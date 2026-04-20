@@ -40,8 +40,37 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             .ToList();
     }
 
-    public async Task<IReadOnlyList<TopicDto>> GetArchivedTopicsAsync(CancellationToken ct = default)
+    public async Task<TopicDto?> GetTopicByIdAsync(Guid topicId, CancellationToken ct = default)
     {
+        var topic = await dbContext.Topics
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == topicId, ct);
+
+        if (topic is null)
+        {
+            return null;
+        }
+
+        var messageCount = await dbContext.ShareItems
+            .AsNoTracking()
+            .CountAsync(x => x.TopicId == topicId, ct);
+
+        return new TopicDto(
+            topic.Id,
+            topic.Name,
+            topic.SortOrder,
+            topic.CreatedAt,
+            topic.LastMessageAt,
+            messageCount,
+            topic.IsBuiltIn,
+            topic.LastMessagePreview,
+            topic.IsPinned,
+            topic.PinnedAt,
+            topic.IsArchived,
+            topic.ArchivedAt);
+    }
+
+    public async Task<IReadOnlyList<TopicDto>> GetArchivedTopicsAsync(CancellationToken ct = default)    {
         var topics = await dbContext.Topics
             .Where(x => x.IsArchived)
             .OrderByDescending(x => x.ArchivedAt ?? x.CreatedAt)

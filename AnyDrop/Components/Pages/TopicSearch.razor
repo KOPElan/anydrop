@@ -153,7 +153,7 @@
                            class="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
                            style="border-color: var(--color-outline-variant); background: var(--color-surface-container-lowest); color: var(--color-on-surface);"
                            value="@_selectedDate.ToString("yyyy-MM-dd")"
-                           max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
+                           max="@MaxDateString"
                            @onchange="HandleDateChanged" />
                     <button type="button"
                             class="btn-primary shrink-0"

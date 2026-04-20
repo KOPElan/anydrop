@@ -133,7 +133,8 @@ AnyDropInterop.scrollToMessage = function (messageId) {
   if (!messageId) return;
   // rAF 确保 Blazor 已将元素渲染到 DOM
   requestAnimationFrame(() => {
-    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    // 使用 CSS.escape() 防止 messageId 中包含特殊 CSS 选择器字符时出错
+    const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     // 添加高亮动画类，2.5 秒后移除
