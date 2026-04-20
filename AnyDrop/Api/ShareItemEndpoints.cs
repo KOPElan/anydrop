@@ -10,7 +10,7 @@ public static class ShareItemEndpoints
 {
     public static IEndpointRouteBuilder MapShareItemEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/share-items").WithTags("Share Items");
+        var group = app.MapGroup("/api/v1/share-items").WithTags("Share Items").RequireAuthorization();
 
         group.MapGet("/", GetRecentAsync)
             .WithName("GetRecentShareItems")

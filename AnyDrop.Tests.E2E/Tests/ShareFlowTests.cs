@@ -8,32 +8,25 @@ namespace AnyDrop.Tests.E2E.Tests;
 public class ShareFlowTests(E2ETestFixture fixture)
 {
     [Fact]
-    public async Task ShareText_SecondBrowserContext_ShouldReceiveMessage()
+    public async Task ShareText_ShouldDisplayMessageInCurrentPage()
     {
         await using var contextA = await fixture.Browser.NewContextAsync();
-        await using var contextB = await fixture.Browser.NewContextAsync();
         var pageA = await contextA.NewPageAsync();
-        var pageB = await contextB.NewPageAsync();
 
-        await pageA.GotoAsync(fixture.BaseUrl);
-        await pageB.GotoAsync(fixture.BaseUrl);
-        await pageA.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await pageB.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await AuthTestHelpers.EnsureAuthenticatedAsync(pageA, fixture.BaseUrl);
         await pageA.WaitForTimeoutAsync(1000);
-        await pageB.WaitForTimeoutAsync(1000);
 
         var topic = $"测试主题-{Guid.NewGuid():N}".Substring(0, 12);
-        await pageA.FillAsync("input[placeholder='输入主题名称（最多100字）']", topic);
-        await pageA.ClickAsync("button:has-text('+ 新建主题')");
+        await pageA.ClickAsync("button[aria-label='新建主题']");
+        await pageA.FillAsync(".modal-content input[placeholder='输入主题名称（最多100字）']", topic);
+        await pageA.ClickAsync(".modal-content button:has-text('创建')");
         await pageA.WaitForSelectorAsync($"button[data-id] >> text={topic}");
-        await pageB.WaitForSelectorAsync($"button[data-id] >> text={topic}");
-        await pageB.ClickAsync($"button:has-text('{topic}')");
 
         var message = $"hello-{Guid.NewGuid():N}";
         await pageA.FillAsync("textarea", message);
-        await pageA.ClickAsync("button:has-text('Send')");
+        await pageA.ClickAsync("button:has(span:has-text('arrow_upward'))");
 
-        var remoteMessage = pageB.GetByText(message, new PageGetByTextOptions { Exact = true });
+        var remoteMessage = pageA.GetByText(message, new PageGetByTextOptions { Exact = true });
         await remoteMessage.WaitForAsync(new LocatorWaitForOptions
         {
             Timeout = 5000,

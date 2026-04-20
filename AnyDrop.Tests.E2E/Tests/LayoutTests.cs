@@ -15,8 +15,7 @@ public class LayoutTests(E2ETestFixture fixture)
             ViewportSize = new() { Width = 1280, Height = 800 }
         });
         var desktopPage = await desktopContext.NewPageAsync();
-        await desktopPage.GotoAsync(fixture.BaseUrl);
-        await desktopPage.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await AuthTestHelpers.EnsureAuthenticatedAsync(desktopPage, fixture.BaseUrl);
         (await desktopPage.IsVisibleAsync("aside.sidebar")).Should().BeTrue();
 
         await using var mobileContext = await fixture.Browser.NewContextAsync(new()
@@ -24,8 +23,7 @@ public class LayoutTests(E2ETestFixture fixture)
             ViewportSize = new() { Width = 375, Height = 667 }
         });
         var mobilePage = await mobileContext.NewPageAsync();
-        await mobilePage.GotoAsync(fixture.BaseUrl);
-        await mobilePage.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await AuthTestHelpers.EnsureAuthenticatedAsync(mobilePage, fixture.BaseUrl);
         await mobilePage.WaitForFunctionAsync(
             "() => getComputedStyle(document.querySelector('aside.sidebar')).display === 'none'");
         (await mobilePage.IsVisibleAsync("aside.sidebar")).Should().BeFalse();

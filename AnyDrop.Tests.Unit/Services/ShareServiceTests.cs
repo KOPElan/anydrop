@@ -122,6 +122,17 @@ public class ShareServiceTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task SendTextAsync_Link_WhenAutoFetchDisabled_ShouldNotTriggerMetadataFetchFailure()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _, out _, autoFetchEnabled: false);
+
+        var dto = await service.SendTextAsync("https://example.com");
+
+        dto.ContentType.Should().Be(ShareContentType.Link);
+    }
+
     private static AnyDropDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
@@ -134,7 +145,8 @@ public class ShareServiceTests
     private static ShareService CreateService(
         AnyDropDbContext dbContext,
         out Mock<IClientProxy> clientProxyMock,
-        out Mock<IFileStorageService> fileStorageServiceMock)
+        out Mock<IFileStorageService> fileStorageServiceMock,
+        bool autoFetchEnabled = true)
     {
         clientProxyMock = new Mock<IClientProxy>();
         clientProxyMock
@@ -166,7 +178,17 @@ public class ShareServiceTests
 
         // IServiceScopeFactory: fire-and-forget 中使用，测试中不需要实际调用
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var systemSettingsMock = new Mock<ISystemSettingsService>();
+        systemSettingsMock.Setup(x => x.IsAutoFetchLinkPreviewEnabledAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(autoFetchEnabled);
 
-        return new ShareService(dbContext, hubContextMock.Object, topicServiceMock.Object, fileStorageServiceMock.Object, linkMetadataService, scopeFactoryMock.Object);
+        return new ShareService(
+            dbContext,
+            hubContextMock.Object,
+            topicServiceMock.Object,
+            fileStorageServiceMock.Object,
+            linkMetadataService,
+            systemSettingsMock.Object,
+            scopeFactoryMock.Object);
     }
 }

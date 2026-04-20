@@ -1,0 +1,16 @@
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var normalized = string.IsNullOrWhiteSpace(relative) ? "/" : $"/{relative}";
+        var target = $"/login?returnUrl={Uri.EscapeDataString(normalized)}";
+        NavigationManager.NavigateTo(target, forceLoad: true);
+    }
+}
