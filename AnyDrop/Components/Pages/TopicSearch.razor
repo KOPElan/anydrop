@@ -153,9 +153,9 @@
         @* ═══════════════════ 日期查找 ═══════════════════ *@
         else if (_activeTab == "date")
         {
-            @* ─── 7 天日历条 ─── *@
+            @* ─── 7 天日历条（最大宽度限制，宽屏不拉伸）─── *@
             <div class="px-3 pt-4 pb-2">
-                <div class="flex items-center gap-1">
+                <div class="mx-auto max-w-lg flex items-center gap-1">
                     @* 向前导航（更早日期） *@
                     <button type="button"
                             class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
@@ -171,30 +171,25 @@
                             var isSelected = day == _selectedDate;
                             var hasMessages = _activeDates.Contains(day);
                             var isFuture = day > Today;
-                            var isToday = day == Today;
 
                             <button type="button"
                                     disabled="@isFuture"
-                                    class="flex-1 flex flex-col items-center justify-center rounded-xl py-1.5 gap-0.5 transition-all disabled:opacity-30 disabled:pointer-events-none"
-                                    style="@(isSelected
-                                        ? "background: var(--color-primary); color: #fff;"
-                                        : hasMessages
-                                            ? "background: var(--color-primary-fixed); color: var(--color-primary);"
-                                            : "color: var(--color-on-surface-variant);")"
+                                    class="flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 transition-all disabled:opacity-30 disabled:pointer-events-none"
+                                    style="color: @(isSelected ? "var(--color-primary)" : "var(--color-on-surface-variant);")"
                                     @onclick="() => SelectCalendarDateAsync(day)">
                                 <span class="text-[10px] font-medium leading-none">
                                     @day.ToString("ddd", System.Globalization.CultureInfo.CurrentCulture)
                                 </span>
-                                <span class="text-base font-bold leading-tight">@day.Day</span>
-                                @* 有消息指示点（未选中时显示） *@
-                                @if (hasMessages && !isSelected)
-                                {
-                                    <span class="w-1 h-1 rounded-full mt-0.5" style="background: var(--color-primary);"></span>
-                                }
-                                else
-                                {
-                                    <span class="w-1 h-1 rounded-full mt-0.5 opacity-0"></span>
-                                }
+                                @* 日期数字：选中时显示实心圆形背景，否则透明 *@
+                                <span class="flex h-8 w-8 items-center justify-center text-sm font-bold rounded-full transition-all"
+                                      style="@(isSelected
+                                          ? "background: var(--color-primary); color: #fff;"
+                                          : "")">
+                                    @day.Day
+                                </span>
+                                @* 有消息指示点：仅点，不改背景色 *@
+                                <span class="w-1.5 h-1.5 rounded-full mt-0.5 transition-opacity @(hasMessages && !isSelected ? "opacity-100" : "opacity-0")"
+                                      style="background: var(--color-primary);"></span>
                             </button>
                         }
                     </div>
@@ -238,7 +233,7 @@
                 @* 已选日期标签 *@
                 @if (_dateSearchPerformed || _isLoadingDate)
                 {
-                    <p class="mt-2 px-1 text-xs font-semibold" style="color: var(--color-primary);">
+                    <p class="mt-2 px-1 text-xs font-semibold text-center" style="color: var(--color-primary);">
                         @_selectedDate.ToString("yyyy 年 M 月 d 日")
                         @if (_isLoadingDate)
                         {
@@ -271,29 +266,64 @@
                 <div class="px-4 py-2 space-y-2">
                     @foreach (var msg in _dateResults)
                     {
-                        <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
-                             @key="msg.Id"
-                             @onclick="() => NavigateToMessage(msg.Id)">
-                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                                 style="background: var(--color-primary-fixed);">
-                                <span class="material-symbols-outlined text-sm"
-                                      style="color: var(--color-primary);">
-                                    @GetContentTypeIcon(msg.ContentType)
+                        @* 图片消息：显示缩略图预览 *@
+                        @if (msg.ContentType == ShareContentType.Image)
+                        {
+                            <div class="group rounded-2xl bg-surface-container-lowest shadow-sm overflow-hidden cursor-pointer"
+                                 @key="msg.Id"
+                                 @onclick="() => NavigateToMessage(msg.Id)">
+                                <img class="w-full max-h-48 object-cover"
+                                     src="@GetFileUrl(msg.Id)"
+                                     alt="@(msg.FileName ?? "图片")" />
+                                <div class="flex items-center justify-between px-3 py-2">
+                                    <p class="text-[11px] text-on-surface-variant">@FormatMessageTime(msg.CreatedAt)</p>
+                                    <span class="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary transition-colors" style="font-size: 16px;">open_in_new</span>
+                                </div>
+                            </div>
+                        }
+                        @* 视频消息：显示内联视频播放器 *@
+                        else if (msg.ContentType == ShareContentType.Video)
+                        {
+                            <div class="group rounded-2xl bg-surface-container-lowest shadow-sm overflow-hidden"
+                                 @key="msg.Id">
+                                <video class="w-full max-h-48 bg-on-surface/10"
+                                       controls
+                                       preload="metadata"
+                                       src="@GetFileUrl(msg.Id)"></video>
+                                <div class="flex items-center justify-between px-3 py-2 cursor-pointer"
+                                     @onclick="() => NavigateToMessage(msg.Id)">
+                                    <p class="text-[11px] text-on-surface-variant">@(msg.FileName ?? "视频") · @FormatMessageTime(msg.CreatedAt)</p>
+                                    <span class="material-symbols-outlined text-on-surface-variant/40 group-hover:text-primary transition-colors" style="font-size: 16px;">open_in_new</span>
+                                </div>
+                            </div>
+                        }
+                        @* 其他消息：通用列表行 *@
+                        else
+                        {
+                            <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
+                                 @key="msg.Id"
+                                 @onclick="() => NavigateToMessage(msg.Id)">
+                                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                                     style="background: var(--color-primary-fixed);">
+                                    <span class="material-symbols-outlined text-sm"
+                                          style="color: var(--color-primary);">
+                                        @GetContentTypeIcon(msg.ContentType)
+                                    </span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm text-on-surface leading-relaxed line-clamp-2 break-words">
+                                        @(msg.FileName ?? msg.LinkTitle ?? msg.Content)
+                                    </p>
+                                    <p class="mt-1 text-[11px] font-medium" style="color: var(--color-primary);">
+                                        @FormatMessageTime(msg.CreatedAt)
+                                    </p>
+                                </div>
+                                <span class="material-symbols-outlined shrink-0 self-center text-on-surface-variant/40 transition-colors group-hover:text-primary"
+                                      style="font-size: 18px;">
+                                    open_in_new
                                 </span>
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm text-on-surface leading-relaxed line-clamp-2 break-words">
-                                    @(msg.FileName ?? msg.LinkTitle ?? msg.Content)
-                                </p>
-                                <p class="mt-1 text-[11px] font-medium" style="color: var(--color-primary);">
-                                    @FormatMessageTime(msg.CreatedAt)
-                                </p>
-                            </div>
-                            <span class="material-symbols-outlined shrink-0 self-center text-on-surface-variant/40 transition-colors group-hover:text-primary"
-                                  style="font-size: 18px;">
-                                open_in_new
-                            </span>
-                        </div>
+                        }
                     }
                 </div>
             }
@@ -326,8 +356,8 @@
                             <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
                             <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
                         </div>
-                        @* 响应式网格：小屏 2 列，中屏 3 列，大屏 4 列 *@
-                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-2">
+                        @* 响应式网格：小屏 2 列，中屏 3 列，大屏 4 列，xl 5 列，2xl 6 列 *@
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 mb-2">
                             @foreach (var msg in group)
                             {
                                 <div class="group relative rounded-2xl overflow-hidden bg-surface-container aspect-square shadow-sm cursor-zoom-in"
@@ -336,11 +366,10 @@
                                     <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                          src="@GetFileUrl(msg.Id)"
                                          alt="@(msg.FileName ?? "图片")" />
-                                    @* 悬浮操作条 *@
-                                    <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+                                    @* 悬浮操作条：两个按钮均靠右 *@
+                                    <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
                                          style="background: linear-gradient(to top, rgba(25,28,29,0.75), transparent);"
                                          @onclick:stopPropagation>
-                                        <span class="text-white text-[10px] truncate font-medium">@(msg.FileName ?? "图片")</span>
                                         <button type="button"
                                                 class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
                                                 title="在聊天中查看"
@@ -405,8 +434,8 @@
                             <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
                             <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
                         </div>
-                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列 *@
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列，xl 4 列，2xl 5 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 mb-2">
                             @foreach (var msg in group)
                             {
                                 <div class="rounded-2xl overflow-hidden bg-surface-container-lowest shadow-sm" @key="msg.Id">
@@ -485,8 +514,8 @@
                             <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
                             <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
                         </div>
-                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列 *@
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列，xl 4 列，2xl 5 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 mb-2">
                             @foreach (var msg in group)
                             {
                                 <div class="flex items-center gap-3 rounded-2xl bg-surface-container-lowest p-4 shadow-sm" @key="msg.Id">
@@ -563,8 +592,8 @@
                             <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
                             <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
                         </div>
-                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列 *@
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列，xl 4 列，2xl 5 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 mb-2">
                             @foreach (var msg in group)
                             {
                                 <div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm flex flex-col gap-2" @key="msg.Id">

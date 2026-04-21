@@ -126,6 +126,21 @@ AnyDropInterop.scrollToBottom = function (element) {
 };
 
 /**
+ * 仅当用户已处于列表底部附近时才自动滚动到底部（用于收到新消息时的条件滚动）。
+ * 若用户已手动向上滚动超过 threshold 像素，则不自动滚动，尊重用户的阅读位置。
+ * @param {HTMLElement} element - 滚动容器
+ * @param {number} [threshold=150] - 距底部多少像素以内视为"底部附近"
+ */
+AnyDropInterop.scrollToBottomIfNearBottom = function (element, threshold = 150) {
+  if (!element) return;
+  const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+  if (distanceFromBottom > threshold) return;
+  element.scrollTop = element.scrollHeight;
+  // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底（同 scrollToBottom 的处理逻辑）
+  setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, 300);
+};
+
+/**
  * 滚动到指定消息并触发高亮动画（从搜索页跳转回聊天时使用）。
  * @param {string} messageId - 目标消息的 data-message-id 属性值
  */

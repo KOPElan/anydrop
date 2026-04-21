@@ -68,7 +68,10 @@ public partial class Home : IAsyncDisposable
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
     private DotNetObjectReference<Home>? _dotNetRef;
+    // 强制滚到底（初次加载、主题切换、手动发消息）
     private bool _shouldScrollToBottom;
+    // 条件滚到底（收到新消息时，仅当用户处于底部附近才滚动）
+    private bool _shouldScrollIfNearBottom;
 
     protected override async Task OnInitializedAsync()
     {
@@ -108,6 +111,86 @@ public partial class Home : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // ── 优先处理滚动/高亮（在 hub 初始化前执行，消除初次打开时先显示顶部再跳底的闪烁）──
+
+        if (_shouldScrollToBottom)
+        {
+            _shouldScrollToBottom = false;
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
+            }
+            catch (JSDisconnectedException)
+            {
+                Logger.LogDebug("JS interop disconnected during scrollToBottom — component is being disposed.");
+            }
+            catch (TaskCanceledException)
+            {
+                Logger.LogDebug("scrollToBottom was cancelled — component is being disposed.");
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottom.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogDebug(ex, "JS interop not available during scrollToBottom.");
+            }
+        }
+
+        if (_shouldScrollIfNearBottom)
+        {
+            _shouldScrollIfNearBottom = false;
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottomIfNearBottom", _messageListRef);
+            }
+            catch (JSDisconnectedException)
+            {
+                Logger.LogDebug("JS interop disconnected during scrollToBottomIfNearBottom — component is being disposed.");
+            }
+            catch (TaskCanceledException)
+            {
+                Logger.LogDebug("scrollToBottomIfNearBottom was cancelled — component is being disposed.");
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottomIfNearBottom.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogDebug(ex, "JS interop not available during scrollToBottomIfNearBottom.");
+            }
+        }
+
+        // 从搜索页跳转回来时，滚动并高亮目标消息
+        if (_shouldHighlight && _pendingHighlightId.HasValue)
+        {
+            _shouldHighlight = false;
+            var targetId = _pendingHighlightId.Value;
+            _pendingHighlightId = null;
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.scrollToMessage", targetId.ToString());
+            }
+            catch (JSDisconnectedException)
+            {
+                Logger.LogDebug("JS interop disconnected during scrollToMessage.");
+            }
+            catch (TaskCanceledException)
+            {
+                Logger.LogDebug("scrollToMessage was cancelled.");
+            }
+            catch (ObjectDisposedException ex)
+            {
+                Logger.LogDebug(ex, "JS runtime disposed during scrollToMessage.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogDebug(ex, "JS interop not available during scrollToMessage.");
+            }
+        }
+
         if (firstRender)
         {
             // 设置聊天区域拖放处理（JS 端负责消抖，仅在状态变化时回调 .NET）
@@ -145,10 +228,11 @@ public partial class Home : IAsyncDisposable
                     }
 
                     // 新消息：O(1) 去重后追加到末尾，保持时间升序
+                    // 仅当用户处于底部附近时才触发自动滚动（避免打断用户翻阅历史记录）
                     if (_messageIds.Add(dto.Id))
                     {
                         _messages.Add(dto);
-                        _shouldScrollToBottom = true;
+                        _shouldScrollIfNearBottom = true;
                         StateHasChanged();
                     }
                 });
@@ -163,59 +247,6 @@ public partial class Home : IAsyncDisposable
                 Logger.LogWarning(ex, "Failed to start ShareHub connection. Falling back to polling.");
                 _pollingCts = new CancellationTokenSource();
                 _pollingTask = StartPollingAsync(_pollingCts.Token);
-            }
-        }
-
-        if (_shouldScrollToBottom)
-        {
-            _shouldScrollToBottom = false;
-            try
-            {
-                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
-            }
-            catch (JSDisconnectedException)
-            {
-                Logger.LogDebug("JS interop disconnected during scrollToBottom — component is being disposed.");
-            }
-            catch (TaskCanceledException)
-            {
-                Logger.LogDebug("scrollToBottom was cancelled — component is being disposed.");
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottom.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger.LogDebug(ex, "JS interop not available during scrollToBottom.");
-            }
-        }
-
-        // 从搜索页跳转回来时，滚动并高亮目标消息
-        if (_shouldHighlight && _pendingHighlightId.HasValue)
-        {
-            _shouldHighlight = false;
-            var targetId = _pendingHighlightId.Value;
-            _pendingHighlightId = null;
-            try
-            {
-                await JS.InvokeVoidAsync("AnyDropInterop.scrollToMessage", targetId.ToString());
-            }
-            catch (JSDisconnectedException)
-            {
-                Logger.LogDebug("JS interop disconnected during scrollToMessage.");
-            }
-            catch (TaskCanceledException)
-            {
-                Logger.LogDebug("scrollToMessage was cancelled.");
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Logger.LogDebug(ex, "JS runtime disposed during scrollToMessage.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger.LogDebug(ex, "JS interop not available during scrollToMessage.");
             }
         }
     }
