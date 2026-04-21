@@ -3,6 +3,7 @@ namespace AnyDrop.Models;
 public sealed record TopicDto(
     Guid Id,
     string Name,
+    string Icon,
     int SortOrder,
     DateTimeOffset CreatedAt,
     DateTimeOffset? LastMessageAt,
@@ -18,6 +19,7 @@ public sealed record TopicDto(
 public sealed record CreateTopicRequest(string Name);
 
 public sealed record UpdateTopicRequest(string Name);
+public sealed record UpdateTopicIconRequest(string Icon);
 public sealed record PinTopicRequest(bool IsPinned);
 public sealed record ArchiveTopicRequest(bool IsArchived);
 

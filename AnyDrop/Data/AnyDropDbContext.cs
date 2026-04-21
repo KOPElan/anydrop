@@ -33,6 +33,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 .HasConversion(
                     value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
                     value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.Property(e => e.Icon).HasMaxLength(100).HasDefaultValue("chat_bubble");
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.IsBuiltIn);
             entity.HasIndex(e => new { e.SortOrder, e.LastMessageAt });

@@ -27,6 +27,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             .Select(t => new TopicDto(
                 t.Id,
                 t.Name,
+                t.Icon,
                 t.SortOrder,
                 t.CreatedAt,
                 t.LastMessageAt,
@@ -58,6 +59,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         return new TopicDto(
             topic.Id,
             topic.Name,
+            topic.Icon,
             topic.SortOrder,
             topic.CreatedAt,
             topic.LastMessageAt,
@@ -89,6 +91,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             .Select(t => new TopicDto(
                 t.Id,
                 t.Name,
+                t.Icon,
                 t.SortOrder,
                 t.CreatedAt,
                 t.LastMessageAt,
@@ -117,7 +120,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
         await BroadcastTopicsUpdatedAsync(ct);
 
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, 0, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
+        return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, 0, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
     public async Task<TopicDto?> UpdateTopicAsync(Guid topicId, UpdateTopicRequest request, CancellationToken ct = default)
@@ -133,7 +136,29 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
+        return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
+    }
+
+    public async Task<TopicDto?> UpdateTopicIconAsync(Guid topicId, UpdateTopicIconRequest request, CancellationToken ct = default)
+    {
+        var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct);
+        if (topic is null)
+        {
+            return null;
+        }
+
+        var icon = request.Icon?.Trim();
+        if (string.IsNullOrWhiteSpace(icon))
+        {
+            icon = "chat_bubble";
+        }
+
+        topic.Icon = icon;
+        await dbContext.SaveChangesAsync(ct);
+        await BroadcastTopicsUpdatedAsync(ct);
+
+        var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
+        return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
     public async Task<bool> DeleteTopicAsync(Guid topicId, CancellationToken ct = default)
@@ -240,7 +265,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
+        return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
     public async Task<TopicDto> ArchiveTopicAsync(Guid topicId, bool isArchived, CancellationToken ct = default)
@@ -262,7 +287,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
-        return new TopicDto(topic.Id, topic.Name, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
+        return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
     public async Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, CancellationToken ct = default)

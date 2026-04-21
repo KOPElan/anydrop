@@ -15,6 +15,9 @@ public interface ITopicService
 
     Task<TopicDto?> UpdateTopicAsync(Guid topicId, UpdateTopicRequest request, CancellationToken ct = default);
 
+    /// <summary>更新主题图标。</summary>
+    Task<TopicDto?> UpdateTopicIconAsync(Guid topicId, UpdateTopicIconRequest request, CancellationToken ct = default);
+
     Task<bool> DeleteTopicAsync(Guid topicId, CancellationToken ct = default);
 
     Task ReorderTopicsAsync(ReorderTopicsRequest request, CancellationToken ct = default);
