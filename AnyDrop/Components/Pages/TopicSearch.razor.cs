@@ -1,7 +1,9 @@
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace AnyDrop.Components.Pages;
 
@@ -13,6 +15,7 @@ public partial class TopicSearch
     [Inject] public required ITopicService TopicService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<TopicSearch> Logger { get; set; }
+    [Inject] public required IJSRuntime JS { get; set; }
 
     // 当前激活的标签页
     private string _activeTab = "text";
@@ -34,6 +37,12 @@ public partial class TopicSearch
     private bool _isLoadingDate;
     private bool _dateSearchPerformed;
 
+    // 日历条：当前 7 天窗口的起始日期（周一对齐，不超过今天）
+    private DateOnly _calendarWindowStart;
+    // 有消息记录的日期集合（当前窗口内）
+    private IReadOnlyCollection<DateOnly> _activeDates = [];
+    private bool _isLoadingActiveDates;
+
     // ─── 媒体/文件/链接 标签页通用 ───
     private List<ShareItemDto> _typeResults = [];
     private bool _typeHasMore;
@@ -45,6 +54,7 @@ public partial class TopicSearch
 
     protected override async Task OnInitializedAsync()
     {
+        _calendarWindowStart = CalcDefaultWindowStart();
         await LoadTopicNameAsync();
     }
 
@@ -77,8 +87,11 @@ public partial class TopicSearch
 
         _activeTab = tab;
 
-        // 切换到媒体/文件/链接标签时自动加载
-        if (tab is "image" or "video" or "file" or "link")
+        if (tab == "date")
+        {
+            await LoadCalendarActiveDatesAsync();
+        }
+        else if (tab is "image" or "video" or "file" or "link")
         {
             await LoadTypeResultsAsync(reset: true);
         }
@@ -144,7 +157,7 @@ public partial class TopicSearch
         }
     }
 
-    private async Task HandleSearchKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
     {
         if (string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
         {
@@ -153,6 +166,60 @@ public partial class TopicSearch
     }
 
     // ─────────────────────────── 日期查找 ───────────────────────────
+
+    /// <summary>计算默认日历窗口起始（今天往前推 6 天，确保今天可见）。</summary>
+    private static DateOnly CalcDefaultWindowStart()
+    {
+        return DateOnly.FromDateTime(DateTime.Today).AddDays(-6);
+    }
+
+    /// <summary>日历条窗口中的 7 天列表（升序）。</summary>
+    private IEnumerable<DateOnly> CalendarDays
+        => Enumerable.Range(0, 7).Select(i => _calendarWindowStart.AddDays(i));
+
+    /// <summary>今天日期，用于禁止导航到未来。</summary>
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
+
+    private bool CanGoForward => _calendarWindowStart.AddDays(6) < Today;
+
+    private async Task ShiftCalendarAsync(int days)
+    {
+        var candidate = _calendarWindowStart.AddDays(days);
+        // 不允许窗口末尾超过今天
+        if (days > 0 && candidate.AddDays(6) > Today)
+        {
+            candidate = Today.AddDays(-6);
+        }
+
+        _calendarWindowStart = candidate;
+        await LoadCalendarActiveDatesAsync();
+    }
+
+    private async Task LoadCalendarActiveDatesAsync()
+    {
+        _isLoadingActiveDates = true;
+        try
+        {
+            var end = _calendarWindowStart.AddDays(6);
+            _activeDates = await ShareService.GetTopicActiveDatesAsync(TopicId, _calendarWindowStart, end);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load active dates for topic {TopicId}", TopicId);
+            _activeDates = [];
+        }
+        finally
+        {
+            _isLoadingActiveDates = false;
+        }
+    }
+
+    private async Task SelectCalendarDateAsync(DateOnly date)
+    {
+        if (date > Today) return;
+        _selectedDate = date;
+        await LoadDateResultsAsync();
+    }
 
     private async Task LoadDateResultsAsync()
     {
@@ -176,13 +243,28 @@ public partial class TopicSearch
         }
     }
 
-    private async Task HandleDateChanged(ChangeEventArgs e)
+    private async Task HandleDatePickerChanged(ChangeEventArgs e)
     {
-        if (DateOnly.TryParse(e.Value?.ToString(), out var date))
+        if (DateOnly.TryParse(e.Value?.ToString(), out var date) && date <= Today)
         {
             _selectedDate = date;
+            // 将日历窗口移到包含所选日期的位置：以 date 为末端，往前取 6 天
+            _calendarWindowStart = date.AddDays(-6);
+            // 若窗口末端超过今天，则以今天为末端（始终显示今天）
+            if (_calendarWindowStart.AddDays(6) > Today)
+            {
+                _calendarWindowStart = Today.AddDays(-6);
+            }
+
+            await LoadCalendarActiveDatesAsync();
             await LoadDateResultsAsync();
         }
+    }
+
+    /// <summary>触发隐藏的 date input 弹出系统日历选择器。</summary>
+    private async Task OpenDatePickerAsync()
+    {
+        await JS.InvokeVoidAsync("AnyDropInterop.showDatePicker", "datepicker-hidden");
     }
 
     // ─────────────────────────── 媒体/文件/链接 ───────────────────────────
@@ -271,9 +353,6 @@ public partial class TopicSearch
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
 
-    /// <summary>日期选择器的最大可选值（今天，避免选择未来日期）。</summary>
-    private static string MaxDateString => DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
-
     private static string FormatFileSize(long bytes)
     {
         return bytes switch
@@ -286,8 +365,5 @@ public partial class TopicSearch
     }
 
     private static string FormatMessageTime(DateTimeOffset time)
-    {
-        var local = time.ToLocalTime();
-        return local.ToString("yyyy/MM/dd HH:mm");
-    }
+        => time.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
 }

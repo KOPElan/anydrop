@@ -57,38 +57,45 @@
         @* ═══════════════════ 文字搜索 ═══════════════════ *@
         @if (_activeTab == "text")
         {
-            <div class="px-4 pt-4 pb-2">
-                <div class="flex gap-2">
-                    <input class="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
-                           style="border-color: var(--color-outline-variant); background: var(--color-surface-container-lowest); color: var(--color-on-surface);"
-                           type="search"
-                           placeholder="搜索消息内容…"
-                           maxlength="200"
-                           @bind="_searchQuery"
-                           @bind:event="oninput"
-                           @onkeydown="HandleSearchKeyDown" />
-                    <button type="button"
-                            class="btn-primary shrink-0 flex items-center gap-1.5"
-                            disabled="@(_isSearching || string.IsNullOrWhiteSpace(_searchQuery))"
-                            @onclick="RunSearchAsync">
+            @* 居中一体式搜索框，宽屏限制最大宽度 *@
+            <div class="flex justify-center px-4 pt-6 pb-3">
+                <div class="w-full max-w-xl">
+                    <div class="flex items-center gap-0 rounded-2xl border overflow-hidden transition focus-within:ring-2 focus-within:ring-primary/30"
+                         style="border-color: var(--color-outline-variant); background: var(--color-surface-container-lowest);">
+                        <span class="material-symbols-outlined pl-4 shrink-0 text-on-surface-variant/50" style="font-size: 20px;">search</span>
+                        <input class="flex-1 bg-transparent px-3 py-3 text-sm outline-none"
+                               style="color: var(--color-on-surface);"
+                               type="search"
+                               placeholder="搜索消息内容…"
+                               maxlength="200"
+                               @bind="_searchQuery"
+                               @bind:event="oninput"
+                               @onkeydown="HandleSearchKeyDown" />
                         @if (_isSearching)
                         {
-                            <span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span>
+                            <span class="material-symbols-outlined animate-spin pr-3 text-on-surface-variant/60 shrink-0" style="font-size: 18px;">progress_activity</span>
                         }
-                        else
+                        else if (!string.IsNullOrWhiteSpace(_searchQuery))
                         {
-                            <span class="material-symbols-outlined" style="font-size: 16px;">search</span>
+                            <button type="button"
+                                    class="pr-4 shrink-0 text-xs font-semibold transition-colors"
+                                    style="color: var(--color-primary);"
+                                    @onclick="RunSearchAsync">
+                                搜索
+                            </button>
                         }
-                        搜索
-                    </button>
+                    </div>
+                    @if (!_searchPerformed)
+                    {
+                        <p class="mt-2 text-center text-xs text-on-surface-variant/70">输入关键词后按 Enter 或点击"搜索"</p>
+                    }
                 </div>
             </div>
 
             @if (!_searchPerformed)
             {
-                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                <div class="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
                     <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">manage_search</span>
-                    <p class="text-sm text-on-surface-variant">输入关键词后按回车或点击搜索</p>
                 </div>
             }
             else if (_searchResults.Count == 0)
@@ -146,49 +153,122 @@
         @* ═══════════════════ 日期查找 ═══════════════════ *@
         else if (_activeTab == "date")
         {
-            <div class="px-4 pt-4 pb-2">
-                <div class="flex items-center gap-3">
-                    <label class="text-sm font-semibold text-on-surface-variant shrink-0">选择日期</label>
-                    <input type="date"
-                           class="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
-                           style="border-color: var(--color-outline-variant); background: var(--color-surface-container-lowest); color: var(--color-on-surface);"
-                           value="@_selectedDate.ToString("yyyy-MM-dd")"
-                           max="@MaxDateString"
-                           @onchange="HandleDateChanged" />
+            @* ─── 7 天日历条 ─── *@
+            <div class="px-3 pt-4 pb-2">
+                <div class="flex items-center gap-1">
+                    @* 向前导航（更早日期） *@
                     <button type="button"
-                            class="btn-primary shrink-0"
-                            disabled="@_isLoadingDate"
-                            @onclick="LoadDateResultsAsync">
-                        @if (_isLoadingDate)
+                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                            title="向前 7 天"
+                            @onclick="() => ShiftCalendarAsync(-7)">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">chevron_left</span>
+                    </button>
+
+                    @* 7 天格子 *@
+                    <div class="flex flex-1 gap-1">
+                        @foreach (var day in CalendarDays)
                         {
-                            <span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span>
+                            var isSelected = day == _selectedDate;
+                            var hasMessages = _activeDates.Contains(day);
+                            var isFuture = day > Today;
+                            var isToday = day == Today;
+
+                            <button type="button"
+                                    disabled="@isFuture"
+                                    class="flex-1 flex flex-col items-center justify-center rounded-xl py-1.5 gap-0.5 transition-all disabled:opacity-30 disabled:pointer-events-none"
+                                    style="@(isSelected
+                                        ? "background: var(--color-primary); color: #fff;"
+                                        : hasMessages
+                                            ? "background: var(--color-primary-fixed); color: var(--color-primary);"
+                                            : "color: var(--color-on-surface-variant);")"
+                                    @onclick="() => SelectCalendarDateAsync(day)">
+                                <span class="text-[10px] font-medium leading-none">
+                                    @day.ToString("ddd", System.Globalization.CultureInfo.CurrentCulture)
+                                </span>
+                                <span class="text-base font-bold leading-tight">@day.Day</span>
+                                @* 有消息指示点（未选中时显示） *@
+                                @if (hasMessages && !isSelected)
+                                {
+                                    <span class="w-1 h-1 rounded-full mt-0.5" style="background: var(--color-primary);"></span>
+                                }
+                                else
+                                {
+                                    <span class="w-1 h-1 rounded-full mt-0.5 opacity-0"></span>
+                                }
+                            </button>
+                        }
+                    </div>
+
+                    @* 向后导航（更近日期） *@
+                    <button type="button"
+                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                            title="向后 7 天"
+                            disabled="@(!CanGoForward)"
+                            @onclick="() => ShiftCalendarAsync(7)">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                    </button>
+
+                    @* 日历选择器按钮 *@
+                    <div class="relative shrink-0">
+                        @if (_isLoadingActiveDates)
+                        {
+                            <span class="flex h-8 w-8 items-center justify-center">
+                                <span class="material-symbols-outlined animate-spin text-on-surface-variant/50" style="font-size: 18px;">progress_activity</span>
+                            </span>
                         }
                         else
                         {
-                            <span>查看</span>
+                            <button type="button"
+                                    class="flex h-8 w-8 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container"
+                                    title="选择具体日期"
+                                    @onclick="OpenDatePickerAsync">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">calendar_month</span>
+                            </button>
                         }
-                    </button>
+                        @* 隐藏的原生 date input，由上方按钮触发 *@
+                        <input type="date"
+                               id="datepicker-hidden"
+                               class="absolute opacity-0 pointer-events-none w-0 h-0"
+                               max="@Today.ToString("yyyy-MM-dd")"
+                               value="@_selectedDate.ToString("yyyy-MM-dd")"
+                               @onchange="HandleDatePickerChanged" />
+                    </div>
                 </div>
+
+                @* 已选日期标签 *@
+                @if (_dateSearchPerformed || _isLoadingDate)
+                {
+                    <p class="mt-2 px-1 text-xs font-semibold" style="color: var(--color-primary);">
+                        @_selectedDate.ToString("yyyy 年 M 月 d 日")
+                        @if (_isLoadingDate)
+                        {
+                            <span class="ml-1 text-on-surface-variant/60">加载中…</span>
+                        }
+                        else if (_dateSearchPerformed)
+                        {
+                            <span class="ml-1 text-on-surface-variant/60">· @_dateResults.Count 条消息</span>
+                        }
+                    </p>
+                }
             </div>
 
-            @if (!_dateSearchPerformed)
+            @if (!_dateSearchPerformed && !_isLoadingDate)
             {
-                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                <div class="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
                     <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">calendar_today</span>
-                    <p class="text-sm text-on-surface-variant">选择日期后点击「查看」，显示当天所有消息</p>
+                    <p class="text-sm text-on-surface-variant">点击日期查看当天的所有消息</p>
                 </div>
             }
-            else if (_dateResults.Count == 0)
+            else if (_dateSearchPerformed && _dateResults.Count == 0)
             {
-                <div class="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
+                <div class="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
                     <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">event_busy</span>
                     <p class="text-sm text-on-surface-variant">@_selectedDate.ToString("yyyy 年 M 月 d 日") 没有消息</p>
                 </div>
             }
-            else
+            else if (_dateSearchPerformed)
             {
                 <div class="px-4 py-2 space-y-2">
-                    <p class="text-xs text-on-surface-variant/60 px-1">@_selectedDate.ToString("yyyy 年 M 月 d 日") · 共 @_dateResults.Count 条消息</p>
                     @foreach (var msg in _dateResults)
                     {
                         <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
@@ -246,8 +326,8 @@
                             <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
                             <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
                         </div>
-                        @* 响应式网格：小屏 2 列，中屏及以上 3 列 *@
-                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-2">
+                        @* 响应式网格：小屏 2 列，中屏 3 列，大屏 4 列 *@
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-2">
                             @foreach (var msg in group)
                             {
                                 <div class="group relative rounded-2xl overflow-hidden bg-surface-container aspect-square shadow-sm cursor-zoom-in"
@@ -325,8 +405,8 @@
                             <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
                             <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
                         </div>
-                        @* 响应式网格：小屏 1 列，sm 及以上 2 列 *@
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
                             @foreach (var msg in group)
                             {
                                 <div class="rounded-2xl overflow-hidden bg-surface-container-lowest shadow-sm" @key="msg.Id">

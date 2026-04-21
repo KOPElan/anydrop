@@ -270,6 +270,30 @@ public sealed class ShareService(
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyCollection<DateOnly>> GetTopicActiveDatesAsync(
+        Guid topicId,
+        DateOnly start,
+        DateOnly end,
+        CancellationToken ct = default)
+    {
+        // 将本地日期范围转换为 UTC 范围
+        var localStart = new DateTime(start.Year, start.Month, start.Day, 0, 0, 0, DateTimeKind.Local);
+        var localEndExclusive = new DateTime(end.Year, end.Month, end.Day, 0, 0, 0, DateTimeKind.Local).AddDays(1);
+        var startOffset = new DateTimeOffset(localStart);
+        var endOffset   = new DateTimeOffset(localEndExclusive);
+
+        // 只拉取 CreatedAt 列，应用端转换为本地日期后去重
+        var timestamps = await dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.CreatedAt >= startOffset && x.CreatedAt < endOffset)
+            .Select(x => x.CreatedAt)
+            .ToListAsync(ct);
+
+        return timestamps
+            .Select(t => DateOnly.FromDateTime(t.ToLocalTime().DateTime))
+            .ToHashSet();
+    }
+
     public async Task<TopicMessagesResponse> GetTopicMessagesByTypeAsync(
         Guid topicId,
         ShareContentType contentType,

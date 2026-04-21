@@ -142,3 +142,15 @@ AnyDropInterop.scrollToMessage = function (messageId) {
     setTimeout(() => el.classList.remove('message-highlight'), 2500);
   });
 };
+
+
+/**
+ * 触发指定 id 的 <input type="date"> 打开系统日历选择器。
+ * @param {string} inputId - input 元素的 id
+ */
+AnyDropInterop.showDatePicker = function (inputId) {
+  const el = document.getElementById(inputId);
+  if (el && typeof el.showPicker === 'function') {
+    el.showPicker();
+  }
+};
