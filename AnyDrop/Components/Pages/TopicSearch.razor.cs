@@ -253,6 +253,19 @@ public partial class TopicSearch
 
     // ─────────────────────────── 工具方法 ───────────────────────────
 
+    private static IEnumerable<IGrouping<DateOnly, ShareItemDto>> GroupByDate(List<ShareItemDto> items)
+        => items
+            .GroupBy(m => DateOnly.FromDateTime(m.CreatedAt.ToLocalTime().DateTime))
+            .OrderByDescending(g => g.Key);
+
+    private static string FormatGroupDate(DateOnly date)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        if (date == today) return "今天";
+        if (date == today.AddDays(-1)) return "昨天";
+        return date.ToString("yyyy 年 M 月 d 日");
+    }
+
     private static string GetFileUrl(Guid itemId, bool download = false)
         => download
             ? $"/api/v1/share-items/{itemId}/file?download=true"

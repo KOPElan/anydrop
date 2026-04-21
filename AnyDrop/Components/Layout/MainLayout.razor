@@ -23,6 +23,8 @@
 
     private Task HandleTopicSelectedAsync(Guid? topicId)
     {
+        // 避免值未变化时触发不必要的级联更新，防止 Home 重复加载消息
+        if (_selectedTopicId == topicId) return Task.CompletedTask;
         _selectedTopicId = topicId;
         return Task.CompletedTask;
     }

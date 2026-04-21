@@ -43,11 +43,17 @@ public partial class TopicSidebar : IAsyncDisposable
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _nickname = state.User.FindFirst("nickname")?.Value ?? state.User.Identity?.Name ?? "用户";
         await LoadTopicsAsync();
-        await InitializeHubAsync();
+        // InitializeHubAsync 已移至 OnAfterRenderAsync，避免预渲染阶段执行导致协商响应 HTML 错误
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            // Hub 只在交互模式（Blazor 电路已建立）下启动，避免预渲染时连接失败
+            await InitializeHubAsync();
+        }
+
         // 每次渲染后重新初始化 SortableJS，确保拖拽排序在任何状态变化后仍能正确工作。
         // initSortable 内部会先 destroy 旧实例再 create 新实例，避免重复绑定。
         if (_topics.Count == 0) return;

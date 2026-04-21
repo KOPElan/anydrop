@@ -5,33 +5,29 @@
 
 @*
     主题搜索页：
-    顶部固定磨砂玻璃栏（返回按钮 + 主题名 + 搜索输入）
-    中部标签栏（文字 | 日期 | 图片 | 视频 | 文件 | 链接）
+    顶部固定磁浮栏（返回按钮 + 主题名 + 标签页选择栏，合为一体，无缝连接）
     内容区（随标签页动态渲染）
 *@
-<section class="relative h-full overflow-hidden bg-surface">
+<section class="relative h-full overflow-hidden bg-surface flex flex-col">
 
-    @* ─── 顶部标题栏 ─── *@
-    <header class="absolute inset-x-0 top-0 z-40 flex items-center gap-3 px-4 py-3 chat-header-glass">
-        <a href="/"
-           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
-           title="返回聊天">
-            <span class="material-symbols-outlined" style="font-size: 22px;">arrow_back</span>
-        </a>
-        <div class="min-w-0 flex-1">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 leading-none mb-0.5">搜索</p>
-            <h2 class="font-headline font-bold text-on-surface text-base leading-tight truncate">
-                @(_topicName ?? "主题")
-            </h2>
+    @* ─── 顶部固定区：标题栏 + 标签栏（glass 效果覆盖整体，无缝连接，无缝隙）─── *@
+    <div class="shrink-0 z-40 chat-header-glass flex flex-col">
+        @* 标题行 *@
+        <div class="flex items-center gap-3 px-4 py-3">
+            <a href="/"
+               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+               title="返回聊天">
+                <span class="material-symbols-outlined" style="font-size: 22px;">arrow_back</span>
+            </a>
+            <div class="min-w-0 flex-1">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 leading-none mb-0.5">搜索</p>
+                <h2 class="font-headline font-bold text-on-surface text-base leading-tight truncate">
+                    @(_topicName ?? "主题")
+                </h2>
+            </div>
         </div>
-    </header>
-
-    @* ─── 搜索区 + 标签栏 + 内容（均在可滚动容器内）─── *@
-    <div class="absolute inset-0 overflow-y-auto" style="padding-top: 72px;">
-
-        @* ─── 标签页选择栏 ─── *@
-        <div class="sticky top-0 z-30 bg-surface border-b px-4 py-2 flex gap-1 overflow-x-auto"
-             style="border-color: var(--color-outline-variant);">
+        @* 标签栏（紧贴标题行下方，与标题共享 glass 背景）*@
+        <div class="px-4 pb-2 flex gap-1 overflow-x-auto">
             @foreach (var tab in new[] {
                 ("text", "search", "文字"),
                 ("date", "calendar_today", "日期"),
@@ -53,6 +49,10 @@
                 </button>
             }
         </div>
+    </div>
+
+    @* ─── 可滚动内容区 ─── *@
+    <div class="flex-1 overflow-y-auto min-h-0">
 
         @* ═══════════════════ 文字搜索 ═══════════════════ *@
         @if (_activeTab == "text")
@@ -239,42 +239,50 @@
             else
             {
                 <div class="px-4 py-3">
-                    <p class="text-xs text-on-surface-variant/60 mb-3">@_typeResults.Count 张图片@(_typeHasMore ? "（加载了部分）" : "")</p>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        @foreach (var msg in _typeResults)
-                        {
-                            <div class="group relative rounded-2xl overflow-hidden bg-surface-container aspect-square shadow-sm cursor-zoom-in"
-                                 @key="msg.Id"
-                                 @onclick="() => OpenImagePreview(GetFileUrl(msg.Id))">
-                                <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                     src="@GetFileUrl(msg.Id)"
-                                     alt="@(msg.FileName ?? "图片")" />
-                                @* 悬浮操作条 *@
-                                <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
-                                     style="background: linear-gradient(to top, rgba(25,28,29,0.75), transparent);"
-                                     @onclick:stopPropagation>
-                                    <span class="text-white text-[10px] truncate font-medium">@(msg.FileName ?? "图片")</span>
-                                    <button type="button"
-                                            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
-                                            title="在聊天中查看"
-                                            @onclick="() => NavigateToMessage(msg.Id)">
-                                        <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
-                                    </button>
-                                    <a href="@GetFileUrl(msg.Id, true)"
-                                       class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
-                                       title="下载"
-                                       @onclick:stopPropagation>
-                                        <span class="material-symbols-outlined" style="font-size: 14px;">download</span>
-                                    </a>
+                    @foreach (var group in GroupByDate(_typeResults))
+                    {
+                        @* 日期分组标题 *@
+                        <div class="flex items-center gap-2 my-3">
+                            <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
+                            <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
+                        </div>
+                        @* 响应式网格：小屏 2 列，中屏及以上 3 列 *@
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-2">
+                            @foreach (var msg in group)
+                            {
+                                <div class="group relative rounded-2xl overflow-hidden bg-surface-container aspect-square shadow-sm cursor-zoom-in"
+                                     @key="msg.Id"
+                                     @onclick="() => OpenImagePreview(GetFileUrl(msg.Id))">
+                                    <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                         src="@GetFileUrl(msg.Id)"
+                                         alt="@(msg.FileName ?? "图片")" />
+                                    @* 悬浮操作条 *@
+                                    <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+                                         style="background: linear-gradient(to top, rgba(25,28,29,0.75), transparent);"
+                                         @onclick:stopPropagation>
+                                        <span class="text-white text-[10px] truncate font-medium">@(msg.FileName ?? "图片")</span>
+                                        <button type="button"
+                                                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
+                                                title="在聊天中查看"
+                                                @onclick="() => NavigateToMessage(msg.Id)">
+                                            <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+                                        </button>
+                                        <a href="@GetFileUrl(msg.Id, true)"
+                                           class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
+                                           title="下载"
+                                           @onclick:stopPropagation>
+                                            <span class="material-symbols-outlined" style="font-size: 14px;">download</span>
+                                        </a>
+                                    </div>
+                                    @* 右上角时间 *@
+                                    <div class="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                         style="background: rgba(0,0,0,0.5);">
+                                        @msg.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                    </div>
                                 </div>
-                                @* 右下角时间 *@
-                                <div class="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                     style="background: rgba(0,0,0,0.5);">
-                                    @msg.CreatedAt.ToLocalTime().ToString("MM/dd")
-                                </div>
-                            </div>
-                        }
-                    </div>
+                            }
+                        </div>
+                    }
                     @if (_typeHasMore)
                     {
                         <div class="py-4 text-center">
@@ -309,40 +317,50 @@
             }
             else
             {
-                <div class="px-4 py-3 space-y-4">
-                    <p class="text-xs text-on-surface-variant/60">@_typeResults.Count 个视频@(_typeHasMore ? "（加载了部分）" : "")</p>
-                    @foreach (var msg in _typeResults)
+                <div class="px-4 py-3">
+                    @foreach (var group in GroupByDate(_typeResults))
                     {
-                        <div class="rounded-2xl overflow-hidden bg-surface-container-lowest shadow-sm" @key="msg.Id">
-                            <video class="w-full max-h-64 bg-on-surface/10"
-                                   controls
-                                   preload="metadata"
-                                   src="@GetFileUrl(msg.Id)"></video>
-                            <div class="flex items-center justify-between p-3">
-                                <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? "视频")</p>
-                                    <p class="text-[11px] text-on-surface-variant">
-                                        @FormatMessageTime(msg.CreatedAt)
-                                        @if (msg.FileSize.HasValue)
-                                        {
-                                            <span> · @FormatFileSize(msg.FileSize.Value)</span>
-                                        }
-                                    </p>
+                        @* 日期分组标题 *@
+                        <div class="flex items-center gap-2 my-3">
+                            <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
+                            <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
+                        </div>
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                            @foreach (var msg in group)
+                            {
+                                <div class="rounded-2xl overflow-hidden bg-surface-container-lowest shadow-sm" @key="msg.Id">
+                                    <video class="w-full max-h-52 bg-on-surface/10"
+                                           controls
+                                           preload="metadata"
+                                           src="@GetFileUrl(msg.Id)"></video>
+                                    <div class="flex items-center justify-between p-3">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? "视频")</p>
+                                            <p class="text-[11px] text-on-surface-variant">
+                                                @msg.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                                @if (msg.FileSize.HasValue)
+                                                {
+                                                    <span> · @FormatFileSize(msg.FileSize.Value)</span>
+                                                }
+                                            </p>
+                                        </div>
+                                        <div class="flex gap-1 shrink-0">
+                                            <button type="button"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                                    title="在聊天中查看"
+                                                    @onclick="() => NavigateToMessage(msg.Id)">
+                                                <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
+                                            </button>
+                                            <a href="@GetFileUrl(msg.Id, true)"
+                                               class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                               title="下载">
+                                                <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex gap-1 shrink-0">
-                                    <button type="button"
-                                            class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
-                                            title="在聊天中查看"
-                                            @onclick="() => NavigateToMessage(msg.Id)">
-                                        <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
-                                    </button>
-                                    <a href="@GetFileUrl(msg.Id, true)"
-                                       class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
-                                       title="下载">
-                                        <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
-                                    </a>
-                                </div>
-                            </div>
+                            }
                         </div>
                     }
                     @if (_typeHasMore)
@@ -379,38 +397,48 @@
             }
             else
             {
-                <div class="px-4 py-3 space-y-2">
-                    <p class="text-xs text-on-surface-variant/60">@_typeResults.Count 个附件@(_typeHasMore ? "（加载了部分）" : "")</p>
-                    @foreach (var msg in _typeResults)
+                <div class="px-4 py-3">
+                    @foreach (var group in GroupByDate(_typeResults))
                     {
-                        <div class="flex items-center gap-4 rounded-2xl bg-surface-container-lowest p-4 shadow-sm" @key="msg.Id">
-                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-                                 style="background: var(--color-error-container); color: var(--color-error);">
-                                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? "附件")</p>
-                                <p class="text-[11px] text-on-surface-variant">
-                                    @FormatMessageTime(msg.CreatedAt)
-                                    @if (msg.FileSize.HasValue)
-                                    {
-                                        <span> · @FormatFileSize(msg.FileSize.Value)</span>
-                                    }
-                                </p>
-                            </div>
-                            <div class="flex gap-1 shrink-0">
-                                <button type="button"
-                                        class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
-                                        title="在聊天中查看"
-                                        @onclick="() => NavigateToMessage(msg.Id)">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
-                                </button>
-                                <a href="@GetFileUrl(msg.Id, true)"
-                                   class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
-                                   title="下载">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
-                                </a>
-                            </div>
+                        @* 日期分组标题 *@
+                        <div class="flex items-center gap-2 my-3">
+                            <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
+                            <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
+                        </div>
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
+                            @foreach (var msg in group)
+                            {
+                                <div class="flex items-center gap-3 rounded-2xl bg-surface-container-lowest p-4 shadow-sm" @key="msg.Id">
+                                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                                         style="background: var(--color-error-container); color: var(--color-error);">
+                                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? "附件")</p>
+                                        <p class="text-[11px] text-on-surface-variant">
+                                            @msg.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                            @if (msg.FileSize.HasValue)
+                                            {
+                                                <span> · @FormatFileSize(msg.FileSize.Value)</span>
+                                            }
+                                        </p>
+                                    </div>
+                                    <div class="flex gap-1 shrink-0">
+                                        <button type="button"
+                                                class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                                title="在聊天中查看"
+                                                @onclick="() => NavigateToMessage(msg.Id)">
+                                            <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
+                                        </button>
+                                        <a href="@GetFileUrl(msg.Id, true)"
+                                           class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                           title="下载">
+                                            <span class="material-symbols-outlined" style="font-size: 18px;">download</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                     @if (_typeHasMore)
@@ -447,36 +475,44 @@
             }
             else
             {
-                <div class="px-4 py-3 space-y-3">
-                    <p class="text-xs text-on-surface-variant/60">@_typeResults.Count 条链接@(_typeHasMore ? "（加载了部分）" : "")</p>
-                    @foreach (var msg in _typeResults)
+                <div class="px-4 py-3">
+                    @foreach (var group in GroupByDate(_typeResults))
                     {
-                        <div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm" @key="msg.Id">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0 flex-1">
+                        @* 日期分组标题 *@
+                        <div class="flex items-center gap-2 my-3">
+                            <span class="text-xs font-semibold text-on-surface-variant/60">@FormatGroupDate(group.Key)</span>
+                            <div class="flex-1 h-px" style="background: var(--color-outline-variant);"></div>
+                        </div>
+                        @* 响应式网格：小屏 1 列，sm 及以上 2 列，lg 及以上 3 列 *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-2">
+                            @foreach (var msg in group)
+                            {
+                                <div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm flex flex-col gap-2" @key="msg.Id">
                                     @if (!string.IsNullOrWhiteSpace(msg.LinkTitle))
                                     {
-                                        <p class="text-sm font-semibold text-on-surface mb-1 leading-snug">@msg.LinkTitle</p>
+                                        <p class="text-sm font-semibold text-on-surface leading-snug line-clamp-2">@msg.LinkTitle</p>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(msg.LinkDescription))
                                     {
-                                        <p class="text-xs text-on-surface-variant mb-2 line-clamp-2">@msg.LinkDescription</p>
+                                        <p class="text-xs text-on-surface-variant line-clamp-2">@msg.LinkDescription</p>
                                     }
-                                    <a class="text-xs text-primary break-all underline underline-offset-2 truncate block"
+                                    <a class="text-xs text-primary break-all underline underline-offset-2 truncate"
                                        href="@msg.Content"
                                        target="_blank"
                                        rel="noopener noreferrer">
                                         @msg.Content
                                     </a>
-                                    <p class="mt-2 text-[11px] text-on-surface-variant">@FormatMessageTime(msg.CreatedAt)</p>
+                                    <div class="flex items-center justify-between mt-auto pt-1">
+                                        <p class="text-[11px] text-on-surface-variant">@msg.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
+                                        <button type="button"
+                                                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
+                                                title="在聊天中查看"
+                                                @onclick="() => NavigateToMessage(msg.Id)">
+                                            <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <button type="button"
-                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
-                                        title="在聊天中查看"
-                                        @onclick="() => NavigateToMessage(msg.Id)">
-                                    <span class="material-symbols-outlined" style="font-size: 18px;">open_in_new</span>
-                                </button>
-                            </div>
+                            }
                         </div>
                     }
                     @if (_typeHasMore)

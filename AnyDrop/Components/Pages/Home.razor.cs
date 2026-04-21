@@ -97,6 +97,12 @@ public partial class Home : IAsyncDisposable
             _selectedTopicId = SelectedTopicId;
             await LoadSelectedTopicMessagesAsync();
             await LoadSelectedTopicMetaAsync();
+
+            // 若有待高亮消息（从搜索页跳转而来），撤销自动滚到底的请求，保留高亮定位
+            if (_shouldHighlight)
+            {
+                _shouldScrollToBottom = false;
+            }
         }
     }
 
