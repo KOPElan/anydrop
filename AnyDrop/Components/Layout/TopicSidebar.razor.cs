@@ -218,11 +218,27 @@ public partial class TopicSidebar : IAsyncDisposable
             .WithAutomaticReconnect()
             .Build();
 
-        _topicsUpdatedSubscription = _hubConnection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", topics =>
+        _topicsUpdatedSubscription = _hubConnection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", async topics =>
         {
             _topics.Clear();
             _topics.AddRange(topics);
-            return InvokeAsync(StateHasChanged);
+
+            // 若已归档下拉列表正在显示，也同步刷新已归档主题列表
+            if (_showArchivedDropdown)
+            {
+                try
+                {
+                    var archived = await TopicService.GetArchivedTopicsAsync();
+                    _archivedTopics.Clear();
+                    _archivedTopics.AddRange(archived);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to refresh archived topics list on TopicsUpdated.");
+                }
+            }
+
+            await InvokeAsync(StateHasChanged);
         });
 
         try

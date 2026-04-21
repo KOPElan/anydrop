@@ -12,6 +12,9 @@ namespace AnyDrop.Components.Pages;
 public partial class Home : IAsyncDisposable
 {
     private const long DefaultMaxFileSizeBytes = 100L * 1024 * 1024;
+    private const int HubInitialDelayMs = 300;
+    private const int HubRetryDelayMs = 500;
+    private const int MaxHubConnectionAttempts = 2;
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
@@ -33,10 +36,14 @@ public partial class Home : IAsyncDisposable
     private bool _isDragging;
     private Guid? _selectedTopicId;
     private string? _selectedTopicName;
+    private string _selectedTopicIcon = "chat_bubble";
     private bool _selectedTopicPinned;
     private bool _selectedTopicArchived;
     private bool _selectedTopicIsBuiltIn;
     private int _selectedTopicMessageCount;
+
+    // 删除确认 Modal 状态
+    private bool _showDeleteConfirmModal;
 
     // 主题设置 Modal 状态
     private bool _showTopicSettingsModal;
@@ -238,15 +245,31 @@ public partial class Home : IAsyncDisposable
                 });
             });
 
-            try
+            // 短暂延迟，等待 Blazor 电路稳定后再连接 SignalR Hub，减少导航后的瞬时协商错误
+            await Task.Delay(HubInitialDelayMs);
+            var hubStarted = false;
+            for (var attempt = 0; attempt < MaxHubConnectionAttempts && !hubStarted; attempt++)
             {
-                await _hubConnection.StartAsync();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Failed to start ShareHub connection. Falling back to polling.");
-                _pollingCts = new CancellationTokenSource();
-                _pollingTask = StartPollingAsync(_pollingCts.Token);
+                try
+                {
+                    if (attempt > 0)
+                    {
+                        await Task.Delay(HubRetryDelayMs);
+                    }
+
+                    await _hubConnection.StartAsync();
+                    hubStarted = true;
+                }
+                catch (Exception ex) when (attempt < MaxHubConnectionAttempts - 1)
+                {
+                    Logger.LogDebug(ex, "ShareHub connection attempt {Attempt} failed, retrying...", attempt + 1);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to start ShareHub connection. Falling back to polling.");
+                    _pollingCts = new CancellationTokenSource();
+                    _pollingTask = StartPollingAsync(_pollingCts.Token);
+                }
             }
         }
     }
@@ -300,7 +323,7 @@ public partial class Home : IAsyncDisposable
     private void OpenTopicSettingsModal()
     {
         _topicSettingsName = _selectedTopicName ?? string.Empty;
-        _topicSettingsIcon = "chat_bubble"; // Default icon, could be loaded from topic metadata
+        _topicSettingsIcon = _selectedTopicIcon;
         _topicSettingsError = null;
         _showTopicSettingsModal = true;
     }
@@ -314,11 +337,29 @@ public partial class Home : IAsyncDisposable
     /// <summary>保存主题图标。</summary>
     private async Task SaveTopicIconAsync()
     {
-        // TODO: Implement icon saving to Topic model when Icon field is added
-        // For now, just show a success message
+        if (!_selectedTopicId.HasValue)
+        {
+            return;
+        }
+
         _topicSettingsError = null;
-        await Task.CompletedTask;
-        // 图标保存功能需要扩展 Topic 模型和数据库架构
+        try
+        {
+            var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(_topicSettingsIcon));
+            if (result is not null)
+            {
+                _selectedTopicIcon = _topicSettingsIcon;
+            }
+            else
+            {
+                _topicSettingsError = "保存图标失败：主题不存在。";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save icon for topic {TopicId}", _selectedTopicId);
+            _topicSettingsError = "保存图标失败，请重试。";
+        }
     }
 
     /// <summary>切换当前主题的置顶状态。</summary>
@@ -422,13 +463,27 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    /// <summary>删除当前主题（仅限无内容时）。</summary>
+    /// <summary>显示删除主题二次确认弹窗。</summary>
+    private void ConfirmDeleteCurrentTopic()
+    {
+        _showDeleteConfirmModal = true;
+    }
+
+    /// <summary>取消删除确认。</summary>
+    private void CancelDeleteConfirm()
+    {
+        _showDeleteConfirmModal = false;
+    }
+
+    /// <summary>删除当前主题（仅限无内容时，用户确认后执行）。</summary>
     private async Task DeleteCurrentTopicAsync()
     {
         if (!_selectedTopicId.HasValue)
         {
             return;
         }
+
+        _showDeleteConfirmModal = false;
 
         try
         {
@@ -437,6 +492,7 @@ public partial class Home : IAsyncDisposable
 
             _selectedTopicId = null;
             _selectedTopicName = null;
+            _selectedTopicIcon = "chat_bubble";
             _messages.Clear();
             _messageIds.Clear();
         }
@@ -678,6 +734,7 @@ public partial class Home : IAsyncDisposable
     private async Task LoadSelectedTopicMetaAsync(CancellationToken ct = default)
     {
         _selectedTopicName = null;
+        _selectedTopicIcon = "chat_bubble";
         _selectedTopicPinned = false;
         _selectedTopicArchived = false;
         _selectedTopicIsBuiltIn = false;
@@ -687,18 +744,11 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
-        // 先从普通列表中查找；找不到再从归档列表查找。
-        // 两次调用已分别走各自的 DB 查询过滤，分布在不同场景的结果集较小。
-        var allTopics = await TopicService.GetAllTopicsAsync(ct);
-        var topic = allTopics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
-
-        if (topic is null)
-        {
-            var archivedTopics = await TopicService.GetArchivedTopicsAsync(ct);
-            topic = archivedTopics.FirstOrDefault(t => t.Id == _selectedTopicId.Value);
-        }
+        // 使用 GetTopicByIdAsync 直接按 ID 查询（含已归档），避免全量加载两次列表
+        var topic = await TopicService.GetTopicByIdAsync(_selectedTopicId.Value, ct);
 
         _selectedTopicName = topic?.Name;
+        _selectedTopicIcon = topic?.Icon ?? "chat_bubble";
         _selectedTopicPinned = topic?.IsPinned == true;
         _selectedTopicArchived = topic?.IsArchived == true;
         _selectedTopicIsBuiltIn = topic?.IsBuiltIn == true;

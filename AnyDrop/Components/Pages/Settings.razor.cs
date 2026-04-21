@@ -7,6 +7,7 @@ namespace AnyDrop.Components.Pages;
 public partial class Settings
 {
     [Inject] public required IJSRuntime JSRuntime { get; set; }
+    [Inject] public required NavigationManager NavigationManager { get; set; }
 
     private string _nickname = string.Empty;
     private string _currentPassword = string.Empty;
@@ -15,6 +16,9 @@ public partial class Settings
     private bool _autoFetchLinkPreview = true;
     private string? _message;
     private string? _error;
+
+    /// <summary>返回首页。</summary>
+    private void GoBack() => NavigationManager.NavigateTo("/");
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
