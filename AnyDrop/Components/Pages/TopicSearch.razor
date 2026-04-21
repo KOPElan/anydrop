@@ -107,7 +107,7 @@
             }
             else
             {
-                <div class="px-4 py-2 space-y-2">
+                <div class="mx-auto max-w-3xl px-4 py-2 space-y-2">
                     <p class="text-xs text-on-surface-variant/60 px-1">共 @_searchResults.Count 条结果@(_searchHasMore ? "（显示最新部分）" : "")</p>
                     @foreach (var msg in _searchResults)
                     {
@@ -263,7 +263,7 @@
             }
             else if (_dateSearchPerformed)
             {
-                <div class="px-4 py-2 space-y-2">
+                <div class="mx-auto max-w-3xl px-4 py-2 space-y-2">
                     @foreach (var msg in _dateResults)
                     {
                         @* 图片消息：显示缩略图预览 *@

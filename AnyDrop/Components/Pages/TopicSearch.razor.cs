@@ -90,6 +90,8 @@ public partial class TopicSearch
         if (tab == "date")
         {
             await LoadCalendarActiveDatesAsync();
+            // 默认加载今天的消息（_selectedDate 已初始化为今天）
+            await LoadDateResultsAsync();
         }
         else if (tab is "image" or "video" or "file" or "link")
         {

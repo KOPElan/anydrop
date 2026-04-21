@@ -606,9 +606,44 @@ public partial class Home : IAsyncDisposable
         {
             if (_selectedTopicId.HasValue)
             {
-                await LoadSelectedTopicMessagesAsync(ct);
+                // 使用增量轮询：仅追加新消息，不清空列表，避免强制滚动到底部打断用户翻阅
+                await PollNewMessagesAsync(ct);
                 await InvokeAsync(StateHasChanged);
             }
+        }
+    }
+
+    /// <summary>
+    /// 增量轮询：查询最新一批消息，仅追加尚未显示的新条目，并在用户处于底部附近时
+    /// 触发条件滚动。不清空已有消息列表，不强制滚到底部，避免打断用户翻阅历史。
+    /// </summary>
+    private async Task PollNewMessagesAsync(CancellationToken ct = default)
+    {
+        if (!_selectedTopicId.HasValue) return;
+
+        var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
+        if (response is null) return;
+
+        var hasNew = false;
+        foreach (var msg in response.Messages.Reverse())
+        {
+            if (_messageIds.Add(msg.Id))
+            {
+                _messages.Add(msg);
+                hasNew = true;
+            }
+            else
+            {
+                // 就地更新已有消息（例如链接元数据后台刷新）
+                var idx = _messages.FindIndex(m => m.Id == msg.Id);
+                if (idx >= 0) _messages[idx] = msg;
+            }
+        }
+
+        if (hasNew)
+        {
+            // 仅当用户处于底部附近时才滚动，不强制跳转
+            _shouldScrollIfNearBottom = true;
         }
     }
 
