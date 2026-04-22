@@ -296,7 +296,7 @@
     /* ─── 消息列表：使用 CSS 变量统一控制顶/底留白，与玻璃栏高度一致 ─── */
     .chat-message-list {
         /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
-        --chat-header-h: 72px;
+        --chat-header-h: 82px;
         --chat-footer-h: 140px;
         padding-top: var(--chat-header-h);
         padding-bottom: var(--chat-footer-h);

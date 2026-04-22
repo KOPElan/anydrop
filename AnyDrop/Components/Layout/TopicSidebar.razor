@@ -122,7 +122,7 @@
     </div>
 
     @* ── 底部功能按钮 ────────────────────────── *@
-    <div class="px-3 pb-4 pt-2 mt-auto space-y-0.5" style="border-top: 1px solid var(--color-outline-variant);">
+    <div class="px-3 pb-4 pt-2 mt-auto space-y-0.5" >
         <div class="px-4 py-2 text-xs font-semibold" style="color: var(--color-on-surface-variant);">
             @_nickname
         </div>
@@ -134,8 +134,7 @@
             设置
         </button>
         <button type="button"
-                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
-                style="color: var(--color-error);"
+                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"                
                 @onclick="LogoutAsync">
             <span class="material-symbols-outlined text-base">logout</span>
             登出
