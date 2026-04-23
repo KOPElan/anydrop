@@ -1,0 +1,36 @@
+services:
+  anydrop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: anydrop:latest
+    container_name: anydrop
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # 持久化 SQLite 数据库和上传文件
+      - anydrop-data:/data
+    environment:
+      # ── 必填：JWT 签名密钥（建议 32 位以上随机字符串）──────────────────────────
+      - Auth__JwtSecret=${ANYDROP_JWT_SECRET:?请在 .env 文件或环境变量中设置 ANYDROP_JWT_SECRET}
+      # ── 可选：访问密码（留空则跳过密码验证）──────────────────────────────────
+      - Auth__Password=${ANYDROP_PASSWORD:-}
+      # ── 存储路径（已在 Dockerfile 中设为 /data，通常无需修改）─────────────────
+      - Storage__DatabasePath=/data/anydrop.db
+      - Storage__BasePath=/data/files
+      # ── 上传文件大小上限（字节），默认 100 MB ────────────────────────────────
+      - Storage__MaxFileSizeBytes=${ANYDROP_MAX_FILE_SIZE:-104857600}
+      # ── JWT 令牌有效期（小时），默认 24 小时 ─────────────────────────────────
+      - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
+      - ASPNETCORE_ENVIRONMENT=Production
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  anydrop-data:
+    driver: local

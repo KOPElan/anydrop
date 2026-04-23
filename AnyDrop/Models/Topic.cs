@@ -32,4 +32,7 @@ public sealed class Topic
 
     /// <summary>归档时间。</summary>
     public DateTimeOffset? ArchivedAt { get; set; }
+
+    /// <summary>主题图标（Material Symbols 图标名称），默认为 "chat_bubble"。</summary>
+    public string Icon { get; set; } = "chat_bubble";
 }

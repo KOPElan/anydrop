@@ -134,6 +134,14 @@
     from { height: 0; opacity: 0; }
     to   { height: 60%; opacity: 1; }
 }
+
+/* 消息高亮闪烁（从搜索页跳回聊天后定位消息时使用） */
+@keyframes highlight-flash {
+    0%   { background-color: transparent; }
+    20%  { background-color: rgba(0, 80, 203, 0.18); }
+    60%  { background-color: rgba(0, 80, 203, 0.12); }
+    100% { background-color: transparent; }
+}
 @layer base {
     html,
     body {
@@ -264,6 +272,12 @@
         background: rgba(255, 218, 214, 0.5) !important;
     }
 
+    /* ─── 搜索跳转后消息高亮动画 ─── */
+    .message-highlight {
+        border-radius: 1rem;
+        animation: highlight-flash 2.5s ease both;
+    }
+
     /* 文本消息气泡 hover */
     .message-bubble:hover .bubble-text {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -282,7 +296,7 @@
     /* ─── 消息列表：使用 CSS 变量统一控制顶/底留白，与玻璃栏高度一致 ─── */
     .chat-message-list {
         /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
-        --chat-header-h: 72px;
+        --chat-header-h: 82px;
         --chat-footer-h: 140px;
         padding-top: var(--chat-header-h);
         padding-bottom: var(--chat-footer-h);

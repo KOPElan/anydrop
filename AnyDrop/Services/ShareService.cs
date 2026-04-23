@@ -203,6 +203,149 @@ public sealed class ShareService(
             .ToListAsync(ct);
     }
 
+    public async Task<TopicMessagesResponse> SearchTopicMessagesAsync(
+        Guid topicId,
+        string query,
+        int limit = 50,
+        DateTimeOffset? before = null,
+        CancellationToken ct = default)
+    {
+        var normalized = query.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return new TopicMessagesResponse([], false, null);
+        }
+
+        var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
+        if (!exists)
+        {
+            return new TopicMessagesResponse([], false, null);
+        }
+
+        var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+        var normalizedSearch = normalized.ToLower();
+
+        // 使用显式的大小写不敏感匹配，避免 SQLite 在未配置 NOCASE 时出现大小写行为与需求不一致。
+        // 同时转义 LIKE 通配符，尽量保持原先 Contains 的“字面子串匹配”语义。
+        var escapedSearch = normalizedSearch
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
+        var likePattern = $"%{escapedSearch}%";
+
+        var queryable = dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && EF.Functions.Like(x.Content.ToLower(), likePattern, @"\"));
+
+        if (before.HasValue)
+        {
+            queryable = queryable.Where(x => x.CreatedAt < before.Value);
+        }
+
+        // 多取一条以判断是否有更多数据，避免额外的 COUNT/ANY 查询
+        var rawMessages = await queryable
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(safeLimit + 1)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+
+        var hasMore = rawMessages.Count > safeLimit;
+        var messages = hasMore ? rawMessages.Take(safeLimit).ToList() : rawMessages;
+
+        string? nextCursor = null;
+        if (hasMore)
+        {
+            nextCursor = messages[^1].CreatedAt.ToString("O");
+        }
+
+        return new TopicMessagesResponse(messages, hasMore, nextCursor);
+    }
+
+    public async Task<IReadOnlyList<ShareItemDto>> GetTopicMessagesByDateAsync(
+        Guid topicId,
+        DateOnly date,
+        CancellationToken ct = default)
+    {
+        // 使用服务器本地时区将日期转换为 UTC 范围，与消息时间显示保持一致
+        var localMidnight = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Local);
+        var startOffset = new DateTimeOffset(localMidnight);
+        var endOffset = startOffset.AddDays(1);
+
+        return await dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.CreatedAt >= startOffset && x.CreatedAt < endOffset)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyCollection<DateOnly>> GetTopicActiveDatesAsync(
+        Guid topicId,
+        DateOnly start,
+        DateOnly end,
+        CancellationToken ct = default)
+    {
+        // 将本地日期范围转换为 UTC 范围
+        var localStart = new DateTime(start.Year, start.Month, start.Day, 0, 0, 0, DateTimeKind.Local);
+        var localEndExclusive = new DateTime(end.Year, end.Month, end.Day, 0, 0, 0, DateTimeKind.Local).AddDays(1);
+        var startOffset = new DateTimeOffset(localStart);
+        var endOffset   = new DateTimeOffset(localEndExclusive);
+
+        // 只拉取 CreatedAt 列，应用端转换为本地日期后去重
+        var timestamps = await dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.CreatedAt >= startOffset && x.CreatedAt < endOffset)
+            .Select(x => x.CreatedAt)
+            .ToListAsync(ct);
+
+        return timestamps
+            .Select(t => DateOnly.FromDateTime(t.ToLocalTime().DateTime))
+            .ToHashSet();
+    }
+
+    public async Task<TopicMessagesResponse> GetTopicMessagesByTypeAsync(
+        Guid topicId,
+        ShareContentType contentType,
+        int limit = 50,
+        DateTimeOffset? before = null,
+        CancellationToken ct = default)
+    {
+        var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
+        if (!exists)
+        {
+            return new TopicMessagesResponse([], false, null);
+        }
+
+        var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+
+        var queryable = dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.TopicId == topicId && x.ContentType == contentType);
+
+        if (before.HasValue)
+        {
+            queryable = queryable.Where(x => x.CreatedAt < before.Value);
+        }
+
+        // 多取一条以判断是否有更多数据，避免额外的 COUNT/ANY 查询
+        var rawMessages = await queryable
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(safeLimit + 1)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+
+        var hasMore = rawMessages.Count > safeLimit;
+        var messages = hasMore ? rawMessages.Take(safeLimit).ToList() : rawMessages;
+
+        string? nextCursor = null;
+        if (hasMore)
+        {
+            nextCursor = messages[^1].CreatedAt.ToString("O");
+        }
+
+        return new TopicMessagesResponse(messages, hasMore, nextCursor);
+    }
+
     private static string BuildPreview(string content)
     {
         const int maxLen = 80;

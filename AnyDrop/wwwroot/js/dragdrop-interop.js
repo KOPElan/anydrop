@@ -124,3 +124,48 @@ AnyDropInterop.scrollToBottom = function (element) {
   const SCROLL_DELAY_MS = 300;
   setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, SCROLL_DELAY_MS);
 };
+
+/**
+ * 仅当用户已处于列表底部附近时才自动滚动到底部（用于收到新消息时的条件滚动）。
+ * 若用户已手动向上滚动超过 threshold 像素，则不自动滚动，尊重用户的阅读位置。
+ * @param {HTMLElement} element - 滚动容器
+ * @param {number} [threshold=150] - 距底部多少像素以内视为"底部附近"
+ */
+AnyDropInterop.scrollToBottomIfNearBottom = function (element, threshold = 150) {
+  if (!element) return;
+  const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+  if (distanceFromBottom > threshold) return;
+  element.scrollTop = element.scrollHeight;
+  // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底（同 scrollToBottom 的处理逻辑）
+  setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, 300);
+};
+
+/**
+ * 滚动到指定消息并触发高亮动画（从搜索页跳转回聊天时使用）。
+ * @param {string} messageId - 目标消息的 data-message-id 属性值
+ */
+AnyDropInterop.scrollToMessage = function (messageId) {
+  if (!messageId) return;
+  // rAF 确保 Blazor 已将元素渲染到 DOM
+  requestAnimationFrame(() => {
+    // 使用 CSS.escape() 防止 messageId 中包含特殊 CSS 选择器字符时出错
+    const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 添加高亮动画类，2.5 秒后移除
+    el.classList.add('message-highlight');
+    setTimeout(() => el.classList.remove('message-highlight'), 2500);
+  });
+};
+
+
+/**
+ * 触发指定 id 的 <input type="date"> 打开系统日历选择器。
+ * @param {string} inputId - input 元素的 id
+ */
+AnyDropInterop.showDatePicker = function (inputId) {
+  const el = document.getElementById(inputId);
+  if (el && typeof el.showPicker === 'function') {
+    el.showPicker();
+  }
+};

@@ -17,6 +17,7 @@ public static class TopicEndpoints
         group.MapPut("/{id:guid}", UpdateTopicAsync);
         group.MapPut("/{id:guid}/pin", PinTopicAsync);
         group.MapPut("/{id:guid}/archive", ArchiveTopicAsync);
+        group.MapPut("/{id:guid}/icon", UpdateTopicIconAsync);
         group.MapDelete("/{id:guid}", DeleteTopicAsync);
 
         return app;
@@ -119,6 +120,18 @@ public static class TopicEndpoints
         {
             return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"));
         }
+    }
+
+    private static async Task<IResult> UpdateTopicIconAsync(
+        Guid id,
+        UpdateTopicIconRequest request,
+        ITopicService topicService,
+        CancellationToken ct)
+    {
+        var updated = await topicService.UpdateTopicIconAsync(id, request, ct);
+        return updated is null
+            ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"))
+            : Results.Ok(ApiEnvelope<TopicDto>.Ok(updated));
     }
 
     private static async Task<IResult> ReorderTopicsAsync(ReorderTopicsRequest request, ITopicService topicService, CancellationToken ct)
