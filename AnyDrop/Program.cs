@@ -196,6 +196,9 @@ else
         options.RoutePrefix = "swagger";
     });
 }
+// 必须在 UseStatusCodePagesWithReExecute 之前，确保 wwwroot 静态文件
+// （含 _framework/blazor.web.js）直接返回，不被 404 重写或认证中间件拦截
+app.UseStaticFiles();
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseAntiforgery();
 app.UseAuthentication();
