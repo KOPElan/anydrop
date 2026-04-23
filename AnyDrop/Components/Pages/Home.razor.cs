@@ -22,6 +22,7 @@ public partial class Home : IAsyncDisposable
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Home> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
+    [Inject] public required ITopicStateService TopicStateService { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
@@ -349,6 +350,7 @@ public partial class Home : IAsyncDisposable
             if (result is not null)
             {
                 _selectedTopicIcon = _topicSettingsIcon;
+                TopicStateService.NotifyTopicsChanged();
             }
             else
             {
@@ -377,6 +379,7 @@ public partial class Home : IAsyncDisposable
             await TopicService.PinTopicAsync(_selectedTopicId.Value, pinning);
             _selectedTopicPinned = pinning;
             await LoadSelectedTopicMetaAsync();
+            TopicStateService.NotifyTopicsChanged();
             StateHasChanged();
         }
         catch (Exception ex)
@@ -415,6 +418,7 @@ public partial class Home : IAsyncDisposable
             await LoadSelectedTopicMetaAsync();
             _topicSettingsName = _selectedTopicName ?? name;
             _showTopicSettingsModal = false;
+            TopicStateService.NotifyTopicsChanged();
         }
         catch (Exception ex)
         {
@@ -449,12 +453,15 @@ public partial class Home : IAsyncDisposable
                 _selectedTopicMessageCount = 0;
                 _messages.Clear();
                 _messageIds.Clear();
+                TopicStateService.SetSelectedTopic(null);
             }
             else
             {
                 // 取消归档：刷新元数据，主题重新出现在普通列表
                 await LoadSelectedTopicMetaAsync();
             }
+
+            TopicStateService.NotifyTopicsChanged();
         }
         catch (Exception ex)
         {
@@ -495,6 +502,8 @@ public partial class Home : IAsyncDisposable
             _selectedTopicIcon = "chat_bubble";
             _messages.Clear();
             _messageIds.Clear();
+            TopicStateService.SetSelectedTopic(null);
+            TopicStateService.NotifyTopicsChanged();
         }
         catch (Exception ex)
         {
@@ -716,6 +725,7 @@ public partial class Home : IAsyncDisposable
         if (response is null)
         {
             _selectedTopicId = null;
+            TopicStateService.SetSelectedTopic(null);
             return;
         }
 
@@ -793,4 +803,3 @@ public partial class Home : IAsyncDisposable
             : $"{(int)remaining.TotalSeconds}秒后删除";
     }
 }
-

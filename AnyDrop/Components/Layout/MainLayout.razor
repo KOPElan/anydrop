@@ -1,12 +1,14 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject ITopicStateService TopicStateService
 
 <div class="app-shell">
     <aside class="sidebar border-r border-gray-200 bg-[var(--color-sidebar)]">
-        <TopicSidebar OnTopicSelected="HandleTopicSelectedAsync" />
+        <TopicSidebar />
     </aside>
 
     <main class="flex flex-col overflow-hidden">
-        <CascadingValue Value="_selectedTopicId">
+        <CascadingValue Value="TopicStateService.SelectedTopicId">
             @Body
         </CascadingValue>
     </main>
@@ -19,13 +21,18 @@
 </div>
 
 @code {
-    private Guid? _selectedTopicId;
-
-    private Task HandleTopicSelectedAsync(Guid? topicId)
+    protected override void OnInitialized()
     {
-        // 避免值未变化时触发不必要的级联更新，防止 Home 重复加载消息
-        if (_selectedTopicId == topicId) return Task.CompletedTask;
-        _selectedTopicId = topicId;
-        return Task.CompletedTask;
+        TopicStateService.SelectedTopicChanged += HandleSelectedTopicChanged;
+    }
+
+    private void HandleSelectedTopicChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        TopicStateService.SelectedTopicChanged -= HandleSelectedTopicChanged;
     }
 }
