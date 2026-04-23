@@ -13,6 +13,7 @@ artifacts/
 # Ignore AnyDrop obj build outputs explicitly
 /AnyDrop/obj/
 /AnyDrop/Data/
+/AnyDrop/data/
 
 # Rider
 *.sln.iml
