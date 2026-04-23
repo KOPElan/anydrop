@@ -9,6 +9,8 @@ namespace AnyDrop.Services;
 
 public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHub> hubContext) : ITopicService
 {
+    private const int TopicIconMaxLength = 100;
+
     public async Task<IReadOnlyList<TopicDto>> GetAllTopicsAsync(CancellationToken ct = default)
     {
         var topics = await BuildOrderedTopicsQuery()
@@ -147,13 +149,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             return null;
         }
 
-        var icon = request.Icon?.Trim();
-        if (string.IsNullOrWhiteSpace(icon))
-        {
-            icon = "chat_bubble";
-        }
-
-        topic.Icon = icon;
+        topic.Icon = NormalizeAndValidateIcon(request.Icon);
         await dbContext.SaveChangesAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
@@ -186,6 +182,24 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await BroadcastTopicsUpdatedAsync(ct);
 
         return true;
+    }
+
+    // Normalizes and validates the topic icon before persisting it so invalid input
+    // is rejected at the service boundary instead of surfacing as a DbUpdateException.
+    private static string NormalizeAndValidateIcon(string? icon)
+    {
+        var normalizedIcon = icon?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedIcon))
+        {
+            return "chat_bubble";
+        }
+
+        if (normalizedIcon.Length > TopicIconMaxLength)
+        {
+            throw new ArgumentException($"Icon must be {TopicIconMaxLength} characters or fewer.", nameof(icon));
+        }
+
+        return normalizedIcon;
     }
 
     public async Task ReorderTopicsAsync(ReorderTopicsRequest request, CancellationToken ct = default)
