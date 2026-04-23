@@ -63,15 +63,42 @@ ANYDROP_TOKEN_EXPIRY_HOURS=24
 
 **3. 启动服务**
 
+标准模式（推荐，以非 root 用户运行）：
+
 ```bash
 docker compose up -d
 ```
 
+Root 模式（仅在需要时使用，如绑定特权端口 80/443）：
+
+```bash
+docker compose -f docker-compose.root.yml up -d
+```
+
 **4. 初始化账号**
 
-首次启动后，在浏览器访问 `http://localhost:8080/setup`，设置登录密码。
+首次启动后，在浏览器访问 `http://localhost:8080/setup`（root 模式为 `http://localhost:80/setup`），设置登录密码。
 
 > 数据（SQLite 数据库 + 上传文件）持久化到 Docker volume `anydrop-data`，容器重启不会丢失。
+
+#### 权限问题排查
+
+如果遇到容器启动失败或 setup 页面无响应，可能是 volume 权限问题：
+
+```bash
+# 检查容器日志
+docker logs anydrop
+
+# 如看到 "WARNING: /data directory is not writable" 错误
+# 方案 1：使用 root 模式（临时解决）
+docker compose -f docker-compose.root.yml up -d
+
+# 方案 2：修复 volume 权限（推荐）
+docker compose down
+docker volume rm anydrop-data
+# 然后重新启动，volume 会以正确权限创建
+docker compose up -d
+```
 
 ---
 
