@@ -197,9 +197,6 @@ else
     });
 }
 app.UseStaticFiles();
-// 只对没有文件扩展名的路径做 404 重写，避免 blazor.web.js 等静态资源
-// 的 404 被重写成 setup 页 HTML（因为 UseStatusCodePagesWithReExecute
-// 会把 404 重新执行到 /not-found，再经过业务中间件触发 /setup 跳转）
 app.UseWhen(
     ctx => !Path.HasExtension(ctx.Request.Path.Value ?? string.Empty),
     branch => branch.UseStatusCodePagesWithReExecute("/not-found")
@@ -210,8 +207,12 @@ app.UseAuthentication();
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value ?? string.Empty;
+
+    // Blazor 框架资源、SignalR、API、静态资源等路径直接放行，
+    // 不进入业务路由守卫，防止 blazor.web.js 等被重定向到 /setup
     var isStaticAssetRequest = Path.HasExtension(path);
-    if (path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+    if (isStaticAssetRequest ||
+        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
@@ -221,8 +222,7 @@ app.Use(async (context, next) =>
         path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/hubs", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/api", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase) ||
-        isStaticAssetRequest)
+        path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase))
     {
         await next();
         return;
