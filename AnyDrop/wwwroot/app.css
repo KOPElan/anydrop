@@ -268,8 +268,9 @@
     }
 
     /* ─── 阅后即焚消息背景标识 ─── */
-    .burn-after-reading > div {
-        background: rgba(255, 218, 214, 0.5) !important;
+    .burn-after-reading > div:first-of-type {
+        /*        background: rgba(255, 218, 214, 0.5) !important;*/
+        border: 2px rgba(255, 218, 214) solid;
     }
 
     /* ─── 搜索跳转后消息高亮动画 ─── */

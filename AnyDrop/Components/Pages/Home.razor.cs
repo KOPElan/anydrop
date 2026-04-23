@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace AnyDrop.Components.Pages;
@@ -335,33 +334,60 @@ public partial class Home : IAsyncDisposable
         _topicSettingsIcon = icon;
     }
 
-    /// <summary>保存主题图标。</summary>
-    private async Task SaveTopicIconAsync()
+    /// <summary>
+    /// 更新主题信息
+    /// </summary>
+    /// <returns></returns>
+    private async Task SaveTopicInfo()
     {
-        if (!_selectedTopicId.HasValue)
+        if (!_selectedTopicId.HasValue) return;
+        _topicSettingsError = null;
+        if (!string.IsNullOrEmpty(_topicSettingsIcon))
         {
-            return;
+            try
+            {
+                var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(_topicSettingsIcon));
+                if (result is not null)
+                {
+                    _selectedTopicIcon = _topicSettingsIcon;
+                    await TopicStateService.NotifyTopicsChangedAsync();
+                }
+                else
+                {
+                    _topicSettingsError = "保存图标失败：主题不存在。";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to save icon for topic {TopicId}", _selectedTopicId);
+                _topicSettingsError = "保存主题图标失败，请重试。";
+            }
         }
 
-        _topicSettingsError = null;
-        try
+        if (_selectedTopicName != _topicSettingsName)
         {
-            var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(_topicSettingsIcon));
-            if (result is not null)
+            var name = _topicSettingsName.Trim();
+            if (string.IsNullOrWhiteSpace(name))
             {
-                _selectedTopicIcon = _topicSettingsIcon;
+                _topicSettingsError = "主题名称不能为空。";
+                return;
+            }
+
+            try
+            {
+                await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(name));
+                await LoadSelectedTopicMetaAsync();
+                _topicSettingsName = _selectedTopicName ?? name;
                 await TopicStateService.NotifyTopicsChangedAsync();
             }
-            else
+            catch (Exception ex)
             {
-                _topicSettingsError = "保存图标失败：主题不存在。";
+                Logger.LogError(ex, "Failed to rename topic {TopicId}", _selectedTopicId);
+                _topicSettingsError = "保存主题名称失败，请重试。";
             }
         }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to save icon for topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "保存图标失败，请重试。";
-        }
+
+        _showTopicSettingsModal = false;
     }
 
     /// <summary>切换当前主题的置顶状态。</summary>
@@ -394,37 +420,6 @@ public partial class Home : IAsyncDisposable
     {
         _showTopicSettingsModal = false;
         _topicSettingsError = null;
-    }
-
-    /// <summary>保存主题名称更改。</summary>
-    private async Task SaveTopicNameAsync()
-    {
-        if (!_selectedTopicId.HasValue)
-        {
-            return;
-        }
-
-        var name = _topicSettingsName.Trim();
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            _topicSettingsError = "主题名称不能为空。";
-            return;
-        }
-
-        _topicSettingsError = null;
-        try
-        {
-            await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(name));
-            await LoadSelectedTopicMetaAsync();
-            _topicSettingsName = _selectedTopicName ?? name;
-            _showTopicSettingsModal = false;
-            await TopicStateService.NotifyTopicsChangedAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to rename topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "保存失败，请重试。";
-        }
     }
 
     /// <summary>归档或取消归档当前主题。</summary>
