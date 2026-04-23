@@ -196,10 +196,14 @@ else
         options.RoutePrefix = "swagger";
     });
 }
-// 必须在 UseStatusCodePagesWithReExecute 之前，确保 wwwroot 静态文件
-// （含 _framework/blazor.web.js）直接返回，不被 404 重写或认证中间件拦截
 app.UseStaticFiles();
-app.UseStatusCodePagesWithReExecute("/not-found");
+// 只对没有文件扩展名的路径做 404 重写，避免 blazor.web.js 等静态资源
+// 的 404 被重写成 setup 页 HTML（因为 UseStatusCodePagesWithReExecute
+// 会把 404 重新执行到 /not-found，再经过业务中间件触发 /setup 跳转）
+app.UseWhen(
+    ctx => !Path.HasExtension(ctx.Request.Path.Value ?? string.Empty),
+    branch => branch.UseStatusCodePagesWithReExecute("/not-found")
+);
 app.UseAntiforgery();
 app.UseAuthentication();
 
