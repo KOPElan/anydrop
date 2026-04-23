@@ -19,6 +19,7 @@ services:
       # ── 存储路径（已在 Dockerfile 中设为 /data，通常无需修改）─────────────────
       - Storage__DatabasePath=/data/anydrop.db
       - Storage__BasePath=/data/files
+      - Storage__KeysPath=/data/keys
       # ── 上传文件大小上限（字节），默认 100 MB ────────────────────────────────
       - Storage__MaxFileSizeBytes=${ANYDROP_MAX_FILE_SIZE:-104857600}
       # ── JWT 令牌有效期（小时），默认 24 小时 ─────────────────────────────────
