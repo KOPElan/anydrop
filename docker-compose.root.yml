@@ -1,19 +1,34 @@
+# Docker Compose 配置 - Root 权限模式
+#
+# 此配置以 root 用户运行容器，适用于以下场景：
+# 1. 需要绑定 80/443 等特权端口
+# 2. 宿主机 volume 权限复杂，需要 root 权限管理
+# 3. 其他需要 root 权限的特殊场景
+#
+# 使用方法：
+#   docker-compose -f docker-compose.root.yml up -d
+#
+# 注意：
+# - 以 root 运行存在一定安全风险，请仅在必要时使用
+# - 生产环境建议使用标准 docker-compose.yml（非 root 模式）
+#
+
 services:
   anydrop:
     build:
       context: .
       dockerfile: Dockerfile
     image: anydrop:latest
-    container_name: anydrop
+    container_name: anydrop-root
     restart: unless-stopped
-    # 使用宿主机 UID:GID 1000:1000 运行，确保 volume 权限正确
-    # 若宿主机用户 ID 不同，可修改为 "$(id -u):$(id -g)"
-    user: "1000:1000"
+    # 以 root 用户运行（UID 0）
+    user: "0:0"
     ports:
-      - "8080:8080"
+      # 可绑定特权端口如 80/443
+      - "80:8080"
     volumes:
       # 持久化 SQLite 数据库和上传文件
-      - anydrop-data:/data
+      - anydrop-data-root:/data
     environment:
       # ── 必填：JWT 签名密钥（建议 32 位以上随机字符串）──────────────────────────
       - Auth__JwtSecret=${ANYDROP_JWT_SECRET:-ANYDROP_JWT_SECRET}
@@ -28,6 +43,8 @@ services:
       # ── JWT 令牌有效期（小时），默认 24 小时 ─────────────────────────────────
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
       - ASPNETCORE_ENVIRONMENT=Production
+      # 以 root 运行时需要修改 Kestrel 监听端口（可选）
+      - ASPNETCORE_URLS=http://+:8080
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
       interval: 30s
@@ -36,5 +53,5 @@ services:
       start_period: 15s
 
 volumes:
-  anydrop-data:
+  anydrop-data-root:
     driver: local

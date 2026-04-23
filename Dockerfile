@@ -34,7 +34,7 @@ RUN dotnet publish AnyDrop/AnyDrop.csproj \
         -o /publish \
         --no-restore
 
-# ─── 阶段 2：运行时镜像 ─────────────────────────────────────────────────────────
+# ─── 阶段 3：运行时镜像 ─────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
@@ -42,9 +42,11 @@ WORKDIR /app
 RUN addgroup -S anydrop && adduser -S anydrop -G anydrop
 
 # 持久化数据目录（SQLite 数据库 + 上传文件）
-RUN mkdir -p /data/files && chown -R anydrop:anydrop /data
+RUN mkdir -p /data/files /data/keys && chown -R anydrop:anydrop /data
 
 COPY --from=build --chown=anydrop:anydrop /publish ./
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER anydrop
 
@@ -60,4 +62,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD wget -qO- http://localhost:8080/ || exit 1
 
-ENTRYPOINT ["dotnet", "AnyDrop.dll"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
