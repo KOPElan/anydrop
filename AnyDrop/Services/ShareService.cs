@@ -223,10 +223,19 @@ public sealed class ShareService(
         }
 
         var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+        var normalizedSearch = normalized.ToLower();
+
+        // 使用显式的大小写不敏感匹配，避免 SQLite 在未配置 NOCASE 时出现大小写行为与需求不一致。
+        // 同时转义 LIKE 通配符，尽量保持原先 Contains 的“字面子串匹配”语义。
+        var escapedSearch = normalizedSearch
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
+        var likePattern = $"%{escapedSearch}%";
 
         var queryable = dbContext.ShareItems
             .AsNoTracking()
-            .Where(x => x.TopicId == topicId && x.Content.Contains(normalized));
+            .Where(x => x.TopicId == topicId && EF.Functions.Like(x.Content.ToLower(), likePattern, @"\"));
 
         if (before.HasValue)
         {
