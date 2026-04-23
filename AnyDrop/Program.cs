@@ -185,8 +185,12 @@ app.UseAuthentication();
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value ?? string.Empty;
+
+    // Blazor 框架资源、SignalR、API、静态资源等路径直接放行，
+    // 不进入业务路由守卫，防止 blazor.web.js 等被重定向到 /setup
     var isStaticAssetRequest = Path.HasExtension(path);
-    if (path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+    if (isStaticAssetRequest ||
+        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
@@ -196,8 +200,7 @@ app.Use(async (context, next) =>
         path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/hubs", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/api", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase) ||
-        isStaticAssetRequest)
+        path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase))
     {
         await next();
         return;

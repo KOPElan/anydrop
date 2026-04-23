@@ -1,4 +1,21 @@
-# ─── 阶段 1：构建 ───────────────────────────────────────────────────────────────
+# ─── 阶段 1：Tailwind CSS 构建 ──────────────────────────────────────────────────
+FROM node:22-alpine AS css-build
+WORKDIR /src
+
+# 只复制 CSS 构建所需文件，最大化层缓存命中率
+COPY package.json ./
+RUN npm install
+
+COPY AnyDrop/wwwroot/app.css AnyDrop/wwwroot/app.css
+# 复制 Razor 文件供 Tailwind 扫描类名（避免生产包缺少用到的样式）
+COPY AnyDrop/Components/ AnyDrop/Components/
+
+RUN npx @tailwindcss/cli \
+        -i ./AnyDrop/wwwroot/app.css \
+        -o ./AnyDrop/wwwroot/tailwind.css \
+        --minify
+
+# ─── 阶段 2：.NET 构建与发布 ────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
@@ -8,8 +25,10 @@ COPY AnyDrop/AnyDrop.csproj AnyDrop/
 
 RUN dotnet restore AnyDrop/AnyDrop.csproj
 
-# 复制源码并发布
+# 复制源码，并从 css-build 阶段注入已构建好的 tailwind.css
 COPY AnyDrop/ AnyDrop/
+COPY --from=css-build /src/AnyDrop/wwwroot/tailwind.css AnyDrop/wwwroot/tailwind.css
+
 RUN dotnet publish AnyDrop/AnyDrop.csproj \
         -c Release \
         -o /publish \
