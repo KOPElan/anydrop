@@ -120,8 +120,8 @@ public partial class TopicSidebar : IAsyncDisposable
             _showCreateModal = false;
             await LoadTopicsAsync();
             _selectedTopicId = topic.Id;
-            TopicStateService.SetSelectedTopic(_selectedTopicId);
-            TopicStateService.NotifyTopicsChanged();
+            await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
+            await TopicStateService.NotifyTopicsChangedAsync();
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
@@ -134,7 +134,7 @@ public partial class TopicSidebar : IAsyncDisposable
     private async Task SelectTopicAsync(Guid topicId)
     {
         _selectedTopicId = topicId;
-        TopicStateService.SetSelectedTopic(topicId);
+        await TopicStateService.SetSelectedTopicAsync(topicId);
         await InvokeAsync(StateHasChanged);
     }
 
@@ -175,7 +175,7 @@ public partial class TopicSidebar : IAsyncDisposable
                 .Select((topicId, index) => new TopicOrderItem(topicId, index))
                 .ToList();
             await TopicService.ReorderTopicsAsync(new ReorderTopicsRequest(items));
-            TopicStateService.NotifyTopicsChanged();
+            await TopicStateService.NotifyTopicsChangedAsync();
         }
         catch (Exception ex)
         {
@@ -195,7 +195,7 @@ public partial class TopicSidebar : IAsyncDisposable
         if (_selectedTopicId.HasValue && !_topics.Any(t => t.Id == _selectedTopicId.Value))
         {
             _selectedTopicId = null;
-            TopicStateService.SetSelectedTopic(null);
+            await TopicStateService.SetSelectedTopicAsync(null);
         }
 
         // 若尚未选中任何主题，优先选中内置默认主题，否则选第一个
@@ -203,7 +203,7 @@ public partial class TopicSidebar : IAsyncDisposable
         {
             var defaultTopic = _topics.FirstOrDefault(t => t.IsBuiltIn) ?? _topics[0];
             _selectedTopicId = defaultTopic.Id;
-            TopicStateService.SetSelectedTopic(_selectedTopicId);
+            await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
         }
     }
 
@@ -256,18 +256,18 @@ public partial class TopicSidebar : IAsyncDisposable
 
     private void OpenSettings() => NavigationManager.NavigateTo("/settings");
 
-    private void HandleSelectedTopicChanged()
+    private Task HandleSelectedTopicChanged()
     {
-        _ = InvokeAsync(() =>
+        return InvokeAsync(() =>
         {
             _selectedTopicId = TopicStateService.SelectedTopicId;
             StateHasChanged();
         });
     }
 
-    private void HandleTopicsChanged()
+    private Task HandleTopicsChanged()
     {
-        _ = InvokeAsync(async () =>
+        return InvokeAsync(async () =>
         {
             await LoadTopicsAsync();
             if (_showArchivedDropdown)

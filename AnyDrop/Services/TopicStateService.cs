@@ -2,27 +2,39 @@ namespace AnyDrop.Services;
 
 public sealed class TopicStateService : ITopicStateService
 {
-    private Guid? selectedTopicId;
+    private Guid? _selectedTopicId;
 
-    public Guid? SelectedTopicId => selectedTopicId;
+    public Guid? SelectedTopicId => _selectedTopicId;
 
-    public event Action? SelectedTopicChanged;
+    public event Func<Task>? SelectedTopicChanged;
 
-    public event Action? TopicsChanged;
+    public event Func<Task>? TopicsChanged;
 
-    public void SetSelectedTopic(Guid? topicId)
+    public async Task SetSelectedTopicAsync(Guid? topicId)
     {
-        if (selectedTopicId == topicId)
+        if (_selectedTopicId == topicId)
         {
             return;
         }
 
-        selectedTopicId = topicId;
-        SelectedTopicChanged?.Invoke();
+        _selectedTopicId = topicId;
+        await InvokeHandlersAsync(SelectedTopicChanged);
     }
 
-    public void NotifyTopicsChanged()
+    public Task NotifyTopicsChangedAsync()
     {
-        TopicsChanged?.Invoke();
+        return InvokeHandlersAsync(TopicsChanged);
+    }
+
+    private static Task InvokeHandlersAsync(Func<Task>? handlers)
+    {
+        if (handlers is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var invocationList = handlers.GetInvocationList()
+            .Cast<Func<Task>>();
+        return Task.WhenAll(invocationList.Select(handler => handler()));
     }
 }

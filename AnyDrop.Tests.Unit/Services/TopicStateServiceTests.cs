@@ -6,40 +6,89 @@ namespace AnyDrop.Tests.Unit.Services;
 public class TopicStateServiceTests
 {
     [Fact]
-    public void SetSelectedTopic_WhenValueChanges_RaisesSelectedTopicChanged()
+    public async Task SetSelectedTopicAsync_WhenValueChanges_RaisesSelectedTopicChanged()
     {
         var service = new TopicStateService();
         var raisedCount = 0;
-        service.SelectedTopicChanged += () => raisedCount++;
+        service.SelectedTopicChanged += () =>
+        {
+            raisedCount++;
+            return Task.CompletedTask;
+        };
 
-        service.SetSelectedTopic(Guid.NewGuid());
+        var topicId = Guid.NewGuid();
+        await service.SetSelectedTopicAsync(topicId);
 
         raisedCount.Should().Be(1);
+        service.SelectedTopicId.Should().Be(topicId);
     }
 
     [Fact]
-    public void SetSelectedTopic_WhenValueUnchanged_DoesNotRaiseSelectedTopicChanged()
+    public async Task SetSelectedTopicAsync_WhenValueUnchanged_DoesNotRaiseSelectedTopicChanged()
     {
         var topicId = Guid.NewGuid();
         var service = new TopicStateService();
         var raisedCount = 0;
-        service.SelectedTopicChanged += () => raisedCount++;
+        service.SelectedTopicChanged += () =>
+        {
+            raisedCount++;
+            return Task.CompletedTask;
+        };
 
-        service.SetSelectedTopic(topicId);
-        service.SetSelectedTopic(topicId);
+        await service.SetSelectedTopicAsync(topicId);
+        await service.SetSelectedTopicAsync(topicId);
 
         raisedCount.Should().Be(1);
     }
 
     [Fact]
-    public void NotifyTopicsChanged_AlwaysRaisesTopicsChanged()
+    public async Task SetSelectedTopicAsync_WhenSwitchingToNull_RaisesSelectedTopicChanged()
+    {
+        var topicId = Guid.NewGuid();
+        var service = new TopicStateService();
+        var raisedCount = 0;
+        service.SelectedTopicChanged += () =>
+        {
+            raisedCount++;
+            return Task.CompletedTask;
+        };
+
+        await service.SetSelectedTopicAsync(topicId);
+        await service.SetSelectedTopicAsync(null);
+
+        raisedCount.Should().Be(2);
+        service.SelectedTopicId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SetSelectedTopicAsync_WhenNullToNull_DoesNotRaiseSelectedTopicChanged()
     {
         var service = new TopicStateService();
         var raisedCount = 0;
-        service.TopicsChanged += () => raisedCount++;
+        service.SelectedTopicChanged += () =>
+        {
+            raisedCount++;
+            return Task.CompletedTask;
+        };
 
-        service.NotifyTopicsChanged();
-        service.NotifyTopicsChanged();
+        await service.SetSelectedTopicAsync(null);
+
+        raisedCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task NotifyTopicsChangedAsync_AlwaysRaisesTopicsChanged()
+    {
+        var service = new TopicStateService();
+        var raisedCount = 0;
+        service.TopicsChanged += () =>
+        {
+            raisedCount++;
+            return Task.CompletedTask;
+        };
+
+        await service.NotifyTopicsChangedAsync();
+        await service.NotifyTopicsChangedAsync();
 
         raisedCount.Should().Be(2);
     }

@@ -350,7 +350,7 @@ public partial class Home : IAsyncDisposable
             if (result is not null)
             {
                 _selectedTopicIcon = _topicSettingsIcon;
-                TopicStateService.NotifyTopicsChanged();
+                await TopicStateService.NotifyTopicsChangedAsync();
             }
             else
             {
@@ -379,7 +379,7 @@ public partial class Home : IAsyncDisposable
             await TopicService.PinTopicAsync(_selectedTopicId.Value, pinning);
             _selectedTopicPinned = pinning;
             await LoadSelectedTopicMetaAsync();
-            TopicStateService.NotifyTopicsChanged();
+            await TopicStateService.NotifyTopicsChangedAsync();
             StateHasChanged();
         }
         catch (Exception ex)
@@ -418,7 +418,7 @@ public partial class Home : IAsyncDisposable
             await LoadSelectedTopicMetaAsync();
             _topicSettingsName = _selectedTopicName ?? name;
             _showTopicSettingsModal = false;
-            TopicStateService.NotifyTopicsChanged();
+            await TopicStateService.NotifyTopicsChangedAsync();
         }
         catch (Exception ex)
         {
@@ -453,7 +453,7 @@ public partial class Home : IAsyncDisposable
                 _selectedTopicMessageCount = 0;
                 _messages.Clear();
                 _messageIds.Clear();
-                TopicStateService.SetSelectedTopic(null);
+                await TopicStateService.SetSelectedTopicAsync(null);
             }
             else
             {
@@ -461,7 +461,7 @@ public partial class Home : IAsyncDisposable
                 await LoadSelectedTopicMetaAsync();
             }
 
-            TopicStateService.NotifyTopicsChanged();
+            await TopicStateService.NotifyTopicsChangedAsync();
         }
         catch (Exception ex)
         {
@@ -502,8 +502,8 @@ public partial class Home : IAsyncDisposable
             _selectedTopicIcon = "chat_bubble";
             _messages.Clear();
             _messageIds.Clear();
-            TopicStateService.SetSelectedTopic(null);
-            TopicStateService.NotifyTopicsChanged();
+            await TopicStateService.SetSelectedTopicAsync(null);
+            await TopicStateService.NotifyTopicsChangedAsync();
         }
         catch (Exception ex)
         {
@@ -725,7 +725,7 @@ public partial class Home : IAsyncDisposable
         if (response is null)
         {
             _selectedTopicId = null;
-            TopicStateService.SetSelectedTopic(null);
+            await TopicStateService.SetSelectedTopicAsync(null);
             return;
         }
 

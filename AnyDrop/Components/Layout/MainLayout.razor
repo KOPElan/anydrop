@@ -26,9 +26,9 @@
         TopicStateService.SelectedTopicChanged += HandleSelectedTopicChanged;
     }
 
-    private void HandleSelectedTopicChanged()
+    private async Task HandleSelectedTopicChanged()
     {
-        _ = InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()

@@ -4,11 +4,11 @@ public interface ITopicStateService
 {
     Guid? SelectedTopicId { get; }
 
-    event Action? SelectedTopicChanged;
+    event Func<Task>? SelectedTopicChanged;
 
-    event Action? TopicsChanged;
+    event Func<Task>? TopicsChanged;
 
-    void SetSelectedTopic(Guid? topicId);
+    Task SetSelectedTopicAsync(Guid? topicId);
 
-    void NotifyTopicsChanged();
+    Task NotifyTopicsChangedAsync();
 }
