@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Logging;
+
 namespace AnyDrop.Services;
 
-public sealed class TopicStateService : ITopicStateService
+public sealed class TopicStateService(ILogger<TopicStateService> logger) : ITopicStateService
 {
     private Guid? _selectedTopicId;
 
@@ -18,23 +20,37 @@ public sealed class TopicStateService : ITopicStateService
         }
 
         _selectedTopicId = topicId;
-        await InvokeHandlersAsync(SelectedTopicChanged);
+        await InvokeHandlersAsync(SelectedTopicChanged, nameof(SelectedTopicChanged));
     }
 
     public Task NotifyTopicsChangedAsync()
     {
-        return InvokeHandlersAsync(TopicsChanged);
+        return InvokeHandlersAsync(TopicsChanged, nameof(TopicsChanged));
     }
 
-    private static Task InvokeHandlersAsync(Func<Task>? handlers)
+    private async Task InvokeHandlersAsync(Func<Task>? multicastHandler, string eventName)
     {
-        if (handlers is null)
+        if (multicastHandler is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        var invocationList = handlers.GetInvocationList()
+        var invocationList = multicastHandler.GetInvocationList()
             .Cast<Func<Task>>();
-        return Task.WhenAll(invocationList.Select(handler => handler()));
+        foreach (var handler in invocationList)
+        {
+            try
+            {
+                await handler();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Topic state handler {HandlerName} failed for event {EventName}. It was skipped and other handlers continued.",
+                    handler.Method.Name,
+                    eventName);
+            }
+        }
     }
 }
