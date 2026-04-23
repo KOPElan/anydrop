@@ -7,6 +7,7 @@ using AnyDrop.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
@@ -24,6 +25,22 @@ if (!string.IsNullOrWhiteSpace(dbDirectory))
 {
     Directory.CreateDirectory(dbDirectory);
 }
+
+// 将 Data Protection 密钥持久化到磁盘，避免容器重启后 antiforgery token 解密失败
+var keysDirectory = Path.GetFullPath(
+    builder.Configuration["Storage:KeysPath"] ?? "data/keys");
+try
+{
+    Directory.CreateDirectory(keysDirectory);
+}
+catch (Exception ex)
+{
+    throw new InvalidOperationException(
+        $"无法创建 Data Protection 密钥目录 \"{keysDirectory}\"。请确认 volume 已正确挂载且应用具有写入权限。" +
+        $"可通过环境变量 Storage__KeysPath 自定义路径。", ex);
+}
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
 
 builder.Services.AddDbContext<AnyDropDbContext>(options =>
     options.UseSqlite($"Data Source={fullDbPath}"));
