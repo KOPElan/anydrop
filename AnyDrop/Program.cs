@@ -1,5 +1,5 @@
-using AnyDrop.Components;
 using AnyDrop.Api;
+using AnyDrop.Components;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Models;
@@ -31,7 +31,8 @@ var keysDirectory = Path.GetFullPath(
     builder.Configuration["Storage:KeysPath"] ?? "data/keys");
 try
 {
-    Directory.CreateDirectory(keysDirectory);
+    var fullKeysDirectory = Path.GetFullPath(keysDirectory);
+    Directory.CreateDirectory(fullKeysDirectory);
 }
 catch (Exception ex)
 {
