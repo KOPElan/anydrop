@@ -615,6 +615,20 @@
   .rounded-xl {
     border-radius: var(--radius-xl);
   }
+  .rounded-tr-2xl {
+    border-top-right-radius: var(--radius-2xl);
+  }
+  .rounded-tr-lg {
+    border-top-right-radius: var(--radius-lg);
+  }
+  .rounded-b-2xl {
+    border-bottom-right-radius: var(--radius-2xl);
+    border-bottom-left-radius: var(--radius-2xl);
+  }
+  .rounded-b-lg {
+    border-bottom-right-radius: var(--radius-lg);
+    border-bottom-left-radius: var(--radius-lg);
+  }
   .border {
     border-style: var(--tw-border-style);
     border-width: 1px;
@@ -1481,8 +1495,8 @@
     transform: translateY(-2px);
     transition: transform 200ms ease, box-shadow 200ms ease;
   }
-  .burn-after-reading > div {
-    background: rgba(255, 218, 214, 0.5) !important;
+  .burn-after-reading > div:first-of-type {
+    border: 2px rgba(255, 218, 214) solid;
   }
   .message-highlight {
     border-radius: 1rem;

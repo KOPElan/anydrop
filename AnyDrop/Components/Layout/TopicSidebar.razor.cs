@@ -15,8 +15,7 @@ public partial class TopicSidebar : IAsyncDisposable
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ILogger<TopicSidebar> Logger { get; set; }
     [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
-
-    [Parameter] public EventCallback<Guid?> OnTopicSelected { get; set; }
+    [Inject] public required ITopicStateService TopicStateService { get; set; }
 
     private readonly List<TopicDto> _topics = [];
     private HubConnection? _hubConnection;
@@ -40,8 +39,12 @@ public partial class TopicSidebar : IAsyncDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        TopicStateService.SelectedTopicChanged += HandleSelectedTopicChanged;
+        TopicStateService.TopicsChanged += HandleTopicsChanged;
+
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _nickname = state.User.FindFirst("nickname")?.Value ?? state.User.Identity?.Name ?? "用户";
+        _selectedTopicId = TopicStateService.SelectedTopicId;
         await LoadTopicsAsync();
         // InitializeHubAsync 已移至 OnAfterRenderAsync，避免预渲染阶段执行导致协商响应 HTML 错误
     }
@@ -117,7 +120,8 @@ public partial class TopicSidebar : IAsyncDisposable
             _showCreateModal = false;
             await LoadTopicsAsync();
             _selectedTopicId = topic.Id;
-            await OnTopicSelected.InvokeAsync(_selectedTopicId);
+            await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
+            await TopicStateService.NotifyTopicsChangedAsync();
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
@@ -130,7 +134,7 @@ public partial class TopicSidebar : IAsyncDisposable
     private async Task SelectTopicAsync(Guid topicId)
     {
         _selectedTopicId = topicId;
-        await OnTopicSelected.InvokeAsync(topicId);
+        await TopicStateService.SetSelectedTopicAsync(topicId);
         await InvokeAsync(StateHasChanged);
     }
 
@@ -171,6 +175,7 @@ public partial class TopicSidebar : IAsyncDisposable
                 .Select((topicId, index) => new TopicOrderItem(topicId, index))
                 .ToList();
             await TopicService.ReorderTopicsAsync(new ReorderTopicsRequest(items));
+            await TopicStateService.NotifyTopicsChangedAsync();
         }
         catch (Exception ex)
         {
@@ -190,6 +195,7 @@ public partial class TopicSidebar : IAsyncDisposable
         if (_selectedTopicId.HasValue && !_topics.Any(t => t.Id == _selectedTopicId.Value))
         {
             _selectedTopicId = null;
+            await TopicStateService.SetSelectedTopicAsync(null);
         }
 
         // 若尚未选中任何主题，优先选中内置默认主题，否则选第一个
@@ -197,7 +203,7 @@ public partial class TopicSidebar : IAsyncDisposable
         {
             var defaultTopic = _topics.FirstOrDefault(t => t.IsBuiltIn) ?? _topics[0];
             _selectedTopicId = defaultTopic.Id;
-            await OnTopicSelected.InvokeAsync(_selectedTopicId);
+            await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
         }
     }
 
@@ -206,8 +212,7 @@ public partial class TopicSidebar : IAsyncDisposable
         _showArchivedDropdown = !_showArchivedDropdown;
         if (_showArchivedDropdown)
         {
-            _archivedTopics.Clear();
-            _archivedTopics.AddRange(await TopicService.GetArchivedTopicsAsync());
+            await LoadArchivedTopicsAsync();
         }
     }
 
@@ -228,9 +233,7 @@ public partial class TopicSidebar : IAsyncDisposable
             {
                 try
                 {
-                    var archived = await TopicService.GetArchivedTopicsAsync();
-                    _archivedTopics.Clear();
-                    _archivedTopics.AddRange(archived);
+                    await LoadArchivedTopicsAsync();
                 }
                 catch (Exception ex)
                 {
@@ -253,6 +256,35 @@ public partial class TopicSidebar : IAsyncDisposable
 
     private void OpenSettings() => NavigationManager.NavigateTo("/settings");
 
+    private Task HandleSelectedTopicChanged()
+    {
+        return InvokeAsync(() =>
+        {
+            _selectedTopicId = TopicStateService.SelectedTopicId;
+            StateHasChanged();
+        });
+    }
+
+    private Task HandleTopicsChanged()
+    {
+        return InvokeAsync(async () =>
+        {
+            await LoadTopicsAsync();
+            if (_showArchivedDropdown)
+            {
+                await LoadArchivedTopicsAsync();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadArchivedTopicsAsync()
+    {
+        _archivedTopics.Clear();
+        _archivedTopics.AddRange(await TopicService.GetArchivedTopicsAsync());
+    }
+
     private async Task LogoutAsync()
     {
         try
@@ -269,6 +301,8 @@ public partial class TopicSidebar : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        TopicStateService.SelectedTopicChanged -= HandleSelectedTopicChanged;
+        TopicStateService.TopicsChanged -= HandleTopicsChanged;
         _topicsUpdatedSubscription?.Dispose();
 
         if (_topics.Count > 0)

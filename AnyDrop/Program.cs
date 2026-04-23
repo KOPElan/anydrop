@@ -30,6 +30,7 @@ builder.Services.AddDbContext<AnyDropDbContext>(options =>
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<ITopicService, TopicService>();
+builder.Services.AddScoped<ITopicStateService, TopicStateService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();

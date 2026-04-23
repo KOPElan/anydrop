@@ -40,7 +40,8 @@
                         class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
                         @onclick="() => SelectTopicAsync(topic.Id)">
                         <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(isActive ? "1" : "0"); color: @(topic.IsPinned ? "var(--color-primary)" : "inherit");">
-                            @(topic.IsPinned ? "bookmark" : "chat_bubble")
+                            @* @(topic.IsPinned ? "bookmark" : "chat_bubble") *@
+                            @topic.Icon
                         </span>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1">
