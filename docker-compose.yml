@@ -2,7 +2,7 @@ services:
   anydrop:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: AnyDrop/Dockerfile
     image: anydrop:latest
     container_name: anydrop
     restart: unless-stopped
