@@ -21,7 +21,7 @@
 
     @* ── 会话主题 ─────────────────────────── *@
     <div class="px-5 pb-2">
-        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">Sessions</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">会话</p>
     </div>
 
     @* 主题列表 *@
@@ -52,14 +52,16 @@
                                     <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
                                 }
                             </div>
-                            @* 状态徽标 *@
+                            @* 仅在激活时显示状态徽标 *@
                             @if (isActive)
                             {
                                 <span class="sidebar-item__status sidebar-item__status--active">active</span>
                             }
-                            else if (topic.LastMessageAt.HasValue)
+                            else
                             {
-                                <span class="sidebar-item__status sidebar-item__status--unread">unread</span>
+                                <div class="sidebar-item__preview">
+                                    @(topic.LastMessagePreview ?? "暂无消息")
+                                </div>
                             }
                         </div>
                     </button>
@@ -110,17 +112,17 @@
 
     @* ── 在线设备（占位，无实际实现）──────────────── *@
     <div class="px-5 pt-4 pb-2">
-        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">Devices</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">设备</p>
     </div>
     <div class="px-3 pb-4 space-y-0.5">
         <div class="flex items-center gap-3 px-3 py-2 rounded-xl text-on-surface-variant">
             <div class="relative">
                 <span class="material-symbols-outlined text-lg">laptop_mac</span>
-                <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-low" style="background-color: #22c55e;"></span>
+                <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-low" style="background-color: var(--color-status-online);"></span>
             </div>
             <div class="flex flex-col min-w-0">
-                <span class="text-sm font-medium leading-none text-on-surface truncate">Current Device</span>
-                <span class="text-[10px] font-bold mt-0.5" style="color: #22c55e;">Online</span>
+                <span class="text-sm font-medium leading-none text-on-surface truncate">当前设备</span>
+                <span class="text-[10px] font-bold mt-0.5" style="color: var(--color-status-online);">在线</span>
             </div>
         </div>
         <div class="flex items-center gap-3 px-3 py-2 rounded-xl text-on-surface-variant opacity-50">
@@ -129,8 +131,8 @@
                 <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-low" style="background-color: var(--color-outline);"></span>
             </div>
             <div class="flex flex-col min-w-0">
-                <span class="text-sm font-medium leading-none truncate">Phone</span>
-                <span class="text-[10px] font-bold mt-0.5">Offline</span>
+                <span class="text-sm font-medium leading-none truncate">手机</span>
+                <span class="text-[10px] font-bold mt-0.5">离线</span>
             </div>
         </div>
     </div>
@@ -142,14 +144,14 @@
                 style="color: var(--color-on-surface-variant);"
                 @onclick="OpenSettings">
             <span class="material-symbols-outlined text-base">settings</span>
-            Settings
+            设置
         </button>
         <button type="button"
                 class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-error-container/20"
                 style="color: var(--color-error);"
                 @onclick="LogoutAsync">
             <span class="material-symbols-outlined text-base">logout</span>
-            Logout
+            登出
         </button>
     </div>
 </div>

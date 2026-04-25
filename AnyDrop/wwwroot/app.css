@@ -53,7 +53,8 @@
     --color-background: #f8f9fa;
     --color-on-background: #191c1d;
 
-    /* Legacy compat */
+    /* ─── 在线状态颜色 ─── */
+    --color-status-online: #22c55e;
     --color-brand: #0050cb;
     --color-brand-hover: #0040a0;
     --color-sidebar: #f3f4f5;
@@ -338,16 +339,11 @@
 
     /* ─── 侧边栏状态徽标 ─── */
     .sidebar-item__status {
-        @apply inline-block text-[10px] font-bold mt-0.5 px-1.5 py-0 rounded-full leading-4;
+        @apply inline-block text-[10px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full leading-4;
     }
 
     .sidebar-item__status--active {
         background-color: var(--color-primary-fixed);
-        color: var(--color-primary);
-    }
-
-    .sidebar-item__status--unread {
-        background-color: rgba(0, 80, 203, 0.1);
         color: var(--color-primary);
     }
 
@@ -388,7 +384,7 @@
     }
 
     .login-card {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.10);
         border: 1px solid rgba(255, 255, 255, 0.15);
         border-radius: 1.5rem;
         padding: 2rem;
@@ -447,7 +443,7 @@
     .login-glow {
         position: absolute;
         border-radius: 50%;
-        filter: blur(80px);
+        filter: blur(60px);
         opacity: 0.35;
         pointer-events: none;
     }
