@@ -13,8 +13,15 @@
          @ondragover:preventDefault>
 
     @* ─────────── 顶部标题栏（磨砂玻璃效果，absolute 定位覆盖消息列表）─────────── *@
-    <header class="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-4 chat-header-glass">
-        <div class="flex items-center gap-3">
+    <header class="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-4 py-4 chat-header-glass">
+        <div class="flex items-center gap-2">
+            @* 移动端菜单按钮（桌面端隐藏）*@
+            <button type="button"
+                    class="sidebar-menu-toggle h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                    title="打开菜单"
+                    @onclick="() => ToggleMobileSidebar?.Invoke()">
+                <span class="material-symbols-outlined" style="font-size: 22px;">menu</span>
+            </button>
             <h2 class="font-headline font-bold text-on-surface text-lg leading-tight">
                 @(_selectedTopicName ?? "选择主题")
             </h2>
@@ -352,10 +359,10 @@
     @* ─────────── 输入区（磨砂玻璃效果，absolute 定位覆盖消息列表底部）─────────── *@
     <footer class="absolute inset-x-0 bottom-0 z-40 p-4 chat-footer-glass">
         <div class="mx-auto max-w-4xl">
-        <div class="flex items-end gap-3 bg-surface-container-lowest p-3 rounded-[2rem]"
+        <div class="input-wrapper bg-surface-container-lowest p-3 rounded-[2rem]"
              style="box-shadow: 0 8px 32px rgba(25,28,29,0.06);">
             @* 附件按钮 *@
-            <div class="flex gap-1 px-1 mb-1">
+            <div class="input-actions">
                 <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
                        title="上传图片或视频">
                     <span class="material-symbols-outlined">image</span>
@@ -380,7 +387,7 @@
             </div>
 
             @* 文本输入 *@
-            <div class="flex-1 min-w-0">
+            <div class="input-textarea-wrap">
                 <textarea class="w-full resize-none bg-transparent py-2 px-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/50"
                           style="border: none; max-height: 8rem; field-sizing: content;"
                           placeholder="输入消息，或拖入文件到聊天区域…（Ctrl+Enter 发送）"
@@ -396,7 +403,7 @@
             </div>
 
             @* 发送按钮 *@
-            <div class="mb-1 mr-1">
+            <div class="input-send-wrap">
                 <button type="button"
                         class="flex h-10 w-10 items-center justify-center rounded-full text-white shadow-md transition-all active:scale-90 disabled:opacity-50"
                         style="background: linear-gradient(135deg, #0050cb, #0066ff);"

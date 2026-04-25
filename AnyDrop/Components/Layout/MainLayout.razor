@@ -3,13 +3,21 @@
 @inject ITopicStateService TopicStateService
 
 <div class="app-shell">
-    <aside class="sidebar border-r border-gray-200 bg-[var(--color-sidebar)]">
+    @* 移动端遮罩层（半透明磨砂，点击关闭侧边栏）*@
+    @if (_sidebarMobileOpen)
+    {
+        <div class="sidebar-mobile-backdrop" @onclick="CloseMobileSidebar"></div>
+    }
+
+    <aside class="sidebar border-r border-gray-200 bg-[var(--color-sidebar)] @(_sidebarMobileOpen ? "sidebar--mobile-open" : "")">
         <TopicSidebar />
     </aside>
 
     <main class="flex flex-col overflow-hidden">
         <CascadingValue Value="TopicStateService.SelectedTopicId">
-            @Body
+            <CascadingValue Value="@((Action)ToggleMobileSidebar)" Name="ToggleMobileSidebar">
+                @Body
+            </CascadingValue>
         </CascadingValue>
     </main>
 </div>
@@ -21,13 +29,29 @@
 </div>
 
 @code {
+    private bool _sidebarMobileOpen;
+
     protected override void OnInitialized()
     {
         TopicStateService.SelectedTopicChanged += HandleSelectedTopicChanged;
     }
 
+    private void ToggleMobileSidebar()
+    {
+        _sidebarMobileOpen = !_sidebarMobileOpen;
+        StateHasChanged();
+    }
+
+    private void CloseMobileSidebar()
+    {
+        _sidebarMobileOpen = false;
+        StateHasChanged();
+    }
+
     private async Task HandleSelectedTopicChanged()
     {
+        // 移动端选中主题后自动关闭侧边栏
+        _sidebarMobileOpen = false;
         await InvokeAsync(StateHasChanged);
     }
 

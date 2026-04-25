@@ -23,6 +23,7 @@ public partial class Home : IAsyncDisposable
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
+    [CascadingParameter(Name = "ToggleMobileSidebar")] public Action? ToggleMobileSidebar { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
     // O(1) 消息去重：避免 SignalR 推送与主动刷新产生重复条目
