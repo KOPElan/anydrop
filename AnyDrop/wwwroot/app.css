@@ -335,5 +335,146 @@
             display: none;
         }
     }
-}
 
+    /* ─── 侧边栏状态徽标 ─── */
+    .sidebar-item__status {
+        @apply inline-block text-[10px] font-bold mt-0.5 px-1.5 py-0 rounded-full leading-4;
+    }
+
+    .sidebar-item__status--active {
+        background-color: var(--color-primary-fixed);
+        color: var(--color-primary);
+    }
+
+    .sidebar-item__status--unread {
+        background-color: rgba(0, 80, 203, 0.1);
+        color: var(--color-primary);
+    }
+
+    /* ─── 文本消息气泡（蓝色 pill 样式）─── */
+    .bubble-text {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        box-shadow: 0 4px 16px rgba(0, 80, 203, 0.25);
+    }
+
+    /* ─── 登录页面 ─── */
+    @keyframes login-card-in {
+        from {
+            opacity: 0;
+            transform: translateY(24px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .login-shell {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: linear-gradient(135deg, #0a0f2e 0%, #0050cb 55%, #0a84ff 100%);
+    }
+
+    .login-body {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 420px;
+        padding: 1rem;
+    }
+
+    .login-card {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 1.5rem;
+        padding: 2rem;
+        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        animation: login-card-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .login-logo-icon {
+        background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .login-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        outline: none;
+        transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+    }
+
+    .login-input::placeholder {
+        color: rgba(255, 255, 255, 0.35);
+    }
+
+    .login-input:focus {
+        border-color: rgba(255, 255, 255, 0.6);
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+    }
+
+    .login-btn {
+        background: white;
+        color: var(--color-primary);
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .login-btn:active:not(:disabled) {
+        transform: translateY(0) scale(0.98);
+    }
+
+    .login-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .login-glow {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    .login-glow--1 {
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, #0066ff, transparent);
+        top: -150px;
+        right: -100px;
+    }
+
+    .login-glow--2 {
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, #0050cb, transparent);
+        bottom: -100px;
+        left: -80px;
+        opacity: 0.25;
+    }
+
+    /* ─── spinner 动画（用于登录中状态）─── */
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+}
