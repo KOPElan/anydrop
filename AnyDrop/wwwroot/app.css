@@ -617,7 +617,7 @@
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        background: linear-gradient(135deg, #0a0f2e 0%, #0050cb 55%, #0a84ff 100%);
+        background: var(--color-background);
     }
 
     .login-body {
@@ -629,51 +629,49 @@
     }
 
     .login-card {
-        background: rgba(255, 255, 255, 0.10);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: var(--color-surface-container-lowest);
+        border: 1px solid var(--color-outline-variant);
         border-radius: 1.5rem;
         padding: 2rem;
-        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(24px) saturate(160%);
-        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
         animation: login-card-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
     .login-logo-icon {
-        background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        box-shadow: 0 8px 24px rgba(0, 80, 203, 0.25);
     }
 
     .login-input {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
+        background: var(--color-surface-container-low);
+        border: 1px solid var(--color-outline-variant);
+        color: var(--color-on-surface);
         outline: none;
         transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
     }
 
     .login-input::placeholder {
-        color: rgba(255, 255, 255, 0.35);
+        color: var(--color-outline);
     }
 
     .login-input:focus {
-        border-color: rgba(255, 255, 255, 0.6);
-        background: rgba(255, 255, 255, 0.14);
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+        border-color: var(--color-primary);
+        background: var(--color-surface-container-lowest);
+        box-shadow: 0 0 0 3px rgba(0, 80, 203, 0.12);
     }
 
     .login-btn {
-        background: white;
-        color: var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-on-primary);
         font-weight: 600;
         letter-spacing: 0.025em;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 16px rgba(0, 80, 203, 0.25);
     }
 
     .login-btn:hover:not(:disabled) {
+        background: var(--color-brand-hover);
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 8px 24px rgba(0, 80, 203, 0.35);
     }
 
     .login-btn:active:not(:disabled) {
@@ -688,26 +686,24 @@
     .login-glow {
         position: absolute;
         border-radius: 50%;
-        filter: blur(60px);
-        opacity: 0.35;
+        filter: blur(80px);
         pointer-events: none;
     }
 
     .login-glow--1 {
-        width: 500px;
-        height: 500px;
-        background: radial-gradient(circle, #0066ff, transparent);
-        top: -150px;
-        right: -100px;
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(0, 102, 255, 0.08), transparent);
+        top: -200px;
+        right: -150px;
     }
 
     .login-glow--2 {
-        width: 400px;
-        height: 400px;
-        background: radial-gradient(circle, #0050cb, transparent);
-        bottom: -100px;
-        left: -80px;
-        opacity: 0.25;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(0, 80, 203, 0.06), transparent);
+        bottom: -150px;
+        left: -100px;
     }
 
     /* ─── spinner 动画（用于登录中状态）─── */

@@ -14,21 +14,21 @@
 
     @* 标题 *@
     <div class="text-center mb-8">
-        <h1 class="font-headline text-3xl font-extrabold text-white mb-1">AnyDrop</h1>
-        <p class="text-sm" style="color: rgba(255,255,255,0.55);">私有跨设备内容共享平台</p>
+        <h1 class="font-headline text-3xl font-extrabold mb-1" style="color: var(--color-on-surface);">AnyDrop</h1>
+        <p class="text-sm" style="color: var(--color-outline);">私有跨设备内容共享平台</p>
     </div>
 
     @* 分割线 *@
-    <div class="mb-6" style="border-top: 1px solid rgba(255,255,255,0.12);"></div>
+    <div class="mb-6" style="border-top: 1px solid var(--color-outline-variant);"></div>
 
-    <p class="text-sm text-center mb-5" style="color: rgba(255,255,255,0.70);">输入密码继续使用</p>
+    <p class="text-sm text-center mb-5" style="color: var(--color-on-surface-variant);">输入密码继续使用</p>
 
     <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="login" @onsubmit:preventDefault class="space-y-4">
         <DataAnnotationsValidator />
 
         @* 密码输入框 *@
         <div class="relative">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">lock</span>
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined" style="font-size: 18px; color: var(--color-outline);">lock</span>
             <InputText @bind-Value="_model.Password"
                        type="password"
                        class="login-input w-full pl-11 pr-4 py-3 rounded-2xl text-sm"
@@ -39,9 +39,9 @@
         @* 错误提示 *@
         @if (!string.IsNullOrWhiteSpace(_error))
         {
-            <div class="flex items-center gap-2 rounded-xl px-4 py-2.5" style="background: rgba(186,26,26,0.18); border: 1px solid rgba(186,26,26,0.35);">
-                <span class="material-symbols-outlined text-sm" style="font-size: 16px; color: rgba(255,100,100,0.9);">error</span>
-                <p class="text-sm" style="color: rgba(255,160,160,0.95);">@_error</p>
+            <div class="flex items-center gap-2 rounded-xl px-4 py-2.5" style="background: var(--color-error-container); border: 1px solid var(--color-error);">
+                <span class="material-symbols-outlined text-sm" style="font-size: 16px; color: var(--color-error);">error</span>
+                <p class="text-sm" style="color: var(--color-error);">@_error</p>
             </div>
         }
 
