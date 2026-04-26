@@ -1,8 +1,8 @@
+using AnyDrop.Resources;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Text.Json;
-using AnyDrop.Resources;
 
 namespace AnyDrop.Components.Pages;
 

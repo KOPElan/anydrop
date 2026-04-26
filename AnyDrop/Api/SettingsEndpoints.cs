@@ -125,6 +125,7 @@ public static class SettingsEndpoints
             CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(request.Culture)),
             new CookieOptions
             {
+                Path = "/",
                 Expires = DateTimeOffset.UtcNow.AddYears(1),
                 IsEssential = true,
                 SameSite = SameSiteMode.Lax,

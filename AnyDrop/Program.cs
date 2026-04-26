@@ -50,8 +50,9 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 多语言本地化
-builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+// 多语言本地化：SharedStrings 资源当前嵌入名为 AnyDrop.SharedStrings.resources，
+// 因此不设置 ResourcesPath，避免运行时按 AnyDrop.Resources.* 查找导致回退键名。
+builder.Services.AddLocalization();
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     options.DefaultRequestCulture = new RequestCulture(AnyDrop.Models.SupportedLanguages.ZhCN);

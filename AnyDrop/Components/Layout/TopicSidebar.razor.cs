@@ -1,9 +1,10 @@
 using AnyDrop.Models;
+using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace AnyDrop.Components.Layout;
@@ -16,6 +17,7 @@ public partial class TopicSidebar : IAsyncDisposable
     [Inject] public required ILogger<TopicSidebar> Logger { get; set; }
     [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     // 由 MainLayout 通过 CascadingValue 提供，触发布局层 Modal（避免 backdrop-filter 限制）
     [CascadingParameter(Name = "OpenCreateTopicModal")] public Action? OpenCreateTopicModal { get; set; }
@@ -32,7 +34,7 @@ public partial class TopicSidebar : IAsyncDisposable
     // 已归档主题下拉状态
     private bool _showArchivedDropdown;
     private readonly List<TopicDto> _archivedTopics = [];
-    private string _nickname = "用户";
+    private string _nickname = string.Empty;
 
     // 未读通知：记录收到新消息但未查看的主题 ID
     private readonly HashSet<Guid> _unreadTopicIds = [];
@@ -43,7 +45,7 @@ public partial class TopicSidebar : IAsyncDisposable
         TopicStateService.TopicsChanged += HandleTopicsChanged;
 
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        _nickname = state.User.FindFirst("nickname")?.Value ?? state.User.Identity?.Name ?? "用户";
+        _nickname = state.User.FindFirst("nickname")?.Value ?? state.User.Identity?.Name ?? L["Sidebar_DefaultUser"];
         _selectedTopicId = TopicStateService.SelectedTopicId;
         await LoadTopicsAsync();
         // InitializeHubAsync 已移至 OnAfterRenderAsync，避免预渲染阶段执行导致协商响应 HTML 错误
@@ -140,7 +142,7 @@ public partial class TopicSidebar : IAsyncDisposable
             Logger.LogError(ex, "Failed to reorder topics");
             _topics.Clear();
             _topics.AddRange(snapshot);
-            _error = "排序更新失败，已回滚";
+            _error = L["Sidebar_ReorderFailedRollback"];
             await InvokeAsync(StateHasChanged);
         }
     }

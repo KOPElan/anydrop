@@ -18,17 +18,17 @@
             @* 移动端菜单按钮（桌面端隐藏）*@
             <button type="button"
                     class="sidebar-menu-toggle h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-white/40 active:scale-90"
-                    title="打开菜单"
+                    title="@L["Home_OpenMenu"]"
                     @onclick="() => ToggleMobileSidebar?.Invoke()">
                 <span class="material-symbols-outlined" style="font-size: 22px;">menu</span>
             </button>
             <div>
                 <h2 class="font-headline text-2xl font-extrabold tracking-tight leading-none" style="color: var(--color-on-surface);">
-                    @(_selectedTopicName ?? "选择主题")
+                    @(_selectedTopicName ?? L["Home_SelectTopic"])
                 </h2>
                 @if (_selectedTopicId.HasValue)
                 {
-                    <p class="text-[11px] font-medium uppercase tracking-wider mt-1" style="color: var(--color-outline);">存储会话</p>
+                    <p class="text-[11px] font-medium uppercase tracking-wider mt-1" style="color: var(--color-outline);">@L["Home_SessionStorage"]</p>
                 }
             </div>
         </div>
@@ -39,7 +39,7 @@
                 <a href="/search/@_selectedTopicId"
                    class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
                    style="color: var(--color-on-surface-variant);"
-                   title="搜索此主题">
+                         title="@L["Home_SearchTopic"]">
                     <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
                 </a>
                 @* 主题操作下拉菜单 *@
@@ -47,7 +47,7 @@
                     <button type="button"
                             class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
                             style="color: var(--color-on-surface-variant);"
-                            title="更多操作"
+                            title="@L["Home_MoreActions"]"
                             @onclick="ToggleTopicMenu"
                             @onclick:stopPropagation>
                         <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
@@ -59,13 +59,13 @@
                             @* 主题信息 *@
                             <button type="button" class="topic-menu-item" @onclick="OpenTopicInfoModal">
                                 <span class="material-symbols-outlined topic-menu-item__icon">info</span>
-                                <span class="flex-1">主题信息</span>
+                                <span class="flex-1">@L["Home_TopicInfo"]</span>
                             </button>
                             @* 置顶（带开关）*@
                             <button type="button" class="topic-menu-item" @onclick="TogglePinCurrentTopicAsync">
                                 <span class="material-symbols-outlined topic-menu-item__icon"
                                       style="font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
-                                <span class="flex-1">@(_selectedTopicPinned ? "取消置顶" : "置顶")</span>
+                                  <span class="flex-1">@(_selectedTopicPinned ? L["Home_Unpin"] : L["Home_Pin"])</span>
                                 @* 开关状态指示 *@
                                 <span class="topic-menu-toggle @(_selectedTopicPinned ? "topic-menu-toggle--on" : "")">
                                     <span class="topic-menu-toggle__knob"></span>
@@ -74,7 +74,7 @@
                             @* 归档（带开关）*@
                             <button type="button" class="topic-menu-item" @onclick="ArchiveCurrentTopicAsync">
                                 <span class="material-symbols-outlined topic-menu-item__icon">@(_selectedTopicArchived ? "unarchive" : "archive")</span>
-                                <span class="flex-1">@(_selectedTopicArchived ? "取消归档" : "归档")</span>
+                                <span class="flex-1">@(_selectedTopicArchived ? L["Home_Unarchive"] : L["Home_Archive"])</span>
                                 <span class="topic-menu-toggle @(_selectedTopicArchived ? "topic-menu-toggle--on" : "")">
                                     <span class="topic-menu-toggle__knob"></span>
                                 </span>
@@ -86,27 +86,27 @@
                             {
                                 <div class="topic-menu-item topic-menu-item--disabled"
                                      role="menuitem" aria-disabled="true"
-                                     title="内置主题无法删除">
+                                     title="@L["Home_BuiltInCannotDelete"]">
                                     <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
-                                    <span class="flex-1">删除</span>
-                                    <span class="text-[10px]" style="color: var(--color-outline);">内置</span>
+                                    <span class="flex-1">@L["Common_Delete"]</span>
+                                    <span class="text-[10px]" style="color: var(--color-outline);">@L["Home_BuiltInTag"]</span>
                                 </div>
                             }
                             else if (_selectedTopicMessageCount > 0)
                             {
                                 <div class="topic-menu-item topic-menu-item--disabled"
                                      role="menuitem" aria-disabled="true"
-                                     title="主题有消息时无法删除，请先清空或归档">
+                                     title="@L["Home_NotEmptyCannotDelete"]">
                                     <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
-                                    <span class="flex-1">删除</span>
-                                    <span class="text-[10px]" style="color: var(--color-outline);">有内容</span>
+                                    <span class="flex-1">@L["Common_Delete"]</span>
+                                    <span class="text-[10px]" style="color: var(--color-outline);">@L["Home_HasContentTag"]</span>
                                 </div>
                             }
                             else
                             {
                                 <button type="button" class="topic-menu-item topic-menu-item--danger" @onclick="ConfirmDeleteCurrentTopic">
                                     <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
-                                    <span class="flex-1">删除</span>
+                                    <span class="flex-1">@L["Common_Delete"]</span>
                                 </button>
                             }
                         </div>
@@ -126,14 +126,14 @@
         {
             <div class="flex h-full flex-col items-center justify-center text-center">
                 <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">chat_bubble_outline</span>
-                <p class="mt-4 text-sm font-medium text-on-surface-variant">请先在左侧选择一个主题</p>
+                <p class="mt-4 text-sm font-medium text-on-surface-variant">@L["Home_EmptySelectTopic"]</p>
             </div>
         }
         else if (_messages.Count == 0)
         {
             <div class="flex h-full flex-col items-center justify-center text-center">
                 <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">chat_bubble_outline</span>
-                <p class="mt-4 text-sm font-medium text-on-surface-variant">暂无内容，发送第一条消息吧</p>
+                <p class="mt-4 text-sm font-medium text-on-surface-variant">@L["Home_EmptySendFirst"]</p>
             </div>
         }
         else
@@ -151,7 +151,7 @@
                                 <div class="bubble-link bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm max-w-full transition-all duration-150">
                                 <div class="flex items-center gap-2 text-primary mb-3">
                                     <span class="material-symbols-outlined text-sm">link</span>
-                                    <span class="text-xs font-semibold uppercase tracking-wide">链接</span>
+                                    <span class="text-xs font-semibold uppercase tracking-wide">@L["Home_Link"]</span>
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(message.LinkTitle))
                                 {
@@ -172,7 +172,7 @@
                                        target="_blank"
                                        rel="noopener noreferrer">
                                         <span class="material-symbols-outlined" style="font-size: 14px; font-variation-settings: 'FILL' 1;">open_in_new</span>
-                                        打开链接
+                                        @L["Home_OpenLink"]
                                     </a>
                                 </div>
                             </div>
@@ -193,7 +193,7 @@
                                             <span class="material-symbols-outlined text-lg text-white">image</span>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? "图片")</h4>
+                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? L["Home_Image"])</h4>
                                             @if (message.FileSize.HasValue)
                                             {
                                                 <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
@@ -221,7 +221,7 @@
                                             <span class="material-symbols-outlined text-lg text-white">videocam</span>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? "视频")</h4>
+                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? L["Home_Video"])</h4>
                                             @if (message.FileSize.HasValue)
                                             {
                                                 <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
@@ -242,7 +242,7 @@
                                     <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <h4 class="font-semibold text-sm text-white truncate">@(message.FileName ?? "附件")</h4>
+                                    <h4 class="font-semibold text-sm text-white truncate">@(message.FileName ?? L["Home_File"])</h4>
                                     @if (message.FileSize.HasValue)
                                     {
                                         <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
@@ -287,7 +287,7 @@
              style="background: rgba(0,80,203,0.08); backdrop-filter: blur(4px);">
             <div class="flex flex-col items-center gap-3 text-primary">
                 <span class="material-symbols-outlined text-6xl" style="font-variation-settings: 'FILL' 1;">upload_file</span>
-                <p class="text-lg font-bold font-headline">松开即可发送文件</p>
+                <p class="text-lg font-bold font-headline">@L["Home_DropToSend"]</p>
             </div>
         </div>
     }
@@ -305,7 +305,7 @@
             </button>
             <img class="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl"
                  src="@_previewImageUrl"
-                 alt="图片预览"
+                  alt="@L["Home_ImagePreview"]"
                  @onclick:stopPropagation />
         </div>
     }
@@ -328,15 +328,15 @@
                     <div class="flex h-10 w-10 items-center justify-center rounded-full" style="background: var(--color-error-container);">
                         <span class="material-symbols-outlined" style="color: var(--color-error);">delete_forever</span>
                     </div>
-                    <h3 id="modal-delete-confirm-title" class="modal-title mb-0">确认删除主题</h3>
+                    <h3 id="modal-delete-confirm-title" class="modal-title mb-0">@L["Home_ConfirmDeleteTitle"]</h3>
                 </div>
-                <p class="text-sm text-on-surface-variant">确定要删除主题"<strong>@_selectedTopicName</strong>"吗？此操作不可撤销。</p>
+                <p class="text-sm text-on-surface-variant">@L["Home_ConfirmDeleteMessage", _selectedTopicName ?? string.Empty]</p>
                 <div class="modal-actions mt-4">
-                    <button type="button" class="btn-secondary" @onclick="CancelDeleteConfirm">取消</button>
+                    <button type="button" class="btn-secondary" @onclick="CancelDeleteConfirm">@L["Common_Cancel"]</button>
                     <button type="button"
                             class="rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors"
                             style="background: var(--color-error);"
-                            @onclick="DeleteCurrentTopicAsync">确认删除</button>
+                            @onclick="DeleteCurrentTopicAsync">@L["Home_ConfirmDeleteAction"]</button>
                 </div>
             </div>
         </div>
@@ -350,13 +350,13 @@
             <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
                 <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
                        style="color: var(--color-on-surface-variant);"
-                       title="上传图片或视频">
+                      title="@L["Home_UploadImageOrVideo"]">
                     <span class="material-symbols-outlined text-xl">image</span>
                     <InputFile class="hidden" multiple accept="image/*,video/*" OnChange="OnFilesSelected" />
                 </label>
                 <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
                        style="color: var(--color-on-surface-variant);"
-                       title="上传附件">
+                      title="@L["Home_UploadAttachment"]">
                     <span class="material-symbols-outlined text-xl">attach_file</span>
                     <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
                 </label>
@@ -364,7 +364,7 @@
                 <button type="button"
                         class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
                         style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
-                        title="@(_burnAfterReading ? "阅后即焚已开启（10分钟后自动删除）" : "开启阅后即焚")"
+                    title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
                         @onclick="ToggleBurnAfterReading">
                     <span class="material-symbols-outlined text-xl"
                           style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
@@ -377,7 +377,7 @@
             <div class="input-textarea-wrap">
                 <textarea class="w-full resize-none bg-transparent py-2 px-4 text-[15px] font-medium outline-none"
                           style="border: none; max-height: 8rem; field-sizing: content; color: var(--color-on-surface);"
-                          placeholder="输入消息，或拖入文件到聊天区域…（Ctrl+Enter 发送）"
+                          placeholder="@L["Home_InputPlaceholder"]"
                           maxlength="10000"
                           rows="1"
                           @bind="_inputText"

@@ -1,9 +1,11 @@
 using AnyDrop.Models;
+using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Globalization;
 
 namespace AnyDrop.Components.Pages;
 
@@ -17,6 +19,7 @@ public partial class TopicSearch
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<TopicSearch> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     // 当前激活的标签页
     private string _activeTab = "text";
@@ -282,8 +285,8 @@ public partial class TopicSearch
         {
             "image" => ShareContentType.Image,
             "video" => ShareContentType.Video,
-            "file"  => ShareContentType.File,
-            "link"  => ShareContentType.Link,
+            "file" => ShareContentType.File,
+            "link" => ShareContentType.Link,
             _ => ShareContentType.Text
         };
     }
@@ -347,12 +350,17 @@ public partial class TopicSearch
             .GroupBy(m => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(m.CreatedAt.UtcDateTime, _displayTimeZone)))
             .OrderByDescending(g => g.Key);
 
-    private static string FormatGroupDate(DateOnly date)
+    private string FormatGroupDate(DateOnly date)
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
-        if (date == today) return "今天";
-        if (date == today.AddDays(-1)) return "昨天";
-        return date.ToString("yyyy 年 M 月 d 日");
+        if (date == today) return L["Search_Today"];
+        if (date == today.AddDays(-1)) return L["Search_Yesterday"];
+        return FormatDateLabel(date);
+    }
+
+    private static string FormatDateLabel(DateOnly date)
+    {
+        return date.ToString("d", CultureInfo.CurrentCulture);
     }
 
     private static string GetFileUrl(Guid itemId, bool download = false)

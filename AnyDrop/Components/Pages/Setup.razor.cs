@@ -1,8 +1,9 @@
-using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
-using Microsoft.Extensions.Logging;
+using AnyDrop.Resources;
 using AnyDrop.Services;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
+using Microsoft.JSInterop;
+using System.ComponentModel.DataAnnotations;
 
 namespace AnyDrop.Components.Pages;
 
@@ -12,6 +13,7 @@ public partial class Setup
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Setup> Logger { get; set; }
     [Inject] public required IUserService UserService { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     private readonly SetupFormModel _model = new();
     private bool _submitting;
@@ -55,7 +57,7 @@ public partial class Setup
             var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/auth/setup", payload);
             if (!result.ok)
             {
-                _error = result.body?.error ?? "初始化失败，请稍后重试。";
+                _error = result.body?.error ?? L["Setup_FailedRetry"];
                 return;
             }
 
@@ -64,7 +66,7 @@ public partial class Setup
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Setup request failed.");
-            _error = "初始化失败，请稍后重试。";
+            _error = L["Setup_FailedRetry"];
         }
         finally
         {
