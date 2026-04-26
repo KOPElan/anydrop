@@ -181,6 +181,24 @@
     }
 
     /* ─── 侧边栏主题项 ─── */
+    .sidebar-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.40) transparent;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.40);
+        border-radius: 9999px;
+    }
+
     .sidebar-item {
         @apply relative flex w-full cursor-pointer items-center gap-3 rounded-2xl p-3 text-left overflow-hidden;
         color: var(--color-on-surface-variant);
@@ -395,7 +413,12 @@
     .topic-menu-item--disabled {
         opacity: 0.45;
         cursor: not-allowed;
+        pointer-events: none;
         color: var(--color-error);
+    }
+
+    .topic-menu-item--disabled:hover {
+        background: transparent;
     }
 
     /* ─── 菜单开关（toggle switch 样式）─── */

@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject ITopicStateService TopicStateService
 @inject ITopicService TopicService
+@inject ILogger<MainLayout> Logger
 
 <CascadingValue Value="@((Action)OpenCreateTopicModal)" Name="OpenCreateTopicModal">
 <div class="app-shell">
@@ -125,12 +126,14 @@
             await TopicStateService.SetSelectedTopicAsync(topic.Id);
             await TopicStateService.NotifyTopicsChangedAsync();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            Logger.LogWarning(ex, "Network error while creating topic '{Name}'", normalizedName);
             _modalError = "网络请求失败，请检查网络后重试。";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Unexpected error while creating topic '{Name}'", normalizedName);
             _modalError = "创建主题失败，请稍后重试。";
         }
     }
