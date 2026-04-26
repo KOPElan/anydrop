@@ -179,7 +179,7 @@
                             break;
 
                         case ShareContentType.Image:
-                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm transition-all duration-150">
+                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-lg transition-all duration-150">
                                 @* 点击图片在 Modal 中预览原图 *@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
@@ -189,19 +189,19 @@
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
-                                        <div class="p-2 bg-primary-fixed rounded-lg text-primary">
-                                            <span class="material-symbols-outlined text-lg">image</span>
+                                        <div class="p-2 rounded-lg bg-white/20">
+                                            <span class="material-symbols-outlined text-lg text-white">image</span>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "图片")</h4>
+                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? "图片")</h4>
                                             @if (message.FileSize.HasValue)
                                             {
-                                                <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                                <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
                                             }
                                         </div>
                                     </div>
                                     <a href="@GetFileUrl(message.Id, true)"
-                                       class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                       class="p-2 text-white/70 hover:text-white transition-colors">
                                         <span class="material-symbols-outlined">download</span>
                                     </a>
                                 </div>
@@ -209,27 +209,27 @@
                             break;
 
                         case ShareContentType.Video:
-                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm w-full max-w-lg transition-all duration-150">
+                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
-                                    <video class="w-full max-h-64 rounded-xl bg-on-surface"
+                                    <video class="w-full max-h-64 rounded-xl"
                                            controls
                                            src="@GetFileUrl(message.Id)"></video>
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
-                                        <div class="p-2 bg-primary-fixed rounded-lg text-primary">
-                                            <span class="material-symbols-outlined text-lg">videocam</span>
+                                        <div class="p-2 rounded-lg bg-white/20">
+                                            <span class="material-symbols-outlined text-lg text-white">videocam</span>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "视频")</h4>
+                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? "视频")</h4>
                                             @if (message.FileSize.HasValue)
                                             {
-                                                <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                                <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
                                             }
                                         </div>
                                     </div>
                                     <a href="@GetFileUrl(message.Id, true)"
-                                       class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                       class="p-2 text-white/70 hover:text-white transition-colors">
                                         <span class="material-symbols-outlined">download</span>
                                     </a>
                                 </div>
@@ -237,21 +237,19 @@
                             break;
 
                         case ShareContentType.File:
-                                <div class="bubble-file bg-surface-container-lowest p-4 rounded-3xl rounded-tl-lg shadow-sm flex items-center justify-between gap-4 w-full max-w-md transition-all duration-150">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-12 h-12 bg-error-container/30 flex items-center justify-center rounded-xl text-error">
-                                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "附件")</h4>
-                                        @if (message.FileSize.HasValue)
-                                        {
-                                            <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
-                                        }
-                                    </div>
+                                <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg flex items-center gap-4 w-full max-w-md transition-all duration-150">
+                                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 flex-shrink-0">
+                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h4 class="font-semibold text-sm text-white truncate">@(message.FileName ?? "附件")</h4>
+                                    @if (message.FileSize.HasValue)
+                                    {
+                                        <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
+                                    }
                                 </div>
                                 <a href="@GetFileUrl(message.Id, true)"
-                                   class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                   class="p-2 text-white/70 hover:text-white flex-shrink-0 transition-colors">
                                     <span class="material-symbols-outlined">download</span>
                                 </a>
                             </div>
@@ -317,7 +315,7 @@
                         InitialName="@(_topicSettingsName)"
                         InitialIcon="@(_topicSettingsIcon)"
                         AvailableIcons="_availableIcons"
-                        Error="_topicSettingsError"
+                        Error="@_topicSettingsError"
                         OnClose="CloseTopicSettingsModal"
                         OnSave="HandleTopicInfoSave" />
 
