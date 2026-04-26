@@ -53,7 +53,8 @@
     --color-background: #f8f9fa;
     --color-on-background: #191c1d;
 
-    /* Legacy compat */
+    /* ─── 在线状态颜色 ─── */
+    --color-status-online: #22c55e;
     --color-brand: #0050cb;
     --color-brand-hover: #0040a0;
     --color-sidebar: #f3f4f5;
@@ -131,8 +132,8 @@
 
 /* 侧边栏激活指示条扩展 */
 @keyframes pill-expand {
-    from { height: 0; opacity: 0; }
-    to   { height: 60%; opacity: 1; }
+    from { opacity: 0; transform: scaleY(0.2); }
+    to   { opacity: 1; transform: scaleY(1); }
 }
 
 /* 消息高亮闪烁（从搜索页跳回聊天后定位消息时使用） */
@@ -146,7 +147,8 @@
     html,
     body {
         @apply h-full antialiased;
-        background-color: var(--color-surface);
+        /* 整体渐变背景，侧边栏和主内容区在其上叠加玻璃层 */
+        background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
         font-family: var(--font-body);
     }
 }
@@ -179,22 +181,42 @@
     }
 
     /* ─── 侧边栏主题项 ─── */
+    .sidebar-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.40) transparent;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-scroll::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.40);
+        border-radius: 9999px;
+    }
+
     .sidebar-item {
-        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-left;
+        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-2xl p-3 text-left overflow-hidden;
         color: var(--color-on-surface-variant);
-        /* 过渡：背景色 + 颜色 + 轻微位移 */
-        transition: background-color 200ms ease, color 200ms ease, transform 150ms ease;
+        border: 1px solid transparent;
+        transition: background-color 200ms ease, border-color 200ms ease;
     }
 
     .sidebar-item:hover {
-        background-color: var(--color-surface-container);
-        transform: translateX(2px);
+        background-color: rgba(255, 255, 255, 0.4);
+        border-color: rgba(255, 255, 255, 0.4);
     }
 
     .sidebar-item--active {
         color: var(--color-primary);
         font-weight: 600;
-        background-color: var(--color-primary-fixed);
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+        border-color: rgba(147, 197, 253, 0.30);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
     /* 激活时的左侧指示条，带弹入动画 */
@@ -202,13 +224,27 @@
         content: "";
         position: absolute;
         left: 0;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 0.75rem;
+        bottom: 0.75rem;
         width: 4px;
-        height: 60%;
-        background-color: var(--color-primary);
+        background: linear-gradient(180deg, #6366f1, #3b82f6);
         border-radius: 0 4px 4px 0;
+        transform-origin: center;
         animation: pill-expand 250ms var(--ease-bounce) both;
+    }
+
+    /* ─── 侧边栏图标容器 ─── */
+    .sidebar-item__icon {
+        @apply flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl;
+        background: rgba(255, 255, 255, 0.50);
+        color: var(--color-on-surface-variant);
+        transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
+    }
+
+    .sidebar-item--active .sidebar-item__icon {
+        background: linear-gradient(135deg, #6366f1, #3b82f6);
+        color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.30);
     }
 
     .sidebar-item__name {
@@ -233,13 +269,19 @@
 
     /* ─── Modal 动画 ─── */
     .modal-overlay {
-        @apply fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm;
+        @apply fixed inset-0 z-50 flex items-center justify-center;
+        background: rgba(25, 28, 29, 0.35);
+        backdrop-filter: blur(12px) saturate(160%);
+        -webkit-backdrop-filter: blur(12px) saturate(160%);
         animation: overlay-in 200ms ease both;
     }
 
     .modal-content {
         @apply w-full max-w-sm rounded-2xl p-6 shadow-xl mx-4;
-        background-color: var(--color-surface-container-lowest);
+        background: rgba(248, 249, 250, 0.90);
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid var(--glass-border-color);
         animation: modal-slide-up 280ms var(--ease-bounce) both;
         max-height: 90vh;
         overflow-y: auto;
@@ -296,34 +338,176 @@
 
     /* ─── 消息列表：使用 CSS 变量统一控制顶/底留白，与玻璃栏高度一致 ─── */
     .chat-message-list {
-        /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
-        --chat-header-h: 82px;
-        --chat-footer-h: 140px;
+        /* --chat-header-h 对应 h-20 (80px)；--chat-footer-h 对应梯度渐出区高度 */
+        --chat-header-h: 80px;
+        --chat-footer-h: 130px;
         padding-top: var(--chat-header-h);
         padding-bottom: var(--chat-footer-h);
     }
 
-    /* ─── 磨砂玻璃顶栏 ─── */
-    .chat-header-glass {
-        background: var(--glass-header-bg);
-        /* 直接内联值，避免 CSS 变量引用 backdrop-filter 函数时的浏览器兼容问题 */
-        backdrop-filter: blur(20px) saturate(180%);
-        -webkit-backdrop-filter: blur(20px) saturate(180%);
-        border-bottom: 1px solid var(--glass-border-color);
+    /* ─── 主题操作下拉菜单 ─── */
+    .topic-menu-panel {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        z-index: 60;
+        min-width: 11rem;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(20px) saturate(160%);
+        -webkit-backdrop-filter: blur(20px) saturate(160%);
+        border-radius: 0.875rem;
+        border: 1px solid rgba(203, 213, 225, 0.50);
+        box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.12);
+        padding: 0.375rem;
+        animation: menu-in 120ms ease;
     }
 
-    /* ─── 磨砂玻璃底部输入区 ─── */
+    @keyframes menu-in {
+        from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+        to   { opacity: 1; transform: scale(1)    translateY(0);     }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .topic-menu-panel {
+            animation: none;
+        }
+    }
+
+    .topic-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        padding: 0.5rem 0.625rem;
+        border-radius: 0.625rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-align: left;
+        transition: background 150ms ease;
+        color: var(--color-on-surface);
+        cursor: pointer;
+    }
+
+    .topic-menu-item:hover {
+        background: rgba(59, 130, 246, 0.08);
+    }
+
+    .topic-menu-item__icon {
+        font-size: 17px;
+        color: var(--color-on-surface-variant);
+        flex-shrink: 0;
+    }
+
+    .topic-menu-item--danger {
+        color: var(--color-error);
+    }
+
+    .topic-menu-item--danger .topic-menu-item__icon {
+        color: var(--color-error);
+    }
+
+    .topic-menu-item--danger:hover {
+        background: rgba(186, 26, 26, 0.08);
+    }
+
+    .topic-menu-item--disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        pointer-events: none;
+        color: var(--color-error);
+    }
+
+    .topic-menu-item--disabled:hover {
+        background: transparent;
+    }
+
+    /* ─── 菜单开关（toggle switch 样式）─── */
+    .topic-menu-toggle {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        width: 2.25rem;
+        height: 1.25rem;
+        border-radius: 9999px;
+        flex-shrink: 0;
+        transition: background 200ms ease;
+        background: rgba(0, 0, 0, 0.15);
+    }
+
+    .topic-menu-toggle--on {
+        background: var(--color-primary);
+    }
+
+    .topic-menu-toggle__knob {
+        position: absolute;
+        left: 0.2rem;
+        width: 0.875rem;
+        height: 0.875rem;
+        border-radius: 9999px;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        transition: transform 200ms ease;
+    }
+
+    .topic-menu-toggle--on .topic-menu-toggle__knob {
+        transform: translateX(1rem);
+    }
+
+    /* ─── 磨砂玻璃顶栏 ─── */
+    .chat-header-glass {
+        background: rgba(255, 255, 255, 0.30);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(203, 213, 225, 0.40);
+    }
+
+    /* ─── 底部输入区：磨砂玻璃渐出遮罩 ─── */
     .chat-footer-glass {
-        background: var(--glass-footer-bg);
-        backdrop-filter: blur(20px) saturate(180%);
-        -webkit-backdrop-filter: blur(20px) saturate(180%);
-        border-top: 1px solid var(--glass-border-color);
+        background: linear-gradient(to top, rgba(203, 213, 225, 0.60) 0%, rgba(203, 213, 225, 0.25) 60%, transparent 100%);
+        backdrop-filter: blur(12px) saturate(150%);
+        -webkit-backdrop-filter: blur(12px) saturate(150%);
+    }
+
+    /* ─── 输入卡片（floating frosted glass card）─── */
+    .chat-input-card {
+        background: rgba(255, 255, 255, 0.80);
+        backdrop-filter: blur(28px) saturate(200%);
+        -webkit-backdrop-filter: blur(28px) saturate(200%);
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.70);
+        box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(203, 213, 225, 0.35);
     }
 
     /* 整体布局 */
     .app-shell {
         @apply grid h-screen;
-        grid-template-columns: 16rem 1fr;
+        grid-template-columns: 18rem 1fr;
+    }
+
+    /* ─── 侧边栏玻璃态 ─── */
+    .glass-sidebar {
+        background: rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(40px) saturate(180%);
+        -webkit-backdrop-filter: blur(40px) saturate(180%);
+        border-right: 1px solid rgba(255, 255, 255, 0.40);
+    }
+
+    /* ─── 可复用：玻璃按钮（侧边栏 [+]、设置、登出等）─── */
+    .glass-btn {
+        background: rgba(255, 255, 255, 0.40);
+        border: 1px solid rgba(255, 255, 255, 0.40);
+        transition: background 200ms ease, border-color 200ms ease;
+    }
+
+    .glass-btn:hover {
+        background: rgba(255, 255, 255, 0.60);
+        border-color: rgba(255, 255, 255, 0.60);
+    }
+
+    /* ─── 主内容区半透明卡片 ─── */
+    /* 不设 backdrop-filter，避免为子组件的 position:fixed modal 创建 containing block */
+    .main-content-card {
+        background: rgba(255, 255, 255, 0.85);
     }
 
     @media (max-width: 768px) {
@@ -335,5 +519,203 @@
             display: none;
         }
     }
-}
 
+    /* ─── 移动端菜单按钮（桌面隐藏，移动端显示）─── */
+    .sidebar-menu-toggle {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .sidebar-menu-toggle {
+            display: flex;
+        }
+    }
+
+    /* ─── 输入框容器（桌面：行布局；移动：图标移至下方）─── */
+    .input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0;
+    }
+
+    .input-actions {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        flex-shrink: 0;
+        order: 0;
+    }
+
+    .input-textarea-wrap {
+        flex: 1;
+        min-width: 0;
+        order: 1;
+    }
+
+    .input-send-wrap {
+        order: 2;
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+        .input-wrapper {
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        /* 移动端：文本框 + 发送按钮在第一行，图标在第二行 */
+        .input-textarea-wrap {
+            order: 1;
+            flex-basis: calc(100% - 3.5rem);
+        }
+
+        .input-send-wrap {
+            order: 2;
+        }
+
+        .input-actions {
+            order: 3;
+            width: 100%;
+            padding: 0.5rem 0 0;
+            border-right: none !important;
+            border-top: 1px solid rgba(203, 213, 225, 0.50);
+        }
+    }
+
+    /* ─── 侧边栏状态徽标 ─── */
+    .sidebar-item__status {
+        @apply inline-block text-[10px] font-bold mt-0.5 px-1.5 py-0.5 rounded-full leading-4;
+    }
+
+    .sidebar-item__status--active {
+        background-color: var(--color-primary-fixed);
+        color: var(--color-primary);
+    }
+
+    /* ─── 文本消息气泡 ─── */
+    .bubble-text {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.40);
+    }
+
+    /* ─── 登录页面 ─── */
+    @keyframes login-card-in {
+        from {
+            opacity: 0;
+            transform: translateY(24px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .login-shell {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: linear-gradient(135deg, #0a0f2e 0%, #0050cb 55%, #0a84ff 100%);
+    }
+
+    .login-body {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 420px;
+        padding: 1rem;
+    }
+
+    .login-card {
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 1.5rem;
+        padding: 2rem;
+        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(24px) saturate(160%);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        animation: login-card-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .login-logo-icon {
+        background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .login-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        outline: none;
+        transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+    }
+
+    .login-input::placeholder {
+        color: rgba(255, 255, 255, 0.35);
+    }
+
+    .login-input:focus {
+        border-color: rgba(255, 255, 255, 0.6);
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+    }
+
+    .login-btn {
+        background: white;
+        color: var(--color-primary);
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .login-btn:active:not(:disabled) {
+        transform: translateY(0) scale(0.98);
+    }
+
+    .login-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .login-glow {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(60px);
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    .login-glow--1 {
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, #0066ff, transparent);
+        top: -150px;
+        right: -100px;
+    }
+
+    .login-glow--2 {
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, #0050cb, transparent);
+        bottom: -100px;
+        left: -80px;
+        opacity: 0.25;
+    }
+
+    /* ─── spinner 动画（用于登录中状态）─── */
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+}

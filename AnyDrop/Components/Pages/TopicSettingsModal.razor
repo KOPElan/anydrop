@@ -1,0 +1,100 @@
+@* 主题信息 Modal（独立子组件，图标选择仅触发本组件重渲染，不影响 Home 消息列表性能）*@
+
+@if (Visible)
+{
+    <div class="modal-overlay" @onclick="HandleClose">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-topic-settings-title" @onclick:stopPropagation>
+            <h3 id="modal-topic-settings-title" class="modal-title">主题信息</h3>
+
+            @* 改名 *@
+            <div class="mt-4">
+                <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题名称</label>
+                <input class="w-full rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                       style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
+                       maxlength="100"
+                       @bind="_name"
+                       @ref="_nameInputRef" />
+            </div>
+
+            @* 主题图标 *@
+            <div class="mt-4">
+                <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题图标</label>
+                <div class="grid grid-cols-6 gap-2">
+                    @foreach (var icon in AvailableIcons)
+                    {
+                        var isSelected = _selectedIcon == icon;
+                        <button type="button"
+                                class="flex items-center justify-center p-2 rounded-lg transition-all @(isSelected ? "ring-2 ring-primary" : "hover:bg-surface-container")"
+                                style="@(isSelected ? "background: var(--color-primary-fixed);" : "")"
+                                @onclick="() => _selectedIcon = icon">
+                            <span class="material-symbols-outlined text-lg"
+                                  style="color: @(isSelected ? "var(--color-primary)" : "var(--color-on-surface-variant)");">@icon</span>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Error))
+            {
+                <p class="mt-2 text-xs" style="color: var(--color-error);">@Error</p>
+            }
+
+            <div class="modal-actions mt-4">
+                <button type="button" class="btn-secondary" @onclick="HandleClose">取消</button>
+                <button type="button" class="btn-primary" @onclick="HandleSave">保存</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>是否显示弹窗。</summary>
+    [Parameter, EditorRequired] public bool Visible { get; set; }
+
+    /// <summary>打开时的初始主题名称。</summary>
+    [Parameter, EditorRequired] public string InitialName { get; set; } = string.Empty;
+
+    /// <summary>打开时的初始主题图标。</summary>
+    [Parameter, EditorRequired] public string InitialIcon { get; set; } = "chat_bubble";
+
+    /// <summary>可选图标列表。</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> AvailableIcons { get; set; } = [];
+
+    /// <summary>来自父组件的错误提示（API 调用失败时）。</summary>
+    [Parameter] public string? Error { get; set; }
+
+    /// <summary>点击取消或遮罩时触发。</summary>
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>点击保存时触发，携带最新的名称和图标。</summary>
+    [Parameter] public EventCallback<SaveArgs> OnSave { get; set; }
+
+    /// <summary>保存操作的数据载体。</summary>
+    public readonly record struct SaveArgs(string Name, string Icon);
+
+    private string _name = string.Empty;
+    private string _selectedIcon = "chat_bubble";
+    private bool _wasVisible;
+    private ElementReference _nameInputRef;
+
+    protected override void OnParametersSet()
+    {
+        // 仅在弹窗从关闭变为打开时重置内部状态，避免 API 错误触发父组件重渲染时重置用户已编辑的内容
+        if (Visible && !_wasVisible)
+        {
+            _name = InitialName;
+            _selectedIcon = InitialIcon;
+        }
+        _wasVisible = Visible;
+    }
+
+    private async Task HandleClose()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleSave()
+    {
+        await OnSave.InvokeAsync(new SaveArgs(_name, _selectedIcon));
+    }
+}

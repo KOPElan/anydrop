@@ -1,6 +1,6 @@
 .app-shell {
     display: grid;
-    grid-template-columns: 16rem 1fr;
+    grid-template-columns: 18rem 1fr;
     height: 100vh;
     overflow-x: hidden;
 }
@@ -20,5 +20,28 @@ main {
 
     .sidebar {
         display: none;
+    }
+
+    /* 移动端侧边栏展开态：覆盖 display:none，改为 fixed 抽屉 */
+    .sidebar.sidebar--mobile-open {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 60;
+        width: 18rem;
+        overflow-y: auto;
+        box-shadow: 4px 0 24px rgba(25, 28, 29, 0.18);
+    }
+
+    /* 移动端遮罩层 */
+    .sidebar-mobile-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 59;
+        background: rgba(25, 28, 29, 0.45);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
     }
 }

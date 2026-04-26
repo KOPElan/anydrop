@@ -23,6 +23,7 @@ public partial class Home : IAsyncDisposable
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
+    [CascadingParameter(Name = "ToggleMobileSidebar")] public Action? ToggleMobileSidebar { get; set; }
 
     private readonly List<ShareItemDto> _messages = [];
     // O(1) 消息去重：避免 SignalR 推送与主动刷新产生重复条目
@@ -45,12 +46,15 @@ public partial class Home : IAsyncDisposable
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
 
-    // 主题设置 Modal 状态
+    // 主题信息 Modal 状态（仅名称和图标）
     private bool _showTopicSettingsModal;
+    // _topicSettingsName / _topicSettingsIcon 作为 InitialName/InitialIcon 传入子组件，子组件内部管理编辑状态
     private string _topicSettingsName = string.Empty;
     private string _topicSettingsIcon = "chat_bubble";
     private string? _topicSettingsError;
-    private ElementReference _topicSettingsInputRef;
+
+    // 顶部操作下拉菜单状态
+    private bool _showTopicMenu;
 
     // 可选图标列表
     private readonly string[] _availableIcons =
@@ -319,71 +323,81 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    /// <summary>打开主题设置 Modal。</summary>
-    private void OpenTopicSettingsModal()
+    /// <summary>打开主题信息 Modal（仅名称和图标）。</summary>
+    private void OpenTopicInfoModal()
     {
         _topicSettingsName = _selectedTopicName ?? string.Empty;
         _topicSettingsIcon = _selectedTopicIcon;
         _topicSettingsError = null;
         _showTopicSettingsModal = true;
+        _showTopicMenu = false;
     }
 
-    /// <summary>选择图标。</summary>
-    private void SelectIcon(string icon)
+    /// <summary>切换顶部操作下拉菜单。</summary>
+    private void ToggleTopicMenu()
     {
-        _topicSettingsIcon = icon;
+        _showTopicMenu = !_showTopicMenu;
+    }
+
+    /// <summary>关闭顶部操作下拉菜单。</summary>
+    private void CloseTopicMenu()
+    {
+        _showTopicMenu = false;
     }
 
     /// <summary>
-    /// 更新主题信息
+    /// 子组件 TopicSettingsModal 保存回调：接收编辑后的名称和图标，依次调用 API。
+    /// 使用 ValueTuple 参数与 TopicSettingsModal.SaveArgs 兼容。
     /// </summary>
-    /// <returns></returns>
-    private async Task SaveTopicInfo()
+    private async Task HandleTopicInfoSave(TopicSettingsModal.SaveArgs args)
     {
         if (!_selectedTopicId.HasValue) return;
         _topicSettingsError = null;
-        if (!string.IsNullOrEmpty(_topicSettingsIcon))
+
+        var (newName, newIcon) = (args.Name, args.Icon);
+
+        // 保存图标（如有变更）
+        if (!string.IsNullOrEmpty(newIcon) && newIcon != _selectedTopicIcon)
         {
             try
             {
-                var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(_topicSettingsIcon));
+                var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(newIcon));
                 if (result is not null)
                 {
-                    _selectedTopicIcon = _topicSettingsIcon;
+                    _selectedTopicIcon = newIcon;
+                    _topicSettingsIcon = newIcon;
                     await TopicStateService.NotifyTopicsChangedAsync();
                 }
                 else
                 {
                     _topicSettingsError = "保存图标失败：主题不存在。";
+                    return;
                 }
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to save icon for topic {TopicId}", _selectedTopicId);
                 _topicSettingsError = "保存主题图标失败，请重试。";
+                return;
             }
         }
 
-        if (_selectedTopicName != _topicSettingsName)
+        // 保存名称（如有变更）
+        var trimmedName = newName.Trim();
+        if (!string.IsNullOrEmpty(trimmedName) && trimmedName != _selectedTopicName)
         {
-            var name = _topicSettingsName.Trim();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                _topicSettingsError = "主题名称不能为空。";
-                return;
-            }
-
             try
             {
-                await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(name));
+                await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(trimmedName));
                 await LoadSelectedTopicMetaAsync();
-                _topicSettingsName = _selectedTopicName ?? name;
+                _topicSettingsName = _selectedTopicName ?? trimmedName;
                 await TopicStateService.NotifyTopicsChangedAsync();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to rename topic {TopicId}", _selectedTopicId);
                 _topicSettingsError = "保存主题名称失败，请重试。";
+                return;
             }
         }
 
@@ -398,6 +412,7 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
+        _showTopicMenu = false;
         var pinning = !_selectedTopicPinned;
 
         try
@@ -411,7 +426,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to pin/unpin topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "操作失败，请重试。";
+            _validationError = "置顶操作失败，请重试。";
         }
     }
 
@@ -430,12 +445,12 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
+        _showTopicMenu = false;
         var archiving = !_selectedTopicArchived;
 
         try
         {
             await TopicService.ArchiveTopicAsync(_selectedTopicId.Value, archiving);
-            CloseTopicSettingsModal();
 
             // 归档后主题从普通列表消失，清空聊天区
             if (archiving)
@@ -461,13 +476,14 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to archive topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "操作失败，请重试。";
+            _validationError = "归档操作失败，请重试。";
         }
     }
 
     /// <summary>显示删除主题二次确认弹窗。</summary>
     private void ConfirmDeleteCurrentTopic()
     {
+        _showTopicMenu = false;
         _showDeleteConfirmModal = true;
     }
 
@@ -490,7 +506,6 @@ public partial class Home : IAsyncDisposable
         try
         {
             await TopicService.DeleteTopicAsync(_selectedTopicId.Value);
-            CloseTopicSettingsModal();
 
             _selectedTopicId = null;
             _selectedTopicName = null;
@@ -503,7 +518,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to delete topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "删除失败，请重试。";
+            _validationError = "删除失败，请重试。";
         }
     }
 

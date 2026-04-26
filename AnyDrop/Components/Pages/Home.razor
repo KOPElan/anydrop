@@ -9,32 +9,111 @@
     消息列表 absolute inset-0 overflow-y-auto，通过 padding-top/bottom 留出空间。
 *@
 <section @ref="_chatSectionRef"
-         class="relative h-full overflow-hidden bg-surface"
+         class="relative h-full overflow-hidden"
          @ondragover:preventDefault>
 
     @* ─────────── 顶部标题栏（磨砂玻璃效果，absolute 定位覆盖消息列表）─────────── *@
-    <header class="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-4 chat-header-glass">
+    <header class="absolute inset-x-0 top-0 z-40 flex h-20 items-center justify-between px-8 chat-header-glass">
         <div class="flex items-center gap-3">
-            <h2 class="font-headline font-bold text-on-surface text-lg leading-tight">
-                @(_selectedTopicName ?? "选择主题")
-            </h2>
+            @* 移动端菜单按钮（桌面端隐藏）*@
+            <button type="button"
+                    class="sidebar-menu-toggle h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-white/40 active:scale-90"
+                    title="打开菜单"
+                    @onclick="() => ToggleMobileSidebar?.Invoke()">
+                <span class="material-symbols-outlined" style="font-size: 22px;">menu</span>
+            </button>
+            <div>
+                <h2 class="font-headline text-2xl font-extrabold tracking-tight leading-none" style="color: var(--color-on-surface);">
+                    @(_selectedTopicName ?? "选择主题")
+                </h2>
+                @if (_selectedTopicId.HasValue)
+                {
+                    <p class="text-[11px] font-medium uppercase tracking-wider mt-1" style="color: var(--color-outline);">存储会话</p>
+                }
+            </div>
         </div>
         @if (_selectedTopicId.HasValue)
         {
             <div class="flex items-center gap-1">
                 @* 搜索按钮 *@
                 <a href="/search/@_selectedTopicId"
-                   class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                   class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
+                   style="color: var(--color-on-surface-variant);"
                    title="搜索此主题">
                     <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
                 </a>
-                @* 主题设置按钮 *@
-                <button type="button"
-                        class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
-                        title="主题设置"
-                        @onclick="OpenTopicSettingsModal">
-                    <span class="material-symbols-outlined" style="font-size: 20px;">build</span>
-                </button>
+                @* 主题操作下拉菜单 *@
+                <div class="relative">
+                    <button type="button"
+                            class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
+                            style="color: var(--color-on-surface-variant);"
+                            title="更多操作"
+                            @onclick="ToggleTopicMenu"
+                            @onclick:stopPropagation>
+                        <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
+                    </button>
+                    @* 下拉菜单面板 *@
+                    @if (_showTopicMenu)
+                    {
+                        <div class="topic-menu-panel" @onclick:stopPropagation>
+                            @* 主题信息 *@
+                            <button type="button" class="topic-menu-item" @onclick="OpenTopicInfoModal">
+                                <span class="material-symbols-outlined topic-menu-item__icon">info</span>
+                                <span class="flex-1">主题信息</span>
+                            </button>
+                            @* 置顶（带开关）*@
+                            <button type="button" class="topic-menu-item" @onclick="TogglePinCurrentTopicAsync">
+                                <span class="material-symbols-outlined topic-menu-item__icon"
+                                      style="font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
+                                <span class="flex-1">@(_selectedTopicPinned ? "取消置顶" : "置顶")</span>
+                                @* 开关状态指示 *@
+                                <span class="topic-menu-toggle @(_selectedTopicPinned ? "topic-menu-toggle--on" : "")">
+                                    <span class="topic-menu-toggle__knob"></span>
+                                </span>
+                            </button>
+                            @* 归档（带开关）*@
+                            <button type="button" class="topic-menu-item" @onclick="ArchiveCurrentTopicAsync">
+                                <span class="material-symbols-outlined topic-menu-item__icon">@(_selectedTopicArchived ? "unarchive" : "archive")</span>
+                                <span class="flex-1">@(_selectedTopicArchived ? "取消归档" : "归档")</span>
+                                <span class="topic-menu-toggle @(_selectedTopicArchived ? "topic-menu-toggle--on" : "")">
+                                    <span class="topic-menu-toggle__knob"></span>
+                                </span>
+                            </button>
+                            @* 分割线 *@
+                            <div class="my-1" style="border-top: 1px solid var(--color-outline-variant);"></div>
+                            @* 删除 *@
+                            @if (_selectedTopicIsBuiltIn)
+                            {
+                                <div class="topic-menu-item topic-menu-item--disabled"
+                                     role="menuitem" aria-disabled="true"
+                                     title="内置主题无法删除">
+                                    <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
+                                    <span class="flex-1">删除</span>
+                                    <span class="text-[10px]" style="color: var(--color-outline);">内置</span>
+                                </div>
+                            }
+                            else if (_selectedTopicMessageCount > 0)
+                            {
+                                <div class="topic-menu-item topic-menu-item--disabled"
+                                     role="menuitem" aria-disabled="true"
+                                     title="主题有消息时无法删除，请先清空或归档">
+                                    <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
+                                    <span class="flex-1">删除</span>
+                                    <span class="text-[10px]" style="color: var(--color-outline);">有内容</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <button type="button" class="topic-menu-item topic-menu-item--danger" @onclick="ConfirmDeleteCurrentTopic">
+                                    <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
+                                    <span class="flex-1">删除</span>
+                                </button>
+                            }
+                        </div>
+                        @* 点击菜单外关闭 *@
+                        <div class="fixed inset-0 z-50" role="presentation" aria-hidden="true" @onclick="CloseTopicMenu"></div>
+                    }
+                </div>
             </div>
         }
     </header>
@@ -69,7 +148,7 @@
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
-                                <div class="bubble-link bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm max-w-full transition-all duration-150">
+                                <div class="bubble-link bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm max-w-full transition-all duration-150">
                                 <div class="flex items-center gap-2 text-primary mb-3">
                                     <span class="material-symbols-outlined text-sm">link</span>
                                     <span class="text-xs font-semibold uppercase tracking-wide">链接</span>
@@ -100,7 +179,7 @@
                             break;
 
                         case ShareContentType.Image:
-                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm transition-all duration-150">
+                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-lg transition-all duration-150">
                                 @* 点击图片在 Modal 中预览原图 *@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
@@ -110,19 +189,19 @@
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
-                                        <div class="p-2 bg-primary-fixed rounded-lg text-primary">
-                                            <span class="material-symbols-outlined text-lg">image</span>
+                                        <div class="p-2 rounded-lg bg-white/20">
+                                            <span class="material-symbols-outlined text-lg text-white">image</span>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "图片")</h4>
+                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? "图片")</h4>
                                             @if (message.FileSize.HasValue)
                                             {
-                                                <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                                <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
                                             }
                                         </div>
                                     </div>
                                     <a href="@GetFileUrl(message.Id, true)"
-                                       class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                       class="p-2 text-white/70 hover:text-white transition-colors">
                                         <span class="material-symbols-outlined">download</span>
                                     </a>
                                 </div>
@@ -130,27 +209,27 @@
                             break;
 
                         case ShareContentType.Video:
-                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm w-full max-w-lg transition-all duration-150">
+                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
-                                    <video class="w-full max-h-64 rounded-xl bg-on-surface"
+                                    <video class="w-full max-h-64 rounded-xl"
                                            controls
                                            src="@GetFileUrl(message.Id)"></video>
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
-                                        <div class="p-2 bg-primary-fixed rounded-lg text-primary">
-                                            <span class="material-symbols-outlined text-lg">videocam</span>
+                                        <div class="p-2 rounded-lg bg-white/20">
+                                            <span class="material-symbols-outlined text-lg text-white">videocam</span>
                                         </div>
                                         <div>
-                                            <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "视频")</h4>
+                                            <h4 class="font-semibold text-sm text-white">@(message.FileName ?? "视频")</h4>
                                             @if (message.FileSize.HasValue)
                                             {
-                                                <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
+                                                <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
                                             }
                                         </div>
                                     </div>
                                     <a href="@GetFileUrl(message.Id, true)"
-                                       class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                       class="p-2 text-white/70 hover:text-white transition-colors">
                                         <span class="material-symbols-outlined">download</span>
                                     </a>
                                 </div>
@@ -158,40 +237,38 @@
                             break;
 
                         case ShareContentType.File:
-                                <div class="bubble-file bg-surface-container-lowest p-4 rounded-b-2xl rounded-tr-2xl shadow-sm flex items-center justify-between gap-4 w-full max-w-md transition-all duration-150">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-12 h-12 bg-error-container/30 flex items-center justify-center rounded-xl text-error">
-                                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-sm text-on-surface">@(message.FileName ?? "附件")</h4>
-                                        @if (message.FileSize.HasValue)
-                                        {
-                                            <p class="text-[11px] text-on-surface-variant">@FormatFileSize(message.FileSize.Value)</p>
-                                        }
-                                    </div>
+                                <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg flex items-center gap-4 w-full max-w-md transition-all duration-150">
+                                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 flex-shrink-0">
+                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h4 class="font-semibold text-sm text-white truncate">@(message.FileName ?? "附件")</h4>
+                                    @if (message.FileSize.HasValue)
+                                    {
+                                        <p class="text-[11px] text-white/70">@FormatFileSize(message.FileSize.Value)</p>
+                                    }
                                 </div>
                                 <a href="@GetFileUrl(message.Id, true)"
-                                   class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+                                   class="p-2 text-white/70 hover:text-white flex-shrink-0 transition-colors">
                                     <span class="material-symbols-outlined">download</span>
                                 </a>
                             </div>
                             break;
 
                         default:
-                            <div class="bubble-text bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm transition-all duration-150">
-                                <p class="text-sm text-on-surface leading-relaxed whitespace-pre-wrap break-words">@message.Content</p>
+                            <div class="bubble-text px-6 py-4 rounded-3xl rounded-tl-lg transition-all duration-150 max-w-md">
+                                <p class="text-[15px] font-medium leading-relaxed whitespace-pre-wrap break-words text-white">@message.Content</p>
                             </div>
                             break;
                     }
-                    @* 消息时间：显示完整日期 + 时间，阅后即焚时额外显示倒计时 *@
-                    <div class="mt-2 ml-1 flex items-center gap-2 text-[11px] font-bold text-primary">
-                        <span class="material-symbols-outlined" style="font-size: 12px;">schedule</span>
-                        @FormatMessageTime(message.CreatedAt)
+                    @* 消息时间：圆点指示 + 完整日期时间，阅后即焚时额外显示倒计时 *@
+                    <div class="mt-3 flex items-center gap-1.5 text-[11px] font-semibold pl-2" style="color: var(--color-outline);">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style="background-color: rgba(59,130,246,0.50);"></span>
+                        <span>@FormatMessageTime(message.CreatedAt)</span>
                         @if (message.ExpiresAt.HasValue)
                         {
-                            <span class="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                                  style=" color: var(--color-error, #ba1a1a);">
+                            <span class="ml-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style="color: var(--color-error, #ba1a1a);">
                                 <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
                                 @FormatExpiry(message.ExpiresAt.Value)
                             </span>
@@ -233,98 +310,14 @@
         </div>
     }
 
-    @* ─────────── 主题设置 Modal ─────────── *@
-    @if (_showTopicSettingsModal)
-    {
-        <div class="modal-overlay" @onclick="CloseTopicSettingsModal">
-            <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-topic-settings-title" @onclick:stopPropagation>
-                <h3 id="modal-topic-settings-title" class="modal-title">主题设置</h3>
-
-                @* 改名 *@
-                <div class="mt-4">
-                    <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题名称</label>
-                    <div class="flex gap-2">
-                        <input class="flex-1 rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
-                               style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
-                               maxlength="100"
-                               @bind="_topicSettingsName"
-                               @ref="_topicSettingsInputRef" />
-                    </div>                    
-                </div>
-
-                @* 主题图标 *@
-                <div class="mt-4">
-                    <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题图标</label>
-                    <div class="grid grid-cols-6 gap-2">
-                        @foreach (var icon in _availableIcons)
-                        {
-                            var isSelected = _topicSettingsIcon == icon;
-                            <button type="button"
-                                    class="flex items-center justify-center p-2 rounded-lg transition-all @(isSelected ? "ring-2 ring-primary" : "hover:bg-surface-container")"
-                                    style="@(isSelected ? "background: var(--color-primary-fixed);" : "")"
-                                    @onclick="() => SelectIcon(icon)">
-                                <span class="material-symbols-outlined text-lg"
-                                      style="color: @(isSelected ? "var(--color-primary)" : "var(--color-on-surface-variant)");">@icon</span>
-                            </button>
-                        }
-                    </div>
-                    <button type="button" class="btn-primary mt-2 w-full" @onclick="SaveTopicInfo">更新主题</button>
-                </div>
-                @if (!string.IsNullOrWhiteSpace(_topicSettingsError))
-                {
-                    <p class="mt-1 text-xs" style="color: var(--color-error);">@_topicSettingsError</p>
-                }
-
-                @* 分隔线 *@
-                <div class="my-4 border-t" style="border-color: var(--color-outline-variant);"></div>
-
-                @* 操作按钮 *@
-                <div class="space-y-2">
-                    @* 置顶 / 取消置顶 *@
-                    <button type="button"
-                            class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-surface-container"
-                            style="color: var(--color-on-surface-variant);"
-                            @onclick="TogglePinCurrentTopicAsync">
-                        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
-                        @(_selectedTopicPinned ? "取消置顶" : "置顶主题")
-                    </button>
-
-                    @* 归档 / 取消归档 *@
-                    <button type="button"
-                            class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-surface-container"
-                            style="color: var(--color-on-surface-variant);"
-                            @onclick="ArchiveCurrentTopicAsync">
-                        <span class="material-symbols-outlined text-base">@(_selectedTopicArchived ? "unarchive" : "archive")</span>
-                        @(_selectedTopicArchived ? "取消归档" : "归档主题")
-                    </button>
-
-                    @* 删除（仅在无内容时可操作）*@
-                    @if (_selectedTopicMessageCount == 0 && !_selectedTopicIsBuiltIn)
-                    {
-                        <button type="button"
-                                class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-error-container/20"
-                                style="color: var(--color-error);"
-                                @onclick="ConfirmDeleteCurrentTopic">
-                            <span class="material-symbols-outlined text-base">delete</span>
-                            删除主题
-                        </button>
-                    }
-                    else if (!_selectedTopicIsBuiltIn && _selectedTopicMessageCount > 0)
-                    {
-                        <div class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm opacity-40 cursor-not-allowed"
-                             style="color: var(--color-error);" title="主题有消息时无法删除，请先归档">
-                            <span class="material-symbols-outlined text-base">delete</span>
-                            删除主题（有内容，不可删除）
-                        </div>
-                    }
-                </div>
-
-                <div class="modal-actions mt-4">
-                    <button type="button" class="btn-secondary" @onclick="CloseTopicSettingsModal">关闭</button>
-                </div>
-            </div>
-        </div>
-    }
+    @* ─────────── 主题信息 Modal（独立子组件，避免图标选择触发整体重渲染）─────────── *@
+    <TopicSettingsModal Visible="_showTopicSettingsModal"
+                        InitialName="@(_topicSettingsName)"
+                        InitialIcon="@(_topicSettingsIcon)"
+                        AvailableIcons="_availableIcons"
+                        Error="@_topicSettingsError"
+                        OnClose="CloseTopicSettingsModal"
+                        OnSave="HandleTopicInfoSave" />
 
     @* ─────────── 删除主题二次确认 Modal ─────────── *@
     @if (_showDeleteConfirmModal)
@@ -349,30 +342,31 @@
         </div>
     }
 
-    @* ─────────── 输入区（磨砂玻璃效果，absolute 定位覆盖消息列表底部）─────────── *@
-    <footer class="absolute inset-x-0 bottom-0 z-40 p-4 chat-footer-glass">
-        <div class="mx-auto max-w-4xl">
-        <div class="flex items-end gap-3 bg-surface-container-lowest p-3 rounded-[2rem]"
-             style="box-shadow: 0 8px 32px rgba(25,28,29,0.06);">
-            @* 附件按钮 *@
-            <div class="flex gap-1 px-1 mb-1">
-                <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+    @* ─────────── 输入区（渐出遮罩 + 浮动玻璃卡片）─────────── *@
+    <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-16 chat-footer-glass" style="pointer-events: none;">
+        <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
+        <div class="input-wrapper chat-input-card px-4 py-3">
+            @* 附件按钮（带右侧分割线）*@
+            <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
+                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                       style="color: var(--color-on-surface-variant);"
                        title="上传图片或视频">
-                    <span class="material-symbols-outlined">image</span>
+                    <span class="material-symbols-outlined text-xl">image</span>
                     <InputFile class="hidden" multiple accept="image/*,video/*" OnChange="OnFilesSelected" />
                 </label>
-                <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                       style="color: var(--color-on-surface-variant);"
                        title="上传附件">
-                    <span class="material-symbols-outlined">attachment</span>
+                    <span class="material-symbols-outlined text-xl">attach_file</span>
                     <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
                 </label>
                 @* 阅后即焚切换按钮 *@
                 <button type="button"
-                        class="flex items-center justify-center rounded-full p-2 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "text-on-surface-variant hover:bg-surface-container")"
-                        style="@(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
+                        class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
+                        style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
                         title="@(_burnAfterReading ? "阅后即焚已开启（10分钟后自动删除）" : "开启阅后即焚")"
                         @onclick="ToggleBurnAfterReading">
-                    <span class="material-symbols-outlined"
+                    <span class="material-symbols-outlined text-xl"
                           style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
                         timer
                     </span>
@@ -380,9 +374,9 @@
             </div>
 
             @* 文本输入 *@
-            <div class="flex-1 min-w-0">
-                <textarea class="w-full resize-none bg-transparent py-2 px-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/50"
-                          style="border: none; max-height: 8rem; field-sizing: content;"
+            <div class="input-textarea-wrap">
+                <textarea class="w-full resize-none bg-transparent py-2 px-4 text-[15px] font-medium outline-none"
+                          style="border: none; max-height: 8rem; field-sizing: content; color: var(--color-on-surface);"
                           placeholder="输入消息，或拖入文件到聊天区域…（Ctrl+Enter 发送）"
                           maxlength="10000"
                           rows="1"
@@ -391,25 +385,22 @@
                           @onkeydown="HandleKeyDown"></textarea>
                 @if (!string.IsNullOrWhiteSpace(_validationError))
                 {
-                    <p class="px-2 text-xs text-error">@_validationError</p>
+                    <p class="px-4 text-xs text-error">@_validationError</p>
                 }
             </div>
 
-            @* 发送按钮 *@
-            <div class="mb-1 mr-1">
+            @* 发送按钮（方形，渐变）*@
+            <div class="input-send-wrap ml-2">
                 <button type="button"
-                        class="flex h-10 w-10 items-center justify-center rounded-full text-white shadow-md transition-all active:scale-90 disabled:opacity-50"
-                        style="background: linear-gradient(135deg, #0050cb, #0066ff);"
+                        class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);"
                         disabled="@_isSending"
                         @onclick="SendAsync">
-                    <span class="material-symbols-outlined font-bold"
-                          style="font-variation-settings: 'FILL' 1;">arrow_upward</span>
+                    <span class="material-symbols-outlined"
+                          style="font-size: 20px; font-variation-settings: 'FILL' 1;">arrow_upward</span>
                 </button>
             </div>
         </div>
-        <p class="mt-3 text-center text-[10px] font-medium text-on-surface-variant opacity-50">
-            拖放文件到聊天区域可快速发送
-        </p>
         </div>
     </footer>
 

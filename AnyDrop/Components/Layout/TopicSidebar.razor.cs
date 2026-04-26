@@ -17,6 +17,9 @@ public partial class TopicSidebar : IAsyncDisposable
     [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
 
+    // 由 MainLayout 通过 CascadingValue 提供，触发布局层 Modal（避免 backdrop-filter 限制）
+    [CascadingParameter(Name = "OpenCreateTopicModal")] public Action? OpenCreateTopicModal { get; set; }
+
     private readonly List<TopicDto> _topics = [];
     private HubConnection? _hubConnection;
     private IDisposable? _topicsUpdatedSubscription;
@@ -26,16 +29,13 @@ public partial class TopicSidebar : IAsyncDisposable
     // 排序错误提示
     private string? _error;
 
-    // Modal 状态
-    private bool _showCreateModal;
-    private string _newTopicName = string.Empty;
-    private string? _modalError;
-    private ElementReference _modalInputRef;
-
     // 已归档主题下拉状态
     private bool _showArchivedDropdown;
     private readonly List<TopicDto> _archivedTopics = [];
     private string _nickname = "用户";
+
+    // 未读通知：记录收到新消息但未查看的主题 ID
+    private readonly HashSet<Guid> _unreadTopicIds = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,52 +88,10 @@ public partial class TopicSidebar : IAsyncDisposable
         }
     }
 
-    private void OpenCreateModal()
-    {
-        _newTopicName = string.Empty;
-        _modalError = null;
-        _showCreateModal = true;
-    }
-
-    private void CloseCreateModal()
-    {
-        _showCreateModal = false;
-        _newTopicName = string.Empty;
-        _modalError = null;
-    }
-
-    private async Task CreateTopicAsync()
-    {
-        _modalError = null;
-
-        var normalizedName = _newTopicName.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 100)
-        {
-            _modalError = "主题名称不能为空，且不超过 100 个字符";
-            return;
-        }
-
-        try
-        {
-            var topic = await TopicService.CreateTopicAsync(new CreateTopicRequest(normalizedName));
-            _newTopicName = string.Empty;
-            _showCreateModal = false;
-            await LoadTopicsAsync();
-            _selectedTopicId = topic.Id;
-            await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
-            await TopicStateService.NotifyTopicsChangedAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to create topic");
-            _modalError = "创建主题失败";
-        }
-    }
-
     private async Task SelectTopicAsync(Guid topicId)
     {
         _selectedTopicId = topicId;
+        _unreadTopicIds.Remove(topicId);
         await TopicStateService.SetSelectedTopicAsync(topicId);
         await InvokeAsync(StateHasChanged);
     }
@@ -225,8 +183,24 @@ public partial class TopicSidebar : IAsyncDisposable
 
         _topicsUpdatedSubscription = _hubConnection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", async topics =>
         {
+            // 对比旧列表，检测非活动主题是否有新消息（LastMessageAt 更新）
+            var previousLastMessageAt = _topics.ToDictionary(t => t.Id, t => t.LastMessageAt);
+
             _topics.Clear();
             _topics.AddRange(topics);
+
+            foreach (var topic in _topics)
+            {
+                if (topic.Id == _selectedTopicId) continue;
+                if (!topic.LastMessageAt.HasValue) continue;
+
+                var hadPrevious = previousLastMessageAt.TryGetValue(topic.Id, out var prev);
+                // 若是新主题或消息时间更新，则标记为未读
+                if (!hadPrevious || prev is null || topic.LastMessageAt > prev)
+                {
+                    _unreadTopicIds.Add(topic.Id);
+                }
+            }
 
             // 若已归档下拉列表正在显示，也同步刷新已归档主题列表
             if (_showArchivedDropdown)
@@ -261,6 +235,8 @@ public partial class TopicSidebar : IAsyncDisposable
         return InvokeAsync(() =>
         {
             _selectedTopicId = TopicStateService.SelectedTopicId;
+            if (_selectedTopicId.HasValue)
+                _unreadTopicIds.Remove(_selectedTopicId.Value);
             StateHasChanged();
         });
     }
