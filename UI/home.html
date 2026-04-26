@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AnyDrop Desktop Redesign</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<style data-purpose="custom-styles">
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border-right: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .message-bubble {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.4);
+        }
+        
+        .chat-input-shadow {
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.08);
+            border-radius: 4px;
+        }
+        
+        .main-content-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .active-session-gradient {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+        }
+
+        .premium-accent {
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
+        }
+    </style>
+</head>
+<body class="flex h-screen text-slate-800 antialiased p-0">
+<!-- BEGIN: Sidebar -->
+<aside class="glass-sidebar w-72 flex flex-col justify-between h-full z-10 relative">
+<!-- Top Section: Logo & New -->
+<div class="p-6 flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="premium-accent text-white p-2 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+<i class="fa-solid fa-right-left text-sm"></i>
+</div>
+<span class="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500">AnyDrop</span>
+</div>
+<button class="bg-white/40 hover:bg-white/60 text-slate-600 p-2.5 rounded-xl transition-all flex items-center justify-center border border-white/40 shadow-sm">
+<i class="fa-solid fa-plus text-sm"></i>
+</button>
+</div>
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-y-auto sidebar-scroll px-4 py-2">
+<!-- Sessions -->
+<div class="mb-6">
+<h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 px-3">Recent Sessions</h3>
+<!-- Session Item: Default -->
+<div class="flex items-center justify-between p-3 rounded-2xl hover:bg-white/40 cursor-pointer transition-all mb-2 group border border-transparent hover:border-white/40">
+<div class="flex items-center space-x-4">
+<div class="w-10 h-10 rounded-xl bg-white/50 flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-colors">
+<i class="fa-regular fa-message"></i>
+</div>
+<div>
+<div class="text-sm font-semibold text-slate-700">Default</div>
+<div class="text-[11px] text-slate-400">2 unread</div>
+</div>
+</div>
+<div class="text-[10px] font-medium text-slate-400">23:14</div>
+</div>
+<!-- Session Item: Photos (Active) -->
+<div class="flex items-center justify-between p-3 rounded-2xl active-session-gradient cursor-pointer mb-2 relative overflow-hidden border border-blue-200/30 shadow-sm">
+<div class="absolute left-0 top-3 bottom-3 w-1 premium-accent rounded-r-full"></div>
+<div class="flex items-center space-x-4 pl-1">
+<div class="w-10 h-10 rounded-xl premium-accent flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+<i class="fa-solid fa-message text-xs"></i>
+</div>
+<div>
+<div class="text-sm font-bold text-blue-900">Photos</div>
+<div class="text-[11px] text-blue-600 font-medium italic">Active now</div>
+</div>
+</div>
+<div class="text-[10px] text-blue-600 font-bold">18:26</div>
+</div>
+</div>
+</div>
+<!-- Bottom Section: Settings & Logout -->
+<div class="p-6 space-y-2">
+<button class="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-white/40 text-slate-600 transition-all text-sm font-semibold border border-transparent hover:border-white/40">
+<i class="fa-solid fa-gear text-slate-400 w-4"></i>
+<span>Settings</span>
+</button>
+<button class="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-red-50/50 text-red-500 transition-all text-sm font-semibold border border-transparent hover:border-red-100/50">
+<i class="fa-solid fa-arrow-right-from-bracket w-4"></i>
+<span>Logout</span>
+</button>
+</div>
+</aside>
+<!-- END: Sidebar -->
+<!-- BEGIN: Main Content Area -->
+<main class="flex-1 flex flex-col relative main-content-card mt-0 overflow-hidden">
+<!-- Header -->
+<header class="h-20 flex items-center justify-between px-8 bg-white/30 backdrop-blur-sm border-b border-slate-200/40">
+<div>
+<h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Photos</h1>
+<p class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Storage Session</p>
+</div>
+<div class="flex items-center space-x-5 text-slate-400">
+<button class="hover:text-blue-600 transition-colors w-10 h-10 rounded-full hover:bg-blue-50 flex items-center justify-center">
+<i class="fa-solid fa-magnifying-glass"></i>
+</button>
+<button class="hover:text-blue-600 transition-colors w-10 h-10 rounded-full hover:bg-blue-50 flex items-center justify-center">
+<i class="fa-solid fa-ellipsis-vertical"></i>
+</button>
+</div>
+</header>
+<!-- Chat Area -->
+<div class="flex-1 overflow-y-auto p-8 pb-36">
+<!-- Message Group -->
+<div class="flex flex-col items-start mb-8">
+<!-- Message Bubble -->
+<div class="message-bubble text-white px-6 py-4 rounded-3xl rounded-tl-lg max-w-md">
+<p class="text-[15px] font-medium leading-relaxed">Content from Photos</p>
+</div>
+<!-- Timestamp -->
+<div class="flex items-center text-[11px] font-semibold text-slate-400 mt-3 space-x-2 pl-2">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-500/50"></span>
+<span>Apr 19, 2026 • 18:26</span>
+</div>
+</div>
+</div>
+<!-- Input Area -->
+<div class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-white/95 via-white/80 to-transparent pointer-events-none">
+<div class="max-w-4xl mx-auto pointer-events-auto">
+<div class="bg-white/90 backdrop-blur-xl rounded-2xl flex items-center px-4 py-3 chat-input-shadow border border-slate-200/50">
+<!-- Attachment Tools -->
+<div class="flex items-center space-x-1 text-slate-400 pr-3 border-r border-slate-100">
+<button class="hover:text-blue-600 transition-all p-2.5 rounded-xl hover:bg-blue-50" title="Image">
+<i class="fa-regular fa-image text-lg"></i>
+</button>
+<button class="hover:text-blue-600 transition-all p-2.5 rounded-xl hover:bg-blue-50" title="Attachment">
+<i class="fa-solid fa-paperclip text-lg"></i>
+</button><button class="hover:text-blue-600 transition-all p-2.5 rounded-xl hover:bg-blue-50" title="Burn After Reading">
+<i class="fa-solid fa-fire text-lg"></i>
+</button>
+</div>
+<!-- Input Field -->
+<input class="flex-1 bg-transparent border-none focus:ring-0 text-[15px] px-5 text-slate-700 placeholder-slate-400 font-medium" placeholder="Share a file or type a message..." type="text"/>
+<!-- Send Button -->
+<button class="premium-accent hover:shadow-blue-500/40 text-white w-12 h-12 rounded-xl flex items-center justify-center transition-all hover:scale-105 shadow-lg shadow-blue-500/20 flex-shrink-0 ml-2">
+<i class="fa-solid fa-paper-plane text-sm"></i>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- END: Main Content Area -->
+</body></html>
