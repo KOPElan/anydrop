@@ -327,6 +327,109 @@
         padding-bottom: var(--chat-footer-h);
     }
 
+    /* ─── 主题操作下拉菜单 ─── */
+    .topic-menu-panel {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        z-index: 60;
+        min-width: 11rem;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(20px) saturate(160%);
+        -webkit-backdrop-filter: blur(20px) saturate(160%);
+        border-radius: 0.875rem;
+        border: 1px solid rgba(203, 213, 225, 0.50);
+        box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.12);
+        padding: 0.375rem;
+        animation: menu-in 120ms ease;
+    }
+
+    @keyframes menu-in {
+        from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+        to   { opacity: 1; transform: scale(1)    translateY(0);     }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .topic-menu-panel {
+            animation: none;
+        }
+    }
+
+    .topic-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        width: 100%;
+        padding: 0.5rem 0.625rem;
+        border-radius: 0.625rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-align: left;
+        transition: background 150ms ease;
+        color: var(--color-on-surface);
+        cursor: pointer;
+    }
+
+    .topic-menu-item:hover {
+        background: rgba(59, 130, 246, 0.08);
+    }
+
+    .topic-menu-item__icon {
+        font-size: 17px;
+        color: var(--color-on-surface-variant);
+        flex-shrink: 0;
+    }
+
+    .topic-menu-item--danger {
+        color: var(--color-error);
+    }
+
+    .topic-menu-item--danger .topic-menu-item__icon {
+        color: var(--color-error);
+    }
+
+    .topic-menu-item--danger:hover {
+        background: rgba(186, 26, 26, 0.08);
+    }
+
+    .topic-menu-item--disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        color: var(--color-error);
+    }
+
+    /* ─── 菜单开关（toggle switch 样式）─── */
+    .topic-menu-toggle {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        width: 2.25rem;
+        height: 1.25rem;
+        border-radius: 9999px;
+        flex-shrink: 0;
+        transition: background 200ms ease;
+        background: rgba(0, 0, 0, 0.15);
+    }
+
+    .topic-menu-toggle--on {
+        background: var(--color-primary);
+    }
+
+    .topic-menu-toggle__knob {
+        position: absolute;
+        left: 0.2rem;
+        width: 0.875rem;
+        height: 0.875rem;
+        border-radius: 9999px;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        transition: transform 200ms ease;
+    }
+
+    .topic-menu-toggle--on .topic-menu-toggle__knob {
+        transform: translateX(1rem);
+    }
+
     /* ─── 磨砂玻璃顶栏 ─── */
     .chat-header-glass {
         background: rgba(255, 255, 255, 0.30);

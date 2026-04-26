@@ -17,6 +17,9 @@ public partial class TopicSidebar : IAsyncDisposable
     [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
 
+    // 由 MainLayout 通过 CascadingValue 提供，触发布局层 Modal（避免 backdrop-filter 限制）
+    [CascadingParameter(Name = "OpenCreateTopicModal")] public Action? OpenCreateTopicModal { get; set; }
+
     private readonly List<TopicDto> _topics = [];
     private HubConnection? _hubConnection;
     private IDisposable? _topicsUpdatedSubscription;
@@ -25,12 +28,6 @@ public partial class TopicSidebar : IAsyncDisposable
 
     // 排序错误提示
     private string? _error;
-
-    // Modal 状态
-    private bool _showCreateModal;
-    private string _newTopicName = string.Empty;
-    private string? _modalError;
-    private ElementReference _modalInputRef;
 
     // 已归档主题下拉状态
     private bool _showArchivedDropdown;
@@ -85,49 +82,6 @@ public partial class TopicSidebar : IAsyncDisposable
         catch (JSException ex)
         {
             Logger.LogWarning(ex, "JavaScript error during initSortable.");
-        }
-    }
-
-    private void OpenCreateModal()
-    {
-        _newTopicName = string.Empty;
-        _modalError = null;
-        _showCreateModal = true;
-    }
-
-    private void CloseCreateModal()
-    {
-        _showCreateModal = false;
-        _newTopicName = string.Empty;
-        _modalError = null;
-    }
-
-    private async Task CreateTopicAsync()
-    {
-        _modalError = null;
-
-        var normalizedName = _newTopicName.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 100)
-        {
-            _modalError = "主题名称不能为空，且不超过 100 个字符";
-            return;
-        }
-
-        try
-        {
-            var topic = await TopicService.CreateTopicAsync(new CreateTopicRequest(normalizedName));
-            _newTopicName = string.Empty;
-            _showCreateModal = false;
-            await LoadTopicsAsync();
-            _selectedTopicId = topic.Id;
-            await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
-            await TopicStateService.NotifyTopicsChangedAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to create topic");
-            _modalError = "创建主题失败";
         }
     }
 

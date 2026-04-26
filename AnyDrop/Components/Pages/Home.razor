@@ -42,14 +42,78 @@
                    title="搜索此主题">
                     <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
                 </a>
-                @* 主题设置按钮 *@
-                <button type="button"
-                        class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
-                        style="color: var(--color-on-surface-variant);"
-                        title="主题设置"
-                        @onclick="OpenTopicSettingsModal">
-                    <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
-                </button>
+                @* 主题操作下拉菜单 *@
+                <div class="relative">
+                    <button type="button"
+                            class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
+                            style="color: var(--color-on-surface-variant);"
+                            title="更多操作"
+                            @onclick="ToggleTopicMenu"
+                            @onclick:stopPropagation>
+                        <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
+                    </button>
+                    @* 下拉菜单面板 *@
+                    @if (_showTopicMenu)
+                    {
+                        <div class="topic-menu-panel" @onclick:stopPropagation>
+                            @* 主题信息 *@
+                            <button type="button" class="topic-menu-item" @onclick="OpenTopicInfoModal">
+                                <span class="material-symbols-outlined topic-menu-item__icon">info</span>
+                                <span class="flex-1">主题信息</span>
+                            </button>
+                            @* 置顶（带开关）*@
+                            <button type="button" class="topic-menu-item" @onclick="TogglePinCurrentTopicAsync">
+                                <span class="material-symbols-outlined topic-menu-item__icon"
+                                      style="font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
+                                <span class="flex-1">@(_selectedTopicPinned ? "取消置顶" : "置顶")</span>
+                                @* 开关状态指示 *@
+                                <span class="topic-menu-toggle @(_selectedTopicPinned ? "topic-menu-toggle--on" : "")">
+                                    <span class="topic-menu-toggle__knob"></span>
+                                </span>
+                            </button>
+                            @* 归档（带开关）*@
+                            <button type="button" class="topic-menu-item" @onclick="ArchiveCurrentTopicAsync">
+                                <span class="material-symbols-outlined topic-menu-item__icon">@(_selectedTopicArchived ? "unarchive" : "archive")</span>
+                                <span class="flex-1">@(_selectedTopicArchived ? "取消归档" : "归档")</span>
+                                <span class="topic-menu-toggle @(_selectedTopicArchived ? "topic-menu-toggle--on" : "")">
+                                    <span class="topic-menu-toggle__knob"></span>
+                                </span>
+                            </button>
+                            @* 分割线 *@
+                            <div class="my-1" style="border-top: 1px solid var(--color-outline-variant);"></div>
+                            @* 删除 *@
+                            @if (_selectedTopicIsBuiltIn)
+                            {
+                                <div class="topic-menu-item topic-menu-item--disabled"
+                                     role="menuitem" aria-disabled="true"
+                                     title="内置主题无法删除">
+                                    <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
+                                    <span class="flex-1">删除</span>
+                                    <span class="text-[10px]" style="color: var(--color-outline);">内置</span>
+                                </div>
+                            }
+                            else if (_selectedTopicMessageCount > 0)
+                            {
+                                <div class="topic-menu-item topic-menu-item--disabled"
+                                     role="menuitem" aria-disabled="true"
+                                     title="主题有消息时无法删除，请先清空或归档">
+                                    <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
+                                    <span class="flex-1">删除</span>
+                                    <span class="text-[10px]" style="color: var(--color-outline);">有内容</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <button type="button" class="topic-menu-item topic-menu-item--danger" @onclick="ConfirmDeleteCurrentTopic">
+                                    <span class="material-symbols-outlined topic-menu-item__icon">delete</span>
+                                    <span class="flex-1">删除</span>
+                                </button>
+                            }
+                        </div>
+                        @* 点击菜单外关闭 *@
+                        <div class="fixed inset-0 z-40" role="presentation" aria-hidden="true" @onclick="CloseTopicMenu"></div>
+                    }
+                </div>
             </div>
         }
     </header>
@@ -248,12 +312,12 @@
         </div>
     }
 
-    @* ─────────── 主题设置 Modal ─────────── *@
+    @* ─────────── 主题信息 Modal（仅名称和图标）─────────── *@
     @if (_showTopicSettingsModal)
     {
         <div class="modal-overlay" @onclick="CloseTopicSettingsModal">
             <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-topic-settings-title" @onclick:stopPropagation>
-                <h3 id="modal-topic-settings-title" class="modal-title">主题设置</h3>
+                <h3 id="modal-topic-settings-title" class="modal-title">主题信息</h3>
 
                 @* 改名 *@
                 <div class="mt-4">
@@ -264,7 +328,7 @@
                                maxlength="100"
                                @bind="_topicSettingsName"
                                @ref="_topicSettingsInputRef" />
-                    </div>                    
+                    </div>
                 </div>
 
                 @* 主题图标 *@
@@ -283,59 +347,16 @@
                             </button>
                         }
                     </div>
-                    <button type="button" class="btn-primary mt-2 w-full" @onclick="SaveTopicInfo">更新主题</button>
                 </div>
+
                 @if (!string.IsNullOrWhiteSpace(_topicSettingsError))
                 {
-                    <p class="mt-1 text-xs" style="color: var(--color-error);">@_topicSettingsError</p>
+                    <p class="mt-2 text-xs" style="color: var(--color-error);">@_topicSettingsError</p>
                 }
 
-                @* 分隔线 *@
-                <div class="my-4 border-t" style="border-color: var(--color-outline-variant);"></div>
-
-                @* 操作按钮 *@
-                <div class="space-y-2">
-                    @* 置顶 / 取消置顶 *@
-                    <button type="button"
-                            class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-surface-container"
-                            style="color: var(--color-on-surface-variant);"
-                            @onclick="TogglePinCurrentTopicAsync">
-                        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(_selectedTopicPinned ? "1" : "0");">bookmark</span>
-                        @(_selectedTopicPinned ? "取消置顶" : "置顶主题")
-                    </button>
-
-                    @* 归档 / 取消归档 *@
-                    <button type="button"
-                            class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-surface-container"
-                            style="color: var(--color-on-surface-variant);"
-                            @onclick="ArchiveCurrentTopicAsync">
-                        <span class="material-symbols-outlined text-base">@(_selectedTopicArchived ? "unarchive" : "archive")</span>
-                        @(_selectedTopicArchived ? "取消归档" : "归档主题")
-                    </button>
-
-                    @* 删除（仅在无内容时可操作）*@
-                    @if (_selectedTopicMessageCount == 0 && !_selectedTopicIsBuiltIn)
-                    {
-                        <button type="button"
-                                class="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-error-container/20"
-                                style="color: var(--color-error);"
-                                @onclick="ConfirmDeleteCurrentTopic">
-                            <span class="material-symbols-outlined text-base">delete</span>
-                            删除主题
-                        </button>
-                    }
-                    else if (!_selectedTopicIsBuiltIn && _selectedTopicMessageCount > 0)
-                    {
-                        <div class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm opacity-40 cursor-not-allowed"
-                             style="color: var(--color-error);" title="主题有消息时无法删除，请先归档">
-                            <span class="material-symbols-outlined text-base">delete</span>
-                            删除主题（有内容，不可删除）
-                        </div>
-                    }
-                </div>
-
                 <div class="modal-actions mt-4">
-                    <button type="button" class="btn-secondary" @onclick="CloseTopicSettingsModal">关闭</button>
+                    <button type="button" class="btn-secondary" @onclick="CloseTopicSettingsModal">取消</button>
+                    <button type="button" class="btn-primary" @onclick="SaveTopicInfo">保存</button>
                 </div>
             </div>
         </div>
@@ -379,7 +400,7 @@
                 <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
                        style="color: var(--color-on-surface-variant);"
                        title="上传附件">
-                    <span class="material-symbols-outlined text-xl">attachment</span>
+                    <span class="material-symbols-outlined text-xl">attach_file</span>
                     <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
                 </label>
                 @* 阅后即焚切换按钮 *@
@@ -419,7 +440,7 @@
                         disabled="@_isSending"
                         @onclick="SendAsync">
                     <span class="material-symbols-outlined"
-                          style="font-size: 20px; font-variation-settings: 'FILL' 1;">send</span>
+                          style="font-size: 20px; font-variation-settings: 'FILL' 1;">arrow_upward</span>
                 </button>
             </div>
         </div>

@@ -1,7 +1,9 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject ITopicStateService TopicStateService
+@inject ITopicService TopicService
 
+<CascadingValue Value="@((Action)OpenCreateTopicModal)" Name="OpenCreateTopicModal">
 <div class="app-shell">
     @* 移动端遮罩层（半透明磨砂，点击关闭侧边栏）*@
     @if (_sidebarMobileOpen)
@@ -21,6 +23,34 @@
         </CascadingValue>
     </main>
 </div>
+</CascadingValue>
+
+@* 新建主题 Modal（渲染在 <aside> 外部，避免 backdrop-filter 层叠上下文限制）*@
+@if (_showCreateModal)
+{
+    <div class="modal-overlay" @onclick="CloseCreateModal">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-create-topic-layout-title" @onclick:stopPropagation>
+            <h3 id="modal-create-topic-layout-title" class="modal-title">新建主题</h3>
+            <input
+                id="layout-topic-name-input"
+                aria-label="主题名称"
+                class="mt-3 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
+                placeholder="输入主题名称（最多100字）"
+                maxlength="100"
+                @bind="_newTopicName"
+                @ref="_modalInputRef" />
+            @if (!string.IsNullOrWhiteSpace(_modalError))
+            {
+                <p class="mt-1 text-xs" style="color: var(--color-error);">@_modalError</p>
+            }
+            <div class="modal-actions mt-4">
+                <button type="button" class="btn-secondary" @onclick="CloseCreateModal">取消</button>
+                <button type="button" class="btn-primary" @onclick="CreateTopicAsync">创建</button>
+            </div>
+        </div>
+    </div>
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -30,6 +60,12 @@
 
 @code {
     private bool _sidebarMobileOpen;
+
+    // ── 新建主题 Modal（移至布局层，避免 glass-sidebar backdrop-filter 限制 position:fixed）──
+    private bool _showCreateModal;
+    private string _newTopicName = string.Empty;
+    private string? _modalError;
+    private ElementReference _modalInputRef;
 
     protected override void OnInitialized()
     {
@@ -53,6 +89,50 @@
         // 移动端选中主题后自动关闭侧边栏
         _sidebarMobileOpen = false;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void OpenCreateTopicModal()
+    {
+        _newTopicName = string.Empty;
+        _modalError = null;
+        _showCreateModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseCreateModal()
+    {
+        _showCreateModal = false;
+        _newTopicName = string.Empty;
+        _modalError = null;
+    }
+
+    private async Task CreateTopicAsync()
+    {
+        _modalError = null;
+
+        var normalizedName = _newTopicName.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 100)
+        {
+            _modalError = "主题名称不能为空，且不超过 100 个字符";
+            return;
+        }
+
+        try
+        {
+            var topic = await TopicService.CreateTopicAsync(new CreateTopicRequest(normalizedName));
+            _newTopicName = string.Empty;
+            _showCreateModal = false;
+            await TopicStateService.SetSelectedTopicAsync(topic.Id);
+            await TopicStateService.NotifyTopicsChangedAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _modalError = "网络请求失败，请检查网络后重试。";
+        }
+        catch (Exception)
+        {
+            _modalError = "创建主题失败，请稍后重试。";
+        }
     }
 
     public void Dispose()

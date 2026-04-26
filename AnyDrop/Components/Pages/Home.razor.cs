@@ -46,12 +46,15 @@ public partial class Home : IAsyncDisposable
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
 
-    // 主题设置 Modal 状态
+    // 主题信息 Modal 状态（仅名称和图标）
     private bool _showTopicSettingsModal;
     private string _topicSettingsName = string.Empty;
     private string _topicSettingsIcon = "chat_bubble";
     private string? _topicSettingsError;
     private ElementReference _topicSettingsInputRef;
+
+    // 顶部操作下拉菜单状态
+    private bool _showTopicMenu;
 
     // 可选图标列表
     private readonly string[] _availableIcons =
@@ -320,13 +323,26 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    /// <summary>打开主题设置 Modal。</summary>
-    private void OpenTopicSettingsModal()
+    /// <summary>打开主题信息 Modal（仅名称和图标）。</summary>
+    private void OpenTopicInfoModal()
     {
         _topicSettingsName = _selectedTopicName ?? string.Empty;
         _topicSettingsIcon = _selectedTopicIcon;
         _topicSettingsError = null;
         _showTopicSettingsModal = true;
+        _showTopicMenu = false;
+    }
+
+    /// <summary>切换顶部操作下拉菜单。</summary>
+    private void ToggleTopicMenu()
+    {
+        _showTopicMenu = !_showTopicMenu;
+    }
+
+    /// <summary>关闭顶部操作下拉菜单。</summary>
+    private void CloseTopicMenu()
+    {
+        _showTopicMenu = false;
     }
 
     /// <summary>选择图标。</summary>
@@ -399,6 +415,7 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
+        _showTopicMenu = false;
         var pinning = !_selectedTopicPinned;
 
         try
@@ -431,6 +448,7 @@ public partial class Home : IAsyncDisposable
             return;
         }
 
+        _showTopicMenu = false;
         var archiving = !_selectedTopicArchived;
 
         try
@@ -469,6 +487,7 @@ public partial class Home : IAsyncDisposable
     /// <summary>显示删除主题二次确认弹窗。</summary>
     private void ConfirmDeleteCurrentTopic()
     {
+        _showTopicMenu = false;
         _showDeleteConfirmModal = true;
     }
 
