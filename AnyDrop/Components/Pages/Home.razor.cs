@@ -48,10 +48,10 @@ public partial class Home : IAsyncDisposable
 
     // 主题信息 Modal 状态（仅名称和图标）
     private bool _showTopicSettingsModal;
+    // _topicSettingsName / _topicSettingsIcon 作为 InitialName/InitialIcon 传入子组件，子组件内部管理编辑状态
     private string _topicSettingsName = string.Empty;
     private string _topicSettingsIcon = "chat_bubble";
     private string? _topicSettingsError;
-    private ElementReference _topicSettingsInputRef;
 
     // 顶部操作下拉菜单状态
     private bool _showTopicMenu;
@@ -345,62 +345,59 @@ public partial class Home : IAsyncDisposable
         _showTopicMenu = false;
     }
 
-    /// <summary>选择图标。</summary>
-    private void SelectIcon(string icon)
-    {
-        _topicSettingsIcon = icon;
-    }
-
     /// <summary>
-    /// 更新主题信息
+    /// 子组件 TopicSettingsModal 保存回调：接收编辑后的名称和图标，依次调用 API。
+    /// 使用 ValueTuple 参数与 TopicSettingsModal.SaveArgs 兼容。
     /// </summary>
-    /// <returns></returns>
-    private async Task SaveTopicInfo()
+    private async Task HandleTopicInfoSave(TopicSettingsModal.SaveArgs args)
     {
         if (!_selectedTopicId.HasValue) return;
         _topicSettingsError = null;
-        if (!string.IsNullOrEmpty(_topicSettingsIcon))
+
+        var (newName, newIcon) = (args.Name, args.Icon);
+
+        // 保存图标（如有变更）
+        if (!string.IsNullOrEmpty(newIcon) && newIcon != _selectedTopicIcon)
         {
             try
             {
-                var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(_topicSettingsIcon));
+                var result = await TopicService.UpdateTopicIconAsync(_selectedTopicId.Value, new UpdateTopicIconRequest(newIcon));
                 if (result is not null)
                 {
-                    _selectedTopicIcon = _topicSettingsIcon;
+                    _selectedTopicIcon = newIcon;
+                    _topicSettingsIcon = newIcon;
                     await TopicStateService.NotifyTopicsChangedAsync();
                 }
                 else
                 {
                     _topicSettingsError = "保存图标失败：主题不存在。";
+                    return;
                 }
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to save icon for topic {TopicId}", _selectedTopicId);
                 _topicSettingsError = "保存主题图标失败，请重试。";
+                return;
             }
         }
 
-        if (_selectedTopicName != _topicSettingsName)
+        // 保存名称（如有变更）
+        var trimmedName = newName.Trim();
+        if (!string.IsNullOrEmpty(trimmedName) && trimmedName != _selectedTopicName)
         {
-            var name = _topicSettingsName.Trim();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                _topicSettingsError = "主题名称不能为空。";
-                return;
-            }
-
             try
             {
-                await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(name));
+                await TopicService.UpdateTopicAsync(_selectedTopicId.Value, new UpdateTopicRequest(trimmedName));
                 await LoadSelectedTopicMetaAsync();
-                _topicSettingsName = _selectedTopicName ?? name;
+                _topicSettingsName = _selectedTopicName ?? trimmedName;
                 await TopicStateService.NotifyTopicsChangedAsync();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to rename topic {TopicId}", _selectedTopicId);
                 _topicSettingsError = "保存主题名称失败，请重试。";
+                return;
             }
         }
 

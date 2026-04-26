@@ -503,10 +503,9 @@
     }
 
     /* ─── 主内容区半透明卡片 ─── */
+    /* 不设 backdrop-filter，避免为子组件的 position:fixed modal 创建 containing block */
     .main-content-card {
         background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
     }
 
     @media (max-width: 768px) {

@@ -1738,8 +1738,6 @@
   }
   .main-content-card {
     background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
   }
   @media (max-width: 768px) {
     .app-shell {
