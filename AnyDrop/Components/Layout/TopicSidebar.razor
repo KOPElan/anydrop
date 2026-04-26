@@ -12,7 +12,7 @@
         </div>
         @* 新建主题按钮（触发布局层 Modal，避免 backdrop-filter 层叠上下文限制）*@
         <button type="button"
-                aria-label="新建主题"
+            aria-label="@L["Layout_CreateTopicTitle"]"
                 class="glass-btn flex items-center justify-center p-2.5 rounded-xl transition-all active:scale-90"
                 style="color: var(--color-on-surface-variant);"
                 @onclick="() => OpenCreateTopicModal?.Invoke()">
@@ -22,14 +22,14 @@
 
     @* ── 会话主题 ─────────────────────────── *@
     <div class="px-4 mb-4">
-        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">最近会话</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">@L["Sidebar_RecentSessions"]</p>
     </div>
 
     @* 主题列表 *@
     <div class="flex-1 overflow-y-auto px-4 pb-2 sidebar-scroll">
         @if (_topics.Count == 0)
         {
-            <div class="sidebar-empty-state mx-1">暂无主题</div>
+            <div class="sidebar-empty-state mx-1">@L["Sidebar_NoTopics"]</div>
         }
         else
         {
@@ -70,12 +70,12 @@
                             @* 激活时显示「Active now」；否则显示消息预览 *@
                             @if (isActive)
                             {
-                                <p class="text-[11px] font-medium italic" style="color: #3b82f6;">当前活动</p>
+                                <p class="text-[11px] font-medium italic" style="color: #3b82f6;">@L["Sidebar_ActiveNow"]</p>
                             }
                             else
                             {
                                 <div class="sidebar-item__preview @(hasUnread ? "font-semibold" : "")">
-                                    @(topic.LastMessagePreview ?? "暂无消息")
+                                    @(topic.LastMessagePreview ?? L["Sidebar_NoMessages"])
                                 </div>
                             }
                         </div>
@@ -97,7 +97,7 @@
             <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg" style="background: rgba(255,255,255,0.50);">
                 <span class="material-symbols-outlined text-sm">archive</span>
             </div>
-            <span class="flex-1 text-left">已归档</span>
+            <span class="flex-1 text-left">@L["Sidebar_Archived"]</span>
             <span class="material-symbols-outlined text-sm transition-transform @(_showArchivedDropdown ? "rotate-180" : "")">expand_more</span>
         </button>
 
@@ -107,7 +107,7 @@
             <div class="mt-1 space-y-0.5 pl-3">
                 @if (_archivedTopics.Count == 0)
                 {
-                    <div class="px-3 py-2 text-xs" style="color: var(--color-outline);">暂无归档主题</div>
+                    <div class="px-3 py-2 text-xs" style="color: var(--color-outline);">@L["Sidebar_NoArchivedTopics"]</div>
                 }
                 else
                 {
@@ -136,14 +136,14 @@
                 style="color: var(--color-on-surface-variant); border: 1px solid transparent;"
                 @onclick="OpenSettings">
             <span class="material-symbols-outlined text-base" style="color: var(--color-outline);">settings</span>
-            设置
+            @L["Sidebar_Settings"]
         </button>
         <button type="button"
                 class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all hover:bg-red-50/50 active:scale-95"
                 style="color: var(--color-error); border: 1px solid transparent;"
                 @onclick="LogoutAsync">
             <span class="material-symbols-outlined text-base">logout</span>
-            登出
+            @L["Sidebar_Logout"]
         </button>
     </div>
 </div>

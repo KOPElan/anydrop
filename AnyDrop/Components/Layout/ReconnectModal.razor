@@ -1,4 +1,6 @@
 ﻿<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
+@using AnyDrop.Resources
+@inject IStringLocalizer<SharedStrings> L
 
 <dialog id="components-reconnect-modal" data-nosnippet>
     <div class="components-reconnect-container">
@@ -7,25 +9,25 @@
             <div></div>
         </div>
         <p class="components-reconnect-first-attempt-visible">
-            Rejoining the server...
+            @L["Reconnect_Rejoining"]
         </p>
         <p class="components-reconnect-repeated-attempt-visible">
-            Rejoin failed... trying again in <span id="components-seconds-to-next-attempt"></span> seconds.
+            @L["Reconnect_RejoinFailedPrefix"] <span id="components-seconds-to-next-attempt"></span> @L["Reconnect_RejoinFailedSuffix"]
         </p>
         <p class="components-reconnect-failed-visible">
-            Failed to rejoin.<br />Please retry or reload the page.
+            @L["Reconnect_FailedToRejoin"]<br />@L["Reconnect_RetryOrReload"]
         </p>
         <button id="components-reconnect-button" class="components-reconnect-failed-visible">
-            Retry
+            @L["Common_Retry"]
         </button>
         <p class="components-pause-visible">
-            The session has been paused by the server.
+            @L["Reconnect_SessionPaused"]
         </p>
         <button id="components-resume-button" class="components-pause-visible">
-            Resume
+            @L["Common_Resume"]
         </button>
         <p class="components-resume-failed-visible">
-            Failed to resume the session.<br />Please reload the page.
+            @L["Reconnect_FailedToResume"]<br />@L["Reconnect_PleaseReload"]
         </p>
     </div>
 </dialog>

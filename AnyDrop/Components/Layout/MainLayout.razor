@@ -1,8 +1,10 @@
+@using AnyDrop.Resources
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject ITopicStateService TopicStateService
 @inject ITopicService TopicService
 @inject ILogger<MainLayout> Logger
+@inject IStringLocalizer<SharedStrings> L
 
 <CascadingValue Value="@((Action)OpenCreateTopicModal)" Name="OpenCreateTopicModal">
 <div class="app-shell">
@@ -31,13 +33,13 @@
 {
     <div class="modal-overlay" @onclick="CloseCreateModal">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-create-topic-layout-title" @onclick:stopPropagation>
-            <h3 id="modal-create-topic-layout-title" class="modal-title">新建主题</h3>
+            <h3 id="modal-create-topic-layout-title" class="modal-title">@L["Layout_CreateTopicTitle"]</h3>
             <input
                 id="layout-topic-name-input"
-                aria-label="主题名称"
+                aria-label="@L["Layout_TopicNameAriaLabel"]"
                 class="mt-3 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
                 style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
-                placeholder="输入主题名称（最多100字）"
+                placeholder="@L["Layout_TopicNamePlaceholder"]"
                 maxlength="100"
                 @bind="_newTopicName"
                 @ref="_modalInputRef" />
@@ -46,16 +48,16 @@
                 <p class="mt-1 text-xs" style="color: var(--color-error);">@_modalError</p>
             }
             <div class="modal-actions mt-4">
-                <button type="button" class="btn-secondary" @onclick="CloseCreateModal">取消</button>
-                <button type="button" class="btn-primary" @onclick="CreateTopicAsync">创建</button>
+                <button type="button" class="btn-secondary" @onclick="CloseCreateModal">@L["Common_Cancel"]</button>
+                <button type="button" class="btn-primary" @onclick="CreateTopicAsync">@L["Common_Create"]</button>
             </div>
         </div>
     </div>
 }
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    @L["Layout_UnhandledError"]
+    <a href="." class="reload">@L["Layout_Reload"]</a>
     <span class="dismiss">🗙</span>
 </div>
 
@@ -114,7 +116,7 @@
         var normalizedName = _newTopicName.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 100)
         {
-            _modalError = "主题名称不能为空，且不超过 100 个字符";
+            _modalError = L["Layout_TopicNameInvalid"];
             return;
         }
 
@@ -129,12 +131,12 @@
         catch (HttpRequestException ex)
         {
             Logger.LogWarning(ex, "Network error while creating topic '{Name}'", normalizedName);
-            _modalError = "网络请求失败，请检查网络后重试。";
+            _modalError = L["Common_NetworkFailedRetry"];
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Unexpected error while creating topic '{Name}'", normalizedName);
-            _modalError = "创建主题失败，请稍后重试。";
+            _modalError = L["Layout_CreateTopicFailed"];
         }
     }
 

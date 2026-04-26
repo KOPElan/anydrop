@@ -2,46 +2,43 @@
 @attribute [AllowAnonymous]
 @layout AuthLayout
 
-<PageTitle>登录 - AnyDrop</PageTitle>
+<PageTitle>@L["Login_PageTitle"] - AnyDrop</PageTitle>
 
 <div class="login-card">
     @* Logo *@
     <div class="flex justify-center mb-6">
         <div class="flex h-16 w-16 items-center justify-center rounded-2xl login-logo-icon">
-            <span class="material-symbols-outlined text-white" style="font-size: 32px; font-variation-settings: 'FILL' 1;">sync_alt</span>
+            <span class="material-symbols-outlined text-white login-logo-symbol">sync_alt</span>
         </div>
     </div>
 
     @* 标题 *@
     <div class="text-center mb-8">
-        <h1 class="font-headline text-3xl font-extrabold text-white mb-1">AnyDrop</h1>
-        <p class="text-sm" style="color: rgba(255,255,255,0.55);">私有跨设备内容共享平台</p>
+        <h1 class="font-headline text-3xl font-extrabold mb-1 login-title">AnyDrop</h1>
+        <p class="text-sm login-subtitle">@L["Login_Subtitle"]</p>
     </div>
 
-    @* 分割线 *@
-    <div class="mb-6" style="border-top: 1px solid rgba(255,255,255,0.12);"></div>
-
-    <p class="text-sm text-center mb-5" style="color: rgba(255,255,255,0.70);">输入密码继续使用</p>
+    <p class="text-sm text-center mb-5 login-prompt">@L["Login_Prompt"]</p>
 
     <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync" FormName="login" @onsubmit:preventDefault class="space-y-4">
         <DataAnnotationsValidator />
 
         @* 密码输入框 *@
         <div class="relative">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">lock</span>
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined login-input-icon">lock</span>
             <InputText @bind-Value="_model.Password"
                        type="password"
                        class="login-input w-full pl-11 pr-4 py-3 rounded-2xl text-sm"
-                       placeholder="请输入密码"
-                       aria-label="密码" />
+                       placeholder="@L["Login_PasswordPlaceholder"]"
+                       aria-label="@L["Login_PasswordAriaLabel"]" />
         </div>
 
         @* 错误提示 *@
         @if (!string.IsNullOrWhiteSpace(_error))
         {
-            <div class="flex items-center gap-2 rounded-xl px-4 py-2.5" style="background: rgba(186,26,26,0.18); border: 1px solid rgba(186,26,26,0.35);">
-                <span class="material-symbols-outlined text-sm" style="font-size: 16px; color: rgba(255,100,100,0.9);">error</span>
-                <p class="text-sm" style="color: rgba(255,160,160,0.95);">@_error</p>
+            <div class="login-error flex items-center gap-2 rounded-xl px-4 py-2.5">
+                <span class="material-symbols-outlined text-sm login-error-icon">error</span>
+                <p class="text-sm login-error-text">@_error</p>
             </div>
         }
 
@@ -52,13 +49,13 @@
             @if (_submitting)
             {
                 <span class="flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined animate-spin text-sm" style="font-size: 16px;">progress_activity</span>
-                    登录中…
+                    <span class="material-symbols-outlined animate-spin text-sm login-spinner-icon">progress_activity</span>
+                    @L["Login_Submitting"]
                 </span>
             }
             else
             {
-                <span>登 录</span>
+                <span>@L["Login_Submit"]</span>
             }
         </button>
     </EditForm>

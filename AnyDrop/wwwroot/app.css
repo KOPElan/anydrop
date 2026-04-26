@@ -617,7 +617,28 @@
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        background: linear-gradient(135deg, #0a0f2e 0%, #0050cb 55%, #0a84ff 100%);
+        /* 认证页浅色氛围，与首页保持同一视觉家族 */
+        background:
+            radial-gradient(circle at 12% 18%, rgba(0, 80, 203, 0.12) 0%, transparent 44%),
+            radial-gradient(circle at 85% 82%, rgba(66, 92, 160, 0.10) 0%, transparent 42%),
+            linear-gradient(135deg, #eef3ff 0%, #f7f9ff 45%, #f3f6fb 100%);
+    }
+
+    /* 轻纹理层，避免平面化背景 */
+    .login-shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(115deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.15)),
+            repeating-linear-gradient(
+                -45deg,
+                rgba(194, 198, 216, 0.10) 0,
+                rgba(194, 198, 216, 0.10) 1px,
+                transparent 1px,
+                transparent 12px
+            );
+        pointer-events: none;
     }
 
     .login-body {
@@ -629,51 +650,80 @@
     }
 
     .login-card {
-        background: rgba(255, 255, 255, 0.10);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 1.5rem;
-        padding: 2rem;
-        box-shadow: 0 32px 64px rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(24px) saturate(160%);
-        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(194, 198, 216, 0.65);
+        border-radius: 1.75rem;
+        padding: 2.25rem;
+        box-shadow:
+            0 20px 40px rgba(66, 92, 160, 0.14),
+            0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+        -webkit-backdrop-filter: blur(20px) saturate(140%);
+        backdrop-filter: blur(20px) saturate(140%);
         animation: login-card-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
     .login-logo-icon {
-        background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        border: 1px solid rgba(0, 80, 203, 0.2);
+        box-shadow: 0 10px 24px rgba(0, 80, 203, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+    }
+
+    .login-logo-symbol {
+        font-size: 32px;
+        font-variation-settings: 'FILL' 1;
+    }
+
+    .login-title {
+        color: var(--color-on-surface);
+    }
+
+    .login-subtitle {
+        color: var(--color-on-surface-variant);
+        opacity: 0.8;
+    }
+
+    .login-divider {
+        border-top: 1px solid rgba(194, 198, 216, 0.65);
+    }
+
+    .login-prompt {
+        color: var(--color-on-surface-variant);
     }
 
     .login-input {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(194, 198, 216, 0.9);
+        color: var(--color-on-surface);
         outline: none;
         transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
     }
 
     .login-input::placeholder {
-        color: rgba(255, 255, 255, 0.35);
+        color: rgba(66, 70, 86, 0.52);
+    }
+
+    .login-input-icon {
+        font-size: 18px;
+        color: rgba(66, 70, 86, 0.55);
     }
 
     .login-input:focus {
-        border-color: rgba(255, 255, 255, 0.6);
-        background: rgba(255, 255, 255, 0.14);
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+        border-color: rgba(0, 80, 203, 0.55);
+        background: rgba(255, 255, 255, 1);
+        box-shadow: 0 0 0 3px rgba(0, 80, 203, 0.14);
     }
 
     .login-btn {
-        background: white;
-        color: var(--color-primary);
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        color: var(--color-on-primary);
         font-weight: 600;
         letter-spacing: 0.025em;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 22px rgba(0, 80, 203, 0.3);
     }
 
     .login-btn:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 12px 28px rgba(0, 80, 203, 0.34);
     }
 
     .login-btn:active:not(:disabled) {
@@ -685,29 +735,47 @@
         cursor: not-allowed;
     }
 
+    .login-spinner-icon {
+        font-size: 16px;
+    }
+
+    .login-error {
+        background: var(--color-error-container);
+        border: 1px solid rgba(186, 26, 26, 0.25);
+    }
+
+    .login-error-icon {
+        font-size: 16px;
+        color: var(--color-error);
+    }
+
+    .login-error-text {
+        color: #8b1b1b;
+    }
+
     .login-glow {
         position: absolute;
         border-radius: 50%;
-        filter: blur(60px);
-        opacity: 0.35;
+        filter: blur(96px);
+        opacity: 0.5;
         pointer-events: none;
     }
 
     .login-glow--1 {
-        width: 500px;
-        height: 500px;
-        background: radial-gradient(circle, #0066ff, transparent);
-        top: -150px;
-        right: -100px;
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(0, 102, 255, 0.24), transparent 70%);
+        top: -200px;
+        right: -150px;
     }
 
     .login-glow--2 {
-        width: 400px;
-        height: 400px;
-        background: radial-gradient(circle, #0050cb, transparent);
-        bottom: -100px;
-        left: -80px;
-        opacity: 0.25;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(66, 92, 160, 0.22), transparent 72%);
+        bottom: -150px;
+        left: -100px;
+        opacity: 0.38;
     }
 
     /* ─── spinner 动画（用于登录中状态）─── */
@@ -717,5 +785,183 @@
 
     .animate-spin {
         animation: spin 1s linear infinite;
+    }
+
+    /* ─── 设置页卡片 ─── */
+    .settings-card {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(194, 198, 216, 0.45);
+        background: rgba(255, 255, 255, 0.70);
+        backdrop-filter: blur(16px) saturate(160%);
+        -webkit-backdrop-filter: blur(16px) saturate(160%);
+        padding: 1.5rem;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .settings-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--color-on-surface);
+        font-family: var(--font-headline);
+    }
+
+    /* ─── Setup 认证表单（浅色主题）─── */
+    .setup-card {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(194, 198, 216, 0.65);
+        background: rgba(255, 255, 255, 0.88);
+        -webkit-backdrop-filter: blur(18px) saturate(145%);
+        backdrop-filter: blur(18px) saturate(145%);
+        padding: 1.5rem;
+        box-shadow: 0 16px 36px rgba(66, 92, 160, 0.14);
+    }
+
+    .setup-title {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+        font-weight: 700;
+        color: var(--color-on-surface);
+        font-family: var(--font-headline);
+    }
+
+    .setup-subtitle {
+        color: var(--color-on-surface-variant);
+    }
+
+    .auth-label {
+        color: var(--color-on-surface-variant);
+    }
+
+    .auth-input {
+        border: 1px solid rgba(194, 198, 216, 0.9);
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--color-on-surface);
+        outline: none;
+        transition: border-color 200ms ease, box-shadow 200ms ease;
+    }
+
+    .auth-input:focus {
+        border-color: rgba(0, 80, 203, 0.55);
+        box-shadow: 0 0 0 3px rgba(0, 80, 203, 0.14);
+    }
+
+    .auth-submit-btn {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        color: var(--color-on-primary);
+        transition: transform 180ms ease, box-shadow 180ms ease;
+        box-shadow: 0 8px 20px rgba(0, 80, 203, 0.28);
+    }
+
+    .auth-submit-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(0, 80, 203, 0.32);
+    }
+
+    .auth-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .auth-error-text {
+        color: var(--color-error);
+    }
+
+    .settings-label {
+        display: block;
+        margin-bottom: 0.375rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--color-on-surface-variant);
+    }
+
+    .settings-input {
+        border-radius: 0.75rem;
+        border: 1px solid var(--color-outline-variant);
+        background: var(--color-surface-container-lowest);
+        color: var(--color-on-surface);
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+        outline: none;
+        transition: border-color 180ms ease, box-shadow 180ms ease;
+        appearance: auto;
+    }
+
+    .settings-input:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(0, 80, 203, 0.12);
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    /* ─── 搜索结果统一消息卡片 ─── */
+    .search-msg-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        border-radius: 1rem;
+        padding: 0.75rem;
+        background: var(--color-surface-container-lowest);
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .search-msg-card:hover {
+        background: rgba(255, 255, 255, 0.85);
+        border-color: rgba(194, 198, 216, 0.5);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .search-msg-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.625rem;
+        margin-top: 0.125rem;
+        background: var(--color-primary-fixed);
+        color: var(--color-primary);
+    }
+
+    .search-msg-content {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .search-msg-text {
+        font-size: 0.875rem;
+        color: var(--color-on-surface);
+        line-height: 1.55;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-words;
+    }
+
+    .search-msg-meta {
+        margin-top: 0.3rem;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        color: var(--color-primary);
+    }
+
+    .search-msg-arrow {
+        flex-shrink: 0;
+        align-self: center;
+        color: rgba(66, 70, 86, 0.35);
+        font-size: 1.125rem;
+        transition: color 150ms ease;
+    }
+
+    .search-msg-card:hover .search-msg-arrow {
+        color: var(--color-primary);
     }
 }

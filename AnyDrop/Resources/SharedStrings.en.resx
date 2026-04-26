@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Navigation -->
+  <data name="Nav_Settings"><value>Settings</value></data>
+  <data name="Nav_Back"><value>Back</value></data>
+
+  <!-- Settings Page -->
+  <data name="Settings_Title"><value>Settings</value></data>
+  <data name="Settings_Account"><value>Account</value></data>
+  <data name="Settings_Nickname"><value>Nickname</value></data>
+  <data name="Settings_SaveNickname"><value>Save Nickname</value></data>
+  <data name="Settings_ChangePassword"><value>Change Password</value></data>
+  <data name="Settings_CurrentPassword"><value>Current Password</value></data>
+  <data name="Settings_NewPassword"><value>New Password</value></data>
+  <data name="Settings_ConfirmPassword"><value>Confirm New Password</value></data>
+  <data name="Settings_UpdatePassword"><value>Update Password</value></data>
+  <data name="Settings_Security"><value>System Settings</value></data>
+  <data name="Settings_AutoFetchLink"><value>Auto-fetch link previews</value></data>
+  <data name="Settings_BurnDuration"><value>Burn-after-reading duration (minutes)</value></data>
+  <data name="Settings_BurnDurationHint"><value>Default retention in minutes for burn-after-reading messages (1–43200)</value></data>
+  <data name="Settings_Timezone"><value>Display timezone</value></data>
+  <data name="Settings_TimezoneHint"><value>All message timestamps will be shown in the selected timezone</value></data>
+  <data name="Settings_Language"><value>Interface language</value></data>
+  <data name="Settings_SaveSecurity"><value>Save Settings</value></data>
+  <data name="Settings_NicknameSaved"><value>Nickname updated.</value></data>
+  <data name="Settings_PasswordUpdated"><value>Password updated.</value></data>
+  <data name="Settings_SecuritySaved"><value>Settings saved.</value></data>
+  <data name="Settings_SaveNicknameFailed"><value>Failed to save nickname.</value></data>
+  <data name="Settings_UpdatePasswordFailed"><value>Failed to update password.</value></data>
+  <data name="Settings_SaveSecurityFailed"><value>Failed to save settings.</value></data>
+
+  <!-- Login Page -->
+  <data name="Login_Title"><value>AnyDrop</value></data>
+  <data name="Login_Subtitle"><value>Private cross-device content sharing</value></data>
+  <data name="Login_Prompt"><value>Enter your password to continue</value></data>
+  <data name="Login_PasswordPlaceholder"><value>Password</value></data>
+  <data name="Login_Submit"><value>Sign In</value></data>
+  <data name="Login_Submitting"><value>Signing in…</value></data>
+
+  <!-- Language Options -->
+  <data name="Lang_ZhCN"><value>简体中文</value></data>
+  <data name="Lang_ZhTW"><value>繁體中文</value></data>
+  <data name="Lang_En"><value>English</value></data>
+
+  <!-- Common -->
+  <data name="Common_Cancel"><value>Cancel</value></data>
+  <data name="Common_Save"><value>Save</value></data>
+  <data name="Common_Create"><value>Create</value></data>
+  <data name="Common_Retry"><value>Retry</value></data>
+  <data name="Common_Resume"><value>Resume</value></data>
+  <data name="Common_LoadMore"><value>Load More</value></data>
+  <data name="Common_Loading"><value>Loading...</value></data>
+  <data name="Common_Download"><value>Download</value></data>
+  <data name="Common_Delete"><value>Delete</value></data>
+  <data name="Common_NetworkFailedRetry"><value>Network request failed. Please check your network and try again.</value></data>
+
+  <!-- Login -->
+  <data name="Login_PageTitle"><value>Login</value></data>
+  <data name="Login_PasswordAriaLabel"><value>Password</value></data>
+  <data name="Login_InvalidCredentials"><value>Invalid account or password.</value></data>
+  <data name="Login_FailedRetry"><value>Login failed. Please try again later.</value></data>
+
+  <!-- Setup -->
+  <data name="Setup_PageTitle"><value>Setup</value></data>
+  <data name="Setup_Title"><value>Initial Setup</value></data>
+  <data name="Setup_Subtitle"><value>Create the only administrator account.</value></data>
+  <data name="Setup_Nickname"><value>Nickname</value></data>
+  <data name="Setup_Password"><value>Password</value></data>
+  <data name="Setup_ConfirmPassword"><value>Confirm Password</value></data>
+  <data name="Setup_Submit"><value>Create and Sign In</value></data>
+  <data name="Setup_FailedRetry"><value>Setup failed. Please try again later.</value></data>
+
+  <!-- Layout -->
+  <data name="Layout_CreateTopicTitle"><value>Create Topic</value></data>
+  <data name="Layout_TopicNameAriaLabel"><value>Topic Name</value></data>
+  <data name="Layout_TopicNamePlaceholder"><value>Enter topic name (max 100 chars)</value></data>
+  <data name="Layout_UnhandledError"><value>An unhandled error has occurred.</value></data>
+  <data name="Layout_Reload"><value>Reload</value></data>
+  <data name="Layout_TopicNameInvalid"><value>Topic name is required and must be no more than 100 characters.</value></data>
+  <data name="Layout_CreateTopicFailed"><value>Failed to create topic. Please try again later.</value></data>
+
+  <!-- Sidebar -->
+  <data name="Sidebar_RecentSessions"><value>Recent Sessions</value></data>
+  <data name="Sidebar_NoTopics"><value>No topics yet</value></data>
+  <data name="Sidebar_ActiveNow"><value>Active now</value></data>
+  <data name="Sidebar_NoMessages"><value>No messages</value></data>
+  <data name="Sidebar_Archived"><value>Archived</value></data>
+  <data name="Sidebar_NoArchivedTopics"><value>No archived topics</value></data>
+  <data name="Sidebar_Settings"><value>Settings</value></data>
+  <data name="Sidebar_Logout"><value>Logout</value></data>
+  <data name="Sidebar_DefaultUser"><value>User</value></data>
+  <data name="Sidebar_ReorderFailedRollback"><value>Failed to update order. Rolled back.</value></data>
+
+  <!-- Topic Modal -->
+  <data name="TopicModal_Title"><value>Topic Info</value></data>
+  <data name="TopicModal_Name"><value>Topic Name</value></data>
+  <data name="TopicModal_Icon"><value>Topic Icon</value></data>
+
+  <!-- Error/NotFound -->
+  <data name="Error_PageTitle"><value>Error</value></data>
+  <data name="Error_Title"><value>Error.</value></data>
+  <data name="Error_Description"><value>An error occurred while processing your request.</value></data>
+  <data name="Error_RequestId"><value>Request ID:</value></data>
+  <data name="Error_DevelopmentMode"><value>Development Mode</value></data>
+  <data name="Error_DevelopmentHint"><value>Switching to Development environment will display more detailed error information.</value></data>
+  <data name="Error_ProductionWarning"><value>The Development environment should not be enabled for deployed applications, as it may expose sensitive exception details. For local debugging, set ASPNETCORE_ENVIRONMENT=Development and restart the app.</value></data>
+  <data name="NotFound_Title"><value>Not Found</value></data>
+  <data name="NotFound_Description"><value>Sorry, the content you are looking for does not exist.</value></data>
+
+  <!-- Reconnect -->
+  <data name="Reconnect_Rejoining"><value>Rejoining the server...</value></data>
+  <data name="Reconnect_RejoinFailedPrefix"><value>Rejoin failed... trying again in</value></data>
+  <data name="Reconnect_RejoinFailedSuffix"><value>seconds.</value></data>
+  <data name="Reconnect_FailedToRejoin"><value>Failed to rejoin.</value></data>
+  <data name="Reconnect_RetryOrReload"><value>Please retry or reload the page.</value></data>
+  <data name="Reconnect_SessionPaused"><value>The session has been paused by the server.</value></data>
+  <data name="Reconnect_FailedToResume"><value>Failed to resume the session.</value></data>
+  <data name="Reconnect_PleaseReload"><value>Please reload the page.</value></data>
+
+  <!-- Home -->
+  <data name="Home_OpenMenu"><value>Open menu</value></data>
+  <data name="Home_SelectTopic"><value>Select topic</value></data>
+  <data name="Home_SessionStorage"><value>Storage Session</value></data>
+  <data name="Home_SearchTopic"><value>Search this topic</value></data>
+  <data name="Home_MoreActions"><value>More actions</value></data>
+  <data name="Home_TopicInfo"><value>Topic Info</value></data>
+  <data name="Home_Unpin"><value>Unpin</value></data>
+  <data name="Home_Pin"><value>Pin</value></data>
+  <data name="Home_Unarchive"><value>Unarchive</value></data>
+  <data name="Home_Archive"><value>Archive</value></data>
+  <data name="Home_BuiltInCannotDelete"><value>Built-in topic cannot be deleted</value></data>
+  <data name="Home_BuiltInTag"><value>Built-in</value></data>
+  <data name="Home_NotEmptyCannotDelete"><value>Topic with messages cannot be deleted. Please clear or archive first.</value></data>
+  <data name="Home_HasContentTag"><value>Has Content</value></data>
+  <data name="Home_EmptySelectTopic"><value>Please select a topic from the left first</value></data>
+  <data name="Home_EmptySendFirst"><value>No content yet. Send the first message.</value></data>
+  <data name="Home_Link"><value>Link</value></data>
+  <data name="Home_OpenLink"><value>Open Link</value></data>
+  <data name="Home_Image"><value>Image</value></data>
+  <data name="Home_Video"><value>Video</value></data>
+  <data name="Home_File"><value>File</value></data>
+  <data name="Home_DropToSend"><value>Release to send file</value></data>
+  <data name="Home_ImagePreview"><value>Image preview</value></data>
+  <data name="Home_ConfirmDeleteTitle"><value>Confirm Delete Topic</value></data>
+  <data name="Home_ConfirmDeleteMessage"><value>Are you sure you want to delete topic "{0}"? This action cannot be undone.</value></data>
+  <data name="Home_ConfirmDeleteAction"><value>Confirm Delete</value></data>
+  <data name="Home_UploadImageOrVideo"><value>Upload image or video</value></data>
+  <data name="Home_UploadAttachment"><value>Upload attachment</value></data>
+  <data name="Home_BurnOnHint"><value>Burn-after-reading enabled (auto delete after 10 minutes)</value></data>
+  <data name="Home_BurnOffHint"><value>Enable burn-after-reading</value></data>
+  <data name="Home_InputPlaceholder"><value>Type a message, or drag files into chat... (Ctrl+Enter to send)</value></data>
+  <data name="Home_MessageRequired"><value>Message cannot be empty.</value></data>
+  <data name="Home_SelectTopicFirst"><value>Please select a topic first.</value></data>
+  <data name="Home_MessageTooLong"><value>Message cannot exceed 10,000 characters.</value></data>
+  <data name="Home_SaveIconTopicNotFound"><value>Failed to save icon: topic not found.</value></data>
+  <data name="Home_SaveIconFailed"><value>Failed to save topic icon. Please try again.</value></data>
+  <data name="Home_SaveTopicNameFailed"><value>Failed to save topic name. Please try again.</value></data>
+  <data name="Home_PinFailed"><value>Pin action failed. Please try again.</value></data>
+  <data name="Home_ArchiveFailed"><value>Archive action failed. Please try again.</value></data>
+  <data name="Home_DeleteFailed"><value>Delete failed. Please try again.</value></data>
+  <data name="Home_FileTooLargeSkipped"><value>File "{0}" exceeds max allowed size and was skipped.</value></data>
+  <data name="Home_FileUploadFailed"><value>Failed to upload file "{0}". Please try again.</value></data>
+  <data name="Home_DropFileUploadFailed"><value>File upload failed. Please try again.</value></data>
+  <data name="Home_ExpiringSoon"><value>Deleting soon</value></data>
+  <data name="Home_DeleteAfterMinutes"><value>Delete in {0} min</value></data>
+  <data name="Home_DeleteAfterSeconds"><value>Delete in {0} sec</value></data>
+
+  <!-- Search -->
+  <data name="Search_PageTitle"><value>Search · {0}</value></data>
+  <data name="Search_DefaultTopicName"><value>Topic</value></data>
+  <data name="Search_BackToChat"><value>Back to chat</value></data>
+  <data name="Search_Title"><value>Search</value></data>
+  <data name="Search_Tab_Text"><value>Text</value></data>
+  <data name="Search_Tab_Date"><value>Date</value></data>
+  <data name="Search_Tab_Image"><value>Image</value></data>
+  <data name="Search_Tab_Video"><value>Video</value></data>
+  <data name="Search_Tab_File"><value>File</value></data>
+  <data name="Search_Tab_Link"><value>Link</value></data>
+  <data name="Search_InputPlaceholder"><value>Search message content...</value></data>
+  <data name="Search_Action"><value>Search</value></data>
+  <data name="Search_Hint"><value>Type a keyword and press Enter or click "Search"</value></data>
+  <data name="Search_NoResults"><value>No messages found containing "{0}"</value></data>
+  <data name="Search_ResultCount"><value>{0} results</value></data>
+  <data name="Search_ResultSuffixPartial"><value> (showing latest part)</value></data>
+  <data name="Search_DateBack7Days"><value>Back 7 days</value></data>
+  <data name="Search_DateForward7Days"><value>Forward 7 days</value></data>
+  <data name="Search_PickDate"><value>Select date</value></data>
+  <data name="Search_DateMessageCount"><value>{0} messages</value></data>
+  <data name="Search_DateHint"><value>Click a date to view all messages on that day</value></data>
+  <data name="Search_NoMessagesOnDate"><value>No messages on {0}</value></data>
+  <data name="Search_ViewInChat"><value>View in chat</value></data>
+  <data name="Search_NoImages"><value>No images in this topic</value></data>
+  <data name="Search_NoVideos"><value>No videos in this topic</value></data>
+  <data name="Search_NoFiles"><value>No files in this topic</value></data>
+  <data name="Search_NoLinks"><value>No links in this topic</value></data>
+  <data name="Search_ImagePreview"><value>Image preview</value></data>
+  <data name="Search_Today"><value>Today</value></data>
+  <data name="Search_Yesterday"><value>Yesterday</value></data>
+</root>

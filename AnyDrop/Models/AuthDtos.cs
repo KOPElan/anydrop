@@ -14,9 +14,17 @@ public sealed record UpdateNicknameRequest(string Nickname);
 
 public sealed record UpdatePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
 
-public sealed record SecuritySettingsDto(bool AutoFetchLinkPreview);
+public sealed record SecuritySettingsDto(
+    bool AutoFetchLinkPreview,
+    string TimeZoneId,
+    int BurnAfterReadingMinutes,
+    string Language);
 
-public sealed record UpdateSecuritySettingsRequest(bool AutoFetchLinkPreview);
+public sealed record UpdateSecuritySettingsRequest(
+    bool AutoFetchLinkPreview,
+    string TimeZoneId,
+    int BurnAfterReadingMinutes,
+    string Language);
 
 public sealed record SetupStatusDto(bool RequiresSetup);
 

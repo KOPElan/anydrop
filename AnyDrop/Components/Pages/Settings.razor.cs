@@ -1,4 +1,6 @@
+using AnyDrop.Resources;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Text.Json;
 
@@ -8,14 +10,21 @@ public partial class Settings
 {
     [Inject] public required IJSRuntime JSRuntime { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     private string _nickname = string.Empty;
     private string _currentPassword = string.Empty;
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
     private bool _autoFetchLinkPreview = true;
+    private int _burnAfterReadingMinutes = 10;
+    private string _timeZoneId = "UTC";
+    private string _language = "zh-CN";
     private string? _message;
     private string? _error;
+
+    // 所有可用系统时区列表，在 OnAfterRenderAsync 中加载
+    private IReadOnlyList<TimeZoneInfo> _systemTimeZones = [];
 
     /// <summary>返回首页。</summary>
     private void GoBack() => NavigationManager.NavigateTo("/");
@@ -27,6 +36,7 @@ public partial class Settings
             return;
         }
 
+        _systemTimeZones = [.. TimeZoneInfo.GetSystemTimeZones()];
         await LoadAsync();
         await InvokeAsync(StateHasChanged);
     }
@@ -41,10 +51,25 @@ public partial class Settings
         }
 
         var security = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/settings/security");
-        if (security.ok && security.body?.data.ValueKind == JsonValueKind.Object &&
-            security.body.data.TryGetProperty("autoFetchLinkPreview", out var autoFetch))
+        if (security.ok && security.body?.data.ValueKind == JsonValueKind.Object)
         {
-            _autoFetchLinkPreview = autoFetch.GetBoolean();
+            var data = security.body.data;
+            if (data.TryGetProperty("autoFetchLinkPreview", out var autoFetch))
+            {
+                _autoFetchLinkPreview = autoFetch.GetBoolean();
+            }
+            if (data.TryGetProperty("burnAfterReadingMinutes", out var burn))
+            {
+                _burnAfterReadingMinutes = burn.GetInt32();
+            }
+            if (data.TryGetProperty("timeZoneId", out var tz))
+            {
+                _timeZoneId = tz.GetString() ?? "UTC";
+            }
+            if (data.TryGetProperty("language", out var lang))
+            {
+                _language = lang.GetString() ?? "zh-CN";
+            }
         }
     }
 
@@ -54,11 +79,11 @@ public partial class Settings
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/profile", new { nickname = _nickname });
         if (!result.ok)
         {
-            _error = result.body?.error ?? "保存昵称失败。";
+            _error = result.body?.error ?? L["Settings_SaveNicknameFailed"];
             return;
         }
 
-        _message = "昵称已更新。";
+        _message = L["Settings_NicknameSaved"];
     }
 
     private async Task SavePasswordAsync()
@@ -73,28 +98,44 @@ public partial class Settings
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/password", payload);
         if (!result.ok)
         {
-            _error = result.body?.error ?? "更新密码失败。";
+            _error = result.body?.error ?? L["Settings_UpdatePasswordFailed"];
             return;
         }
 
         _currentPassword = string.Empty;
         _newPassword = string.Empty;
         _confirmPassword = string.Empty;
-        _message = "密码已更新。";
+        _message = L["Settings_PasswordUpdated"];
     }
 
     private async Task SaveSecurityAsync()
     {
         ResetMessages();
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security",
-            new { autoFetchLinkPreview = _autoFetchLinkPreview });
+        var payload = new
+        {
+            autoFetchLinkPreview = _autoFetchLinkPreview,
+            timeZoneId = _timeZoneId,
+            burnAfterReadingMinutes = _burnAfterReadingMinutes,
+            language = _language
+        };
+        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
         if (!result.ok)
         {
-            _error = result.body?.error ?? "保存安全设置失败。";
+            _error = result.body?.error ?? L["Settings_SaveSecurityFailed"];
             return;
         }
 
-        _message = "安全设置已更新。";
+        // 设置语言 Cookie，失败时记录提示但不阻断流程
+        var cultureResult = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/settings/set-culture",
+            new { culture = _language });
+        if (!cultureResult.ok)
+        {
+            _error = cultureResult.body?.error ?? L["Settings_SaveSecurityFailed"];
+            return;
+        }
+
+        // 强制刷新以应用新语言
+        NavigationManager.NavigateTo("/settings", forceLoad: true);
     }
 
     private void ResetMessages()

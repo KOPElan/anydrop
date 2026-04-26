@@ -1,14 +1,16 @@
+@using AnyDrop.Resources
 @* 主题信息 Modal（独立子组件，图标选择仅触发本组件重渲染，不影响 Home 消息列表性能）*@
+@inject IStringLocalizer<SharedStrings> L
 
 @if (Visible)
 {
     <div class="modal-overlay" @onclick="HandleClose">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-topic-settings-title" @onclick:stopPropagation>
-            <h3 id="modal-topic-settings-title" class="modal-title">主题信息</h3>
+            <h3 id="modal-topic-settings-title" class="modal-title">@L["TopicModal_Title"]</h3>
 
             @* 改名 *@
             <div class="mt-4">
-                <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题名称</label>
+                <label class="text-xs font-semibold text-on-surface-variant mb-1 block">@L["TopicModal_Name"]</label>
                 <input class="w-full rounded-xl border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
                        style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface);"
                        maxlength="100"
@@ -18,7 +20,7 @@
 
             @* 主题图标 *@
             <div class="mt-4">
-                <label class="text-xs font-semibold text-on-surface-variant mb-1 block">主题图标</label>
+                <label class="text-xs font-semibold text-on-surface-variant mb-1 block">@L["TopicModal_Icon"]</label>
                 <div class="grid grid-cols-6 gap-2">
                     @foreach (var icon in AvailableIcons)
                     {
@@ -40,8 +42,8 @@
             }
 
             <div class="modal-actions mt-4">
-                <button type="button" class="btn-secondary" @onclick="HandleClose">取消</button>
-                <button type="button" class="btn-primary" @onclick="HandleSave">保存</button>
+                <button type="button" class="btn-secondary" @onclick="HandleClose">@L["Common_Cancel"]</button>
+                <button type="button" class="btn-primary" @onclick="HandleSave">@L["Common_Save"]</button>
             </div>
         </div>
     </div>

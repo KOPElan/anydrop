@@ -1,9 +1,11 @@
 using AnyDrop.Models;
+using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 
 namespace AnyDrop.Components.Pages;
@@ -22,6 +24,7 @@ public partial class Home : IAsyncDisposable
     [Inject] public required ILogger<Home> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
     [CascadingParameter(Name = "ToggleMobileSidebar")] public Action? ToggleMobileSidebar { get; set; }
 
@@ -285,19 +288,19 @@ public partial class Home : IAsyncDisposable
         var trimmedText = _inputText.Trim();
         if (string.IsNullOrWhiteSpace(trimmedText))
         {
-            _validationError = "消息内容不能为空。";
+            _validationError = L["Home_MessageRequired"];
             return;
         }
 
         if (!_selectedTopicId.HasValue)
         {
-            _validationError = "请先选择主题。";
+            _validationError = L["Home_SelectTopicFirst"];
             return;
         }
 
         if (trimmedText.Length > 10_000)
         {
-            _validationError = "消息不能超过 10,000 个字符。";
+            _validationError = L["Home_MessageTooLong"];
             return;
         }
 
@@ -370,14 +373,14 @@ public partial class Home : IAsyncDisposable
                 }
                 else
                 {
-                    _topicSettingsError = "保存图标失败：主题不存在。";
+                    _topicSettingsError = L["Home_SaveIconTopicNotFound"];
                     return;
                 }
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to save icon for topic {TopicId}", _selectedTopicId);
-                _topicSettingsError = "保存主题图标失败，请重试。";
+                _topicSettingsError = L["Home_SaveIconFailed"];
                 return;
             }
         }
@@ -396,7 +399,7 @@ public partial class Home : IAsyncDisposable
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to rename topic {TopicId}", _selectedTopicId);
-                _topicSettingsError = "保存主题名称失败，请重试。";
+                _topicSettingsError = L["Home_SaveTopicNameFailed"];
                 return;
             }
         }
@@ -426,7 +429,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to pin/unpin topic {TopicId}", _selectedTopicId);
-            _validationError = "置顶操作失败，请重试。";
+            _validationError = L["Home_PinFailed"];
         }
     }
 
@@ -476,7 +479,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to archive topic {TopicId}", _selectedTopicId);
-            _validationError = "归档操作失败，请重试。";
+            _validationError = L["Home_ArchiveFailed"];
         }
     }
 
@@ -518,7 +521,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to delete topic {TopicId}", _selectedTopicId);
-            _validationError = "删除失败，请重试。";
+            _validationError = L["Home_DeleteFailed"];
         }
     }
 
@@ -526,7 +529,7 @@ public partial class Home : IAsyncDisposable
     {
         if (!_selectedTopicId.HasValue)
         {
-            _validationError = "请先选择主题。";
+            _validationError = L["Home_SelectTopicFirst"];
             return;
         }
 
@@ -543,12 +546,12 @@ public partial class Home : IAsyncDisposable
             }
             catch (IOException ex) when (ex.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
             {
-                _validationError = $"文件\"{file.Name}\"超过最大允许大小，已跳过。";
+                _validationError = L["Home_FileTooLargeSkipped", file.Name];
                 StateHasChanged();
             }
             catch (Exception)
             {
-                _validationError = $"文件\"{file.Name}\"上传失败，请重试。";
+                _validationError = L["Home_FileUploadFailed", file.Name];
                 StateHasChanged();
             }
         }
@@ -575,7 +578,7 @@ public partial class Home : IAsyncDisposable
     {
         if (!_selectedTopicId.HasValue)
         {
-            _validationError = "请先选择主题。";
+            _validationError = L["Home_SelectTopicFirst"];
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -598,7 +601,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to receive dropped file {FileName}", fileName);
-            _validationError = "文件上传失败，请重试。";
+            _validationError = L["Home_DropFileUploadFailed"];
         }
         finally
         {
@@ -800,16 +803,16 @@ public partial class Home : IAsyncDisposable
     }
 
     /// <summary>将阅后即焚到期时间格式化为倒计时或已到期标记。</summary>
-    private static string FormatExpiry(DateTimeOffset expiresAt)
+    private string FormatExpiry(DateTimeOffset expiresAt)
     {
         var remaining = expiresAt - DateTimeOffset.UtcNow;
         if (remaining <= TimeSpan.Zero)
         {
-            return "即将删除";
+            return L["Home_ExpiringSoon"];
         }
 
         return remaining.TotalMinutes >= 1
-            ? $"{(int)remaining.TotalMinutes}分钟后删除"
-            : $"{(int)remaining.TotalSeconds}秒后删除";
+            ? L["Home_DeleteAfterMinutes", (int)remaining.TotalMinutes]
+            : L["Home_DeleteAfterSeconds", (int)remaining.TotalSeconds];
     }
 }

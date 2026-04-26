@@ -41,12 +41,13 @@ public sealed class ShareService(
 
         var isLink = IsLink(normalizedContent);
         var now = DateTimeOffset.UtcNow;
+        var burnMinutes = burnAfterReading ? await systemSettingsService.GetBurnAfterReadingMinutesAsync(ct) : 0;
         var item = new ShareItem
         {
             ContentType = isLink ? ShareContentType.Link : ShareContentType.Text,
             Content = normalizedContent,
             CreatedAt = now,
-            ExpiresAt = burnAfterReading ? now.AddMinutes(10) : null,
+            ExpiresAt = burnAfterReading ? now.AddMinutes(burnMinutes) : null,
             TopicId = topicId
         };
 
@@ -157,6 +158,7 @@ public sealed class ShareService(
         var fileSize = knownFileSize ?? (fileStream.CanSeek ? fileStream.Length : null);
 
         var now = DateTimeOffset.UtcNow;
+        var burnMinutes = burnAfterReading ? await systemSettingsService.GetBurnAfterReadingMinutesAsync(ct) : 0;
         var item = new ShareItem
         {
             ContentType = contentType,
@@ -165,7 +167,7 @@ public sealed class ShareService(
             FileSize = fileSize,
             MimeType = mimeType,
             CreatedAt = now,
-            ExpiresAt = burnAfterReading ? now.AddMinutes(10) : null,
+            ExpiresAt = burnAfterReading ? now.AddMinutes(burnMinutes) : null,
             TopicId = topicId
         };
 

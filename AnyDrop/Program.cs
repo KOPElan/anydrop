@@ -1,5 +1,5 @@
-using AnyDrop.Components;
 using AnyDrop.Api;
+using AnyDrop.Components;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Models;
@@ -7,8 +7,10 @@ using AnyDrop.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 
@@ -47,6 +49,17 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// 多语言本地化：SharedStrings 资源当前嵌入名为 AnyDrop.SharedStrings.resources，
+// 因此不设置 ResourcesPath，避免运行时按 AnyDrop.Resources.* 查找导致回退键名。
+builder.Services.AddLocalization();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture(AnyDrop.Models.SupportedLanguages.ZhCN);
+    options.SupportedCultures = AnyDrop.Models.SupportedLanguages.All.Select(c => new CultureInfo(c)).ToList();
+    options.SupportedUICultures = AnyDrop.Models.SupportedLanguages.All.Select(c => new CultureInfo(c)).ToList();
+    options.RequestCultureProviders = [new CookieRequestCultureProvider()];
+});
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
 var authOptions = builder.Configuration.GetSection("Auth").Get<AuthOptions>() ?? new AuthOptions();
@@ -179,6 +192,7 @@ else
     });
 }
 app.UseStatusCodePagesWithReExecute("/not-found");
+app.UseRequestLocalization();
 app.UseAntiforgery();
 app.UseAuthentication();
 

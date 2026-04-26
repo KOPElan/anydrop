@@ -1,9 +1,11 @@
 using AnyDrop.Models;
+using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Globalization;
 
 namespace AnyDrop.Components.Pages;
 
@@ -13,15 +15,20 @@ public partial class TopicSearch
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
+    [Inject] public required ISystemSettingsService SystemSettingsService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<TopicSearch> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     // 当前激活的标签页
     private string _activeTab = "text";
 
     // 主题名称
     private string? _topicName;
+
+    // 用于时间显示的时区
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
 
     // ─── 文字搜索 ───
     private string _searchQuery = string.Empty;
@@ -55,6 +62,7 @@ public partial class TopicSearch
     protected override async Task OnInitializedAsync()
     {
         _calendarWindowStart = CalcDefaultWindowStart();
+        _displayTimeZone = await SystemSettingsService.GetDisplayTimeZoneAsync();
         await LoadTopicNameAsync();
     }
 
@@ -277,8 +285,8 @@ public partial class TopicSearch
         {
             "image" => ShareContentType.Image,
             "video" => ShareContentType.Video,
-            "file"  => ShareContentType.File,
-            "link"  => ShareContentType.Link,
+            "file" => ShareContentType.File,
+            "link" => ShareContentType.Link,
             _ => ShareContentType.Text
         };
     }
@@ -337,17 +345,22 @@ public partial class TopicSearch
 
     // ─────────────────────────── 工具方法 ───────────────────────────
 
-    private static IEnumerable<IGrouping<DateOnly, ShareItemDto>> GroupByDate(List<ShareItemDto> items)
+    private IEnumerable<IGrouping<DateOnly, ShareItemDto>> GroupByDate(List<ShareItemDto> items)
         => items
-            .GroupBy(m => DateOnly.FromDateTime(m.CreatedAt.ToLocalTime().DateTime))
+            .GroupBy(m => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(m.CreatedAt.UtcDateTime, _displayTimeZone)))
             .OrderByDescending(g => g.Key);
 
-    private static string FormatGroupDate(DateOnly date)
+    private string FormatGroupDate(DateOnly date)
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
-        if (date == today) return "今天";
-        if (date == today.AddDays(-1)) return "昨天";
-        return date.ToString("yyyy 年 M 月 d 日");
+        if (date == today) return L["Search_Today"];
+        if (date == today.AddDays(-1)) return L["Search_Yesterday"];
+        return FormatDateLabel(date);
+    }
+
+    private static string FormatDateLabel(DateOnly date)
+    {
+        return date.ToString("d", CultureInfo.CurrentCulture);
     }
 
     private static string GetFileUrl(Guid itemId, bool download = false)
@@ -366,6 +379,9 @@ public partial class TopicSearch
         };
     }
 
-    private static string FormatMessageTime(DateTimeOffset time)
-        => time.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+    private string FormatMessageTime(DateTimeOffset time)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
+        return local.ToString("yyyy/MM/dd HH:mm");
+    }
 }

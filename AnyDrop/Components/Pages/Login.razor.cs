@@ -1,7 +1,8 @@
-using System.ComponentModel.DataAnnotations;
+using AnyDrop.Resources;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
-using Microsoft.Extensions.Logging;
+using System.ComponentModel.DataAnnotations;
 
 namespace AnyDrop.Components.Pages;
 
@@ -10,6 +11,7 @@ public partial class Login
     [Inject] public required IJSRuntime JSRuntime { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<Login> Logger { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     private readonly LoginFormModel _model = new();
     private bool _submitting;
@@ -56,7 +58,7 @@ public partial class Login
             var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/auth/login", payload);
             if (!result.ok)
             {
-                _error = result.body?.error ?? "账号或密码错误。";
+                _error = result.body?.error ?? L["Login_InvalidCredentials"];
                 return;
             }
 
@@ -65,7 +67,7 @@ public partial class Login
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Login request failed.");
-            _error = "登录失败，请稍后重试。";
+            _error = L["Login_FailedRetry"];
         }
         finally
         {
