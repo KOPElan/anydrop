@@ -1,232 +1,93 @@
-# AnyDrop — 高保真 UI 设计规范 (design.md)
+# Design System Specification: The Fluid Atmosphere
 
-> 本文档基于项目高保真设计稿，定义 AnyDrop Web 应用的设计语言、组件规范和视觉标准。
+## 1. Overview & Creative North Star
 
----
+### The Creative North Star: "Atmospheric Precision"
+This design system rejects the "boxed-in" nature of traditional desktop software. Instead, it treats the interface as a series of light-infused layers. We move away from the rigid, grid-heavy "template" look toward an **Editorial High-Tech** aesthetic. 
 
-## 1. 整体布局
-
-```
-┌────────────────────────────────────────────────────────────┐
-│  Sidebar (220px)        │  Chat Main Area (flex-1)         │
-│  ──────────────────     │  ──────────────────────────────  │
-│  Brand Header           │  ▲ Frosted Glass Header          │
-│    AnyDrop logo + [+]   │    Topic name · Search · Config  │
-│  ─────────────────────  │                                  │
-│  Sessions ─────────     │  Message List (scrollable)       │
-│    • Default   23:14    │    [blue pill bubble]            │
-│      unread             │    🕐 2026/04/19 18:26           │
-│    • Photos    18:26    │                                  │
-│      active ◀ selected  │                                  │
-│  ─────────────────────  │                                  │
-│  Devices ──────────     │  ▼ Frosted Glass Footer          │
-│    💻 Current Device    │    [📷][📎][⏱] input… [→]       │
-│       Online (green)    │                                  │
-│    📱 Phone             │                                  │
-│       Offline (gray)    │                                  │
-│  ─────────────────────  │                                  │
-│  [Settings]             │                                  │
-│  [Logout]               │                                  │
-└────────────────────────────────────────────────────────────┘
-```
+The experience is defined by **Atmospheric Precision**: the sidebar feels like a frosted window into the operating system, while the content areas utilize subtle tonal shifts rather than hard lines to define structure. By embracing intentional asymmetry—such as oversized typography headers paired with hyper-minimal action icons—we create a signature look that feels custom-tailored and premium.
 
 ---
 
-## 2. 颜色系统 (Color System)
+## 2. Colors & Surface Logic
 
-| Token | Value | 用途 |
-|-------|-------|------|
-| `--color-primary` | `#0050cb` | 主按钮、链接、激活状态、消息气泡背景 |
-| `--color-primary-container` | `#0066ff` | 渐变结束色、品牌图标 |
-| `--color-primary-fixed` | `#dae1ff` | 激活侧边栏项背景 |
-| `--color-on-primary` | `#ffffff` | 主色背景上的文字 |
-| `--color-surface` | `#f8f9fa` | 页面/聊天区背景 |
-| `--color-surface-container-low` | `#f3f4f5` | 侧边栏背景 |
-| `--color-surface-container-lowest` | `#ffffff` | 卡片/气泡背景（非文本气泡） |
-| `--color-on-surface` | `#191c1d` | 主文本色 |
-| `--color-on-surface-variant` | `#424656` | 次级文字、图标 |
-| `--color-outline` | `#727687` | 辅助文字、时间戳、分割线 |
-| `--color-outline-variant` | `#c2c6d8` | 边框 |
-| `--color-error` | `#ba1a1a` | 错误提示 |
-| `online-green` | `#22c55e` | 设备在线指示点 |
+The palette is rooted in a sophisticated range of "Cool Grays" (`surface` tiers) contrasted against a "Vibrant Digital Cobalt" (`primary`).
 
----
+### The "No-Line" Rule
+**Explicit Instruction:** Designers are prohibited from using 1px solid borders to section off the primary layout. 
+*   Boundaries must be defined by background color shifts. For example, the sessions list sits on `surface_container_low`, while the main chat area rests on the base `surface`.
+*   This creates a seamless, "liquid" transition between functional areas.
 
-## 3. 字体规范 (Typography)
+### Surface Hierarchy & Nesting
+Depth is achieved through the physical stacking of surface tokens:
+*   **Level 0 (Base):** `surface` (#f5f7fa) - The foundation of the main workspace.
+*   **Level 1 (Nesting):** `surface_container_low` (#eef1f4) - Used for secondary panels like the sessions list.
+*   **Level 2 (Interaction):** `surface_container_lowest` (#ffffff) - Used for interactive elements like the message input field or active cards to make them "pop" against the gray.
 
-| 级别 | Font | Size | Weight | 用途 |
-|------|------|------|--------|------|
-| Headline | Manrope | 16px / 18px | 800 ExtraBold | 品牌名、对话标题 |
-| Body | Inter | 14px | 400 Regular | 消息正文、输入框 |
-| Label | Inter | 12px | 600 SemiBold | 按钮标签、Section 标题 |
-| Caption | Inter | 11px / 10px | 400–700 | 时间戳、状态标签 |
+### The "Glass & Gradient" Rule
+To elevate the UI beyond a standard flat look:
+*   **Sidebar:** Utilize Glassmorphism. Apply a 20-40px `backdrop-blur` behind a semi-transparent `surface` or `surface_variant`. 
+*   **Primary Actions:** Main CTAs (like the "Send" button) should use a subtle linear gradient from `primary` (#0053cd) to `primary_container` (#789dff) at a 135-degree angle. This adds a "soul" and depth that flat hex codes cannot replicate.
 
 ---
 
-## 4. 侧边栏 (Sidebar)
+## 3. Typography
 
-### 4.1 品牌栏 (Brand Header)
-- 高度：~64px（含上下 padding）
-- 左侧：蓝色渐变圆角图标（`sync_alt` 或 `chat` icon）+ "AnyDrop" 文字
-- 右侧：`[+]` 新建主题按钮（正方形圆角，hover 背景浅灰）
+The system utilizes a dual-typeface strategy to balance editorial character with high-tech readability.
 
-### 4.2 Section 标签
-- 字号：10px，`font-bold uppercase tracking-widest`
-- 颜色：`--color-outline`
-
-### 4.3 会话主题项 (Session Item)
-```
-┌─ [icon] ─ [name] ─────────── [HH:mm] ─┐
-│           [status badge]               │
-└────────────────────────────────────────┘
-```
-- **激活状态 (active)**：
-  - 背景：`--color-primary-fixed` (`#dae1ff`)
-  - 文字：`--color-primary`，600 weight
-  - 左侧 4px 蓝色竖条指示条（pill，带弹入动画）
-  - 状态徽标：`active`（蓝色小标签）
-- **普通状态 (inactive)**：
-  - hover 背景：`--color-surface-container`
-  - hover 轻微右移 2px
-- **有未读消息 (unread)**：
-  - 状态徽标：`unread`（蓝/橙色小标签，文字加粗）
-
-### 4.4 设备列表 (Devices)
-- 在线：绿色指示点 (`#22c55e`)，"Online" 标签
-- 离线：灰色指示点，"Offline" 标签，透明度 50%
-
-### 4.5 底部按钮
-- 设置 + 登出，行高 40px，hover 背景 `--color-surface-container`
-- 登出按钮文字颜色：`--color-error`（红色）
+*   **Display & Headlines (Manrope):** This is our "Editorial" voice. Manrope’s geometric yet warm curves should be used for section headers (e.g., "Photos," "Sessions"). Use `display-md` or `headline-lg` with generous tracking to assert authority.
+*   **Interface & Data (Inter):** For everything functional—chat bubbles, device names, timestamps—use Inter. It provides maximum legibility at small scales (`body-sm` and `label-md`).
+*   **Visual Hierarchy:** Establish a high contrast between the `title-lg` headers and `label-sm` metadata. This "Big-and-Small" approach mimics high-end magazine layouts.
 
 ---
 
-## 5. 聊天主区域 (Chat Main)
+## 4. Elevation & Depth
 
-### 5.1 顶部标题栏 (Header Glass)
-- 磨砂玻璃效果：`backdrop-filter: blur(20px) saturate(180%)`
-- 背景：`rgba(248, 249, 250, 0.75)`
-- 底部边框：`rgba(194, 198, 216, 0.35)`
-- 内容：话题名（粗体）| 搜索图标 + 设置图标
+We convey hierarchy through **Tonal Layering** rather than structural scaffolding.
 
-### 5.2 消息气泡 (Message Bubbles)
+### The Layering Principle
+Do not use drop shadows for static layout elements. If a session item is "Active," do not give it a shadow; instead, change its background to `surface_container_highest` or a soft `primary_fixed_dim` with low opacity.
 
-#### 文本消息
-- 样式：蓝色 pill 气泡
-- 背景：`linear-gradient(135deg, #0050cb, #0066ff)`
-- 文字：白色，14px
-- 圆角：`rounded-b-2xl rounded-tr-2xl`（左上尖角表示消息方向）
-- 阴影：`0 4px 16px rgba(0, 80, 203, 0.25)`
-- hover：上移 2px + 加深阴影
+### Ambient Shadows
+Shadows are reserved for "Floating" elements (e.g., Tooltips, Modals, or the Message Input bar). 
+*   **Spec:** Blur: 32px-64px | Opacity: 4-6% | Color: A tinted version of `on_surface`.
+*   **Effect:** The element should appear to be levitating on a cushion of air, not "stuck" to the page.
 
-#### 链接消息
-- 白色卡片，带链接图标和打开按钮
-
-#### 文件/图片/视频消息
-- 白色卡片，带文件图标和下载按钮
-
-### 5.3 时间戳
-- 气泡下方，左对齐
-- 颜色：`--color-primary`（蓝色），12px
-- 格式：`🕐 yyyy/MM/dd HH:mm`
-
-### 5.4 底部输入区 (Footer Glass)
-- 磨砂玻璃效果同顶部
-- 内层：圆角大 pill 容器（`rounded-[2rem]`），白色背景
-- 左侧：图片📷、附件📎、阅后即焚⏱ 三个圆形图标按钮
-- 中央：透明 `textarea`，placeholder："输入消息，或拖入文件到聊天区域…"
-- 右侧：蓝色渐变圆形发送按钮（`arrow_upward` 图标）
+### The "Ghost Border" Fallback
+If an element requires a border for accessibility (e.g., a text input on a white background), use a **Ghost Border**:
+*   Token: `outline_variant` (#abadb0)
+*   Opacity: Set to 15-20%.
+*   **Prohibition:** Never use 100% opaque borders for containment.
 
 ---
 
-## 6. 登录页面 (Login Page)
+## 5. Components
 
-### 6.1 背景
-- 全屏渐变：`linear-gradient(135deg, #0a0f2e 0%, #0050cb 50%, #0a84ff 100%)`
-- 背景装饰：两个大型半透明蓝色圆形（blur 渐变光晕），营造深空感
+### Buttons
+*   **Primary:** High-pill shape (Rounded `full`). Uses the Primary-to-Container gradient. 
+*   **Secondary/Action Icons:** Minimalist stroke-based icons. When hovered, they should reveal a soft `surface_container_high` circular background.
 
-### 6.2 登录卡片
-- 最大宽度：400px，居中
-- 背景：`rgba(255, 255, 255, 0.08)`（玻璃态，frosted glass）
-- 边框：`rgba(255, 255, 255, 0.15)`，1px
-- 圆角：`rounded-3xl`（24px）
-- 内边距：32px
-- 阴影：`0 32px 64px rgba(0, 0, 0, 0.4)`
+### Input Fields
+*   **The "Pill" Input:** The main message bar should be a floating `surface_container_lowest` pill with an `xl` (3rem) corner radius. It should sit "above" the chat content with an ambient shadow to signify it is the primary interaction point.
 
-### 6.3 卡片内容
-```
-┌──────────────────────────────────┐
-│         [Logo icon]              │
-│         AnyDrop                  │
-│    私有跨设备内容共享平台          │
-│  ──────────────────────────────  │
-│         输入密码继续使用           │
-│  ┌──── 密码输入框 ─────────────┐  │
-│  │ 🔒  ················  [👁] │  │
-│  └────────────────────────────┘  │
-│  ┌──────────────────────────────┐ │
-│  │         登 录                │ │
-│  └──────────────────────────────┘ │
-│  ⚠️ 错误提示（如有）              │
-└──────────────────────────────────┘
-```
+### Lists & Sessions
+*   **No Dividers:** Absolutely forbid horizontal divider lines. 
+*   **Separation:** Use a vertical 8px or 12px gap from the Spacing Scale. 
+*   **Active State:** The "Active" session item should use a distinct `surface_container_highest` background with a `sm` (0.5rem) or `md` (1.5rem) corner radius to "hug" the content.
 
-### 6.4 输入框样式
-- 背景：`rgba(255, 255, 255, 0.1)`
-- 边框：`rgba(255, 255, 255, 0.2)`（focus 时白色 / primary 色）
-- 文字：白色
-- placeholder：半透明白色
-
-### 6.5 登录按钮
-- 全宽，圆角 pill（`rounded-full`）
-- 背景：白色渐变 → 按钮文字蓝色；或：蓝色渐变 → 白色文字
-- 设计采用：白色背景 + 蓝色文字，hover 时微微上浮 + 阴影
+### File Transfer Chips
+*   Use `secondary_container` (#caceff) for incoming file indicators. These should be rounded `md` (1.5rem) to feel friendly and tactile.
 
 ---
 
-## 7. 动画与过渡 (Motion)
+## 6. Do’s and Don’ts
 
-| 动画 | 属性 | 缓动 | 持续时间 |
-|------|------|------|----------|
-| 消息气泡入场 | `translateY + scale + opacity` | `cubic-bezier(0.22, 1, 0.36, 1)` | 320ms |
-| 侧边栏项激活竖条 | `height` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | 250ms |
-| Modal 弹出 | `translateY + scale + opacity` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | 280ms |
-| 按钮 hover | `translateY(-1px) + box-shadow` | `ease` | 150ms |
-| 按钮 active | `scale(0.97)` | `ease` | 100ms |
-| 登录卡片入场 | `translateY(24px) + opacity` | `cubic-bezier(0.22, 1, 0.36, 1)` | 600ms |
+### Do
+*   **Do** use `surface_tint` at 5% opacity over the sidebar to give the glass effect a subtle brand-aligned hue.
+*   **Do** prioritize white space. If in doubt, add more padding between the three panes.
+*   **Do** use stroke-based icons with a consistent 1.5px or 2px weight to match the "crisp" typography.
 
----
-
-## 8. 响应式 (Responsive)
-
-| 断点 | 行为 |
-|------|------|
-| ≥ 769px | 双栏布局（侧边栏 220px + 内容区 flex-1） |
-| ≤ 768px | 单栏，侧边栏隐藏，仅显示内容区 |
-
----
-
-## 9. 图标系统 (Icons)
-
-所有图标使用 **Google Material Symbols**（Outlined 变体，`font-variation-settings` 控制 FILL 状态）：
-
-| 场景 | 图标名 |
-|------|--------|
-| 品牌/同步 | `sync_alt` |
-| 新建 | `add` |
-| 聊天气泡 | `chat_bubble` |
-| 搜索 | `search` |
-| 设置/配置 | `settings` / `build` |
-| 登出 | `logout` |
-| 电脑 | `laptop_mac` |
-| 手机 | `smartphone` |
-| 图片 | `image` |
-| 附件 | `attachment` |
-| 阅后即焚 | `timer` |
-| 发送 | `arrow_upward` |
-| 下载 | `download` |
-| 链接 | `link` |
-| 文件 | `description` |
-| 视频 | `videocam` |
-| 时钟 | `schedule` |
-| 锁 | `lock` |
+### Don't
+*   **Don't** use pure black (#000000) for text. Always use `on_surface` (#2c2f32) to maintain the soft, premium feel.
+*   **Don't** use "Default" 1rem padding. Use the specific `md` (1.5rem) or `lg` (2rem) roundedness and spacing to create a more spacious, desktop-optimized feel.
+*   **Don't** use sharp 90-degree corners. Even the "none" setting in our scale is only for edge-to-edge bleed; every container should feel "softened" by at least `sm` (0.5rem) roundedness.

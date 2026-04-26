@@ -9,38 +9,46 @@
     消息列表 absolute inset-0 overflow-y-auto，通过 padding-top/bottom 留出空间。
 *@
 <section @ref="_chatSectionRef"
-         class="relative h-full overflow-hidden bg-surface"
+         class="relative h-full overflow-hidden"
          @ondragover:preventDefault>
 
     @* ─────────── 顶部标题栏（磨砂玻璃效果，absolute 定位覆盖消息列表）─────────── *@
-    <header class="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-4 py-4 chat-header-glass">
-        <div class="flex items-center gap-2">
+    <header class="absolute inset-x-0 top-0 z-40 flex h-20 items-center justify-between px-8 chat-header-glass">
+        <div class="flex items-center gap-3">
             @* 移动端菜单按钮（桌面端隐藏）*@
             <button type="button"
-                    class="sidebar-menu-toggle h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                    class="sidebar-menu-toggle h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-white/40 active:scale-90"
                     title="打开菜单"
                     @onclick="() => ToggleMobileSidebar?.Invoke()">
                 <span class="material-symbols-outlined" style="font-size: 22px;">menu</span>
             </button>
-            <h2 class="font-headline font-bold text-on-surface text-lg leading-tight">
-                @(_selectedTopicName ?? "选择主题")
-            </h2>
+            <div>
+                <h2 class="font-headline text-2xl font-extrabold tracking-tight leading-none" style="color: var(--color-on-surface);">
+                    @(_selectedTopicName ?? "选择主题")
+                </h2>
+                @if (_selectedTopicId.HasValue)
+                {
+                    <p class="text-[11px] font-medium uppercase tracking-wider mt-1" style="color: var(--color-outline);">存储会话</p>
+                }
+            </div>
         </div>
         @if (_selectedTopicId.HasValue)
         {
             <div class="flex items-center gap-1">
                 @* 搜索按钮 *@
                 <a href="/search/@_selectedTopicId"
-                   class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                   class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
+                   style="color: var(--color-on-surface-variant);"
                    title="搜索此主题">
                     <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
                 </a>
                 @* 主题设置按钮 *@
                 <button type="button"
-                        class="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                        class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
+                        style="color: var(--color-on-surface-variant);"
                         title="主题设置"
                         @onclick="OpenTopicSettingsModal">
-                    <span class="material-symbols-outlined" style="font-size: 20px;">build</span>
+                    <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
                 </button>
             </div>
         }
@@ -186,19 +194,19 @@
                             break;
 
                         default:
-                            <div class="bubble-text p-3 rounded-b-2xl rounded-tr-2xl transition-all duration-150">
-                                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words" style="color: var(--color-on-primary);">@message.Content</p>
+                            <div class="bubble-text px-6 py-4 rounded-3xl rounded-tl-lg transition-all duration-150 max-w-md">
+                                <p class="text-[15px] font-medium leading-relaxed whitespace-pre-wrap break-words text-white">@message.Content</p>
                             </div>
                             break;
                     }
-                    @* 消息时间：显示完整日期 + 时间，阅后即焚时额外显示倒计时 *@
-                    <div class="mt-2 ml-1 flex items-center gap-2 text-[11px] font-bold text-primary">
-                        <span class="material-symbols-outlined" style="font-size: 12px;">schedule</span>
-                        @FormatMessageTime(message.CreatedAt)
+                    @* 消息时间：圆点指示 + 完整日期时间，阅后即焚时额外显示倒计时 *@
+                    <div class="mt-3 flex items-center gap-1.5 text-[11px] font-semibold pl-2" style="color: var(--color-outline);">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style="background-color: rgba(59,130,246,0.50);"></span>
+                        <span>@FormatMessageTime(message.CreatedAt)</span>
                         @if (message.ExpiresAt.HasValue)
                         {
-                            <span class="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                                  style=" color: var(--color-error, #ba1a1a);">
+                            <span class="ml-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                  style="color: var(--color-error, #ba1a1a);">
                                 <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
                                 @FormatExpiry(message.ExpiresAt.Value)
                             </span>
@@ -356,30 +364,31 @@
         </div>
     }
 
-    @* ─────────── 输入区（磨砂玻璃效果，absolute 定位覆盖消息列表底部）─────────── *@
-    <footer class="absolute inset-x-0 bottom-0 z-40 p-4 chat-footer-glass">
-        <div class="mx-auto max-w-4xl">
-        <div class="input-wrapper bg-surface-container-lowest p-3 rounded-[2rem]"
-             style="box-shadow: 0 8px 32px rgba(25,28,29,0.06);">
-            @* 附件按钮 *@
-            <div class="input-actions">
-                <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+    @* ─────────── 输入区（渐出遮罩 + 浮动玻璃卡片）─────────── *@
+    <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-16 chat-footer-glass" style="pointer-events: none;">
+        <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
+        <div class="input-wrapper chat-input-card px-4 py-3">
+            @* 附件按钮（带右侧分割线）*@
+            <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
+                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                       style="color: var(--color-on-surface-variant);"
                        title="上传图片或视频">
-                    <span class="material-symbols-outlined">image</span>
+                    <span class="material-symbols-outlined text-xl">image</span>
                     <InputFile class="hidden" multiple accept="image/*,video/*" OnChange="OnFilesSelected" />
                 </label>
-                <label class="flex cursor-pointer items-center justify-center rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container active:scale-90"
+                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                       style="color: var(--color-on-surface-variant);"
                        title="上传附件">
-                    <span class="material-symbols-outlined">attachment</span>
+                    <span class="material-symbols-outlined text-xl">attachment</span>
                     <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
                 </label>
                 @* 阅后即焚切换按钮 *@
                 <button type="button"
-                        class="flex items-center justify-center rounded-full p-2 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "text-on-surface-variant hover:bg-surface-container")"
-                        style="@(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
+                        class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
+                        style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
                         title="@(_burnAfterReading ? "阅后即焚已开启（10分钟后自动删除）" : "开启阅后即焚")"
                         @onclick="ToggleBurnAfterReading">
-                    <span class="material-symbols-outlined"
+                    <span class="material-symbols-outlined text-xl"
                           style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
                         timer
                     </span>
@@ -388,8 +397,8 @@
 
             @* 文本输入 *@
             <div class="input-textarea-wrap">
-                <textarea class="w-full resize-none bg-transparent py-2 px-2 text-sm text-on-surface outline-none placeholder:text-on-surface-variant/50"
-                          style="border: none; max-height: 8rem; field-sizing: content;"
+                <textarea class="w-full resize-none bg-transparent py-2 px-4 text-[15px] font-medium outline-none"
+                          style="border: none; max-height: 8rem; field-sizing: content; color: var(--color-on-surface);"
                           placeholder="输入消息，或拖入文件到聊天区域…（Ctrl+Enter 发送）"
                           maxlength="10000"
                           rows="1"
@@ -398,25 +407,22 @@
                           @onkeydown="HandleKeyDown"></textarea>
                 @if (!string.IsNullOrWhiteSpace(_validationError))
                 {
-                    <p class="px-2 text-xs text-error">@_validationError</p>
+                    <p class="px-4 text-xs text-error">@_validationError</p>
                 }
             </div>
 
-            @* 发送按钮 *@
-            <div class="input-send-wrap">
+            @* 发送按钮（方形，渐变）*@
+            <div class="input-send-wrap ml-2">
                 <button type="button"
-                        class="flex h-10 w-10 items-center justify-center rounded-full text-white shadow-md transition-all active:scale-90 disabled:opacity-50"
-                        style="background: linear-gradient(135deg, #0050cb, #0066ff);"
+                        class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);"
                         disabled="@_isSending"
                         @onclick="SendAsync">
-                    <span class="material-symbols-outlined font-bold"
-                          style="font-variation-settings: 'FILL' 1;">arrow_upward</span>
+                    <span class="material-symbols-outlined"
+                          style="font-size: 20px; font-variation-settings: 'FILL' 1;">send</span>
                 </button>
             </div>
         </div>
-        <p class="mt-3 text-center text-[10px] font-medium text-on-surface-variant opacity-50">
-            拖放文件到聊天区域可快速发送
-        </p>
         </div>
     </footer>
 

@@ -1,6 +1,6 @@
 .app-shell {
     display: grid;
-    grid-template-columns: 16rem 1fr;
+    grid-template-columns: 18rem 1fr;
     height: 100vh;
     overflow-x: hidden;
 }
@@ -30,7 +30,7 @@ main {
         left: 0;
         bottom: 0;
         z-index: 60;
-        width: 16rem;
+        width: 18rem;
         overflow-y: auto;
         box-shadow: 4px 0 24px rgba(25, 28, 29, 0.18);
     }

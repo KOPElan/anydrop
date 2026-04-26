@@ -1,38 +1,39 @@
 @* 侧边栏主体 *@
-<div class="flex h-full flex-col" style="background-color: var(--color-surface-container-low);">
+<div class="flex h-full flex-col">
 
     @* 品牌标题 + 新建按钮 *@
-    <div class="flex items-center justify-between px-4 py-4">
-        <div class="flex items-center gap-2.5">
-            <div class="flex h-8 w-8 items-center justify-center rounded-xl" style="background: linear-gradient(135deg, #0050cb, #0066ff);">
+    <div class="flex items-center justify-between p-6">
+        <div class="flex items-center gap-3">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl shadow-lg"
+                 style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);">
                 <span class="material-symbols-outlined text-white" style="font-size: 18px; font-variation-settings: 'FILL' 1;">sync_alt</span>
             </div>
-            <span class="font-headline text-base font-extrabold" style="color: var(--color-on-surface);">AnyDrop</span>
+            <span class="font-headline text-xl font-extrabold tracking-tight" style="color: var(--color-on-surface);">AnyDrop</span>
         </div>
-        @* 新建主题按钮移至品牌栏右侧 *@
+        @* 新建主题按钮 *@
         <button type="button"
                 aria-label="新建主题"
-                class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-surface-container active:scale-90"
+                class="glass-btn flex items-center justify-center p-2.5 rounded-xl transition-all active:scale-90"
                 style="color: var(--color-on-surface-variant);"
                 @onclick="OpenCreateModal">
-            <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
+            <span class="material-symbols-outlined" style="font-size: 18px;">add</span>
         </button>
     </div>
 
     @* ── 会话主题 ─────────────────────────── *@
-    <div class="px-5 pb-2">
-        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">会话</p>
+    <div class="px-4 mb-4">
+        <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">最近会话</p>
     </div>
 
     @* 主题列表 *@
-    <div class="flex-1 overflow-y-auto px-3 pb-2">
+    <div class="flex-1 overflow-y-auto px-4 pb-2 sidebar-scroll">
         @if (_topics.Count == 0)
         {
             <div class="sidebar-empty-state mx-1">暂无主题</div>
         }
         else
         {
-            <div id="topic-list" class="space-y-0.5 mb-2">
+            <div id="topic-list" class="space-y-1 mb-2">
                 @foreach (var topic in _topics)
                 {
                     var isActive = _selectedTopicId == topic.Id;
@@ -41,21 +42,26 @@
                         data-id="@topic.Id"
                         class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
                         @onclick="() => SelectTopicAsync(topic.Id)">
-                        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' @(isActive ? "1" : "0"); color: @(topic.IsPinned ? "var(--color-primary)" : "inherit");">
-                            @topic.Icon
-                        </span>
+                        @* 图标容器 *@
+                        <div class="sidebar-item__icon">
+                            <span class="material-symbols-outlined text-sm"
+                                  style="font-variation-settings: 'FILL' @(isActive ? "1" : "0");">
+                                @topic.Icon
+                            </span>
+                        </div>
+                        @* 文本内容 *@
                         <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-1">
-                                <span class="sidebar-item__name">@topic.Name</span>
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="sidebar-item__name font-semibold">@topic.Name</span>
                                 @if (topic.LastMessageAt.HasValue)
                                 {
                                     <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
                                 }
                             </div>
-                            @* 仅在激活时显示状态徽标 *@
+                            @* 激活时显示「Active now」；否则显示消息预览 *@
                             @if (isActive)
                             {
-                                <span class="sidebar-item__status sidebar-item__status--active">active</span>
+                                <p class="text-[11px] font-medium italic" style="color: #3b82f6;">当前活动</p>
                             }
                             else
                             {
@@ -76,10 +82,12 @@
 
         @* ── 已归档入口（不参与排序，固定在列表末尾）─────── *@
         <button type="button"
-                class="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium transition-colors hover:bg-surface-container mt-1"
-                style="color: var(--color-on-surface-variant);"
+                class="flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-xs font-medium transition-colors mt-1"
+                style="color: var(--color-on-surface-variant); border: 1px solid transparent;"
                 @onclick="ToggleArchivedDropdownAsync">
-            <span class="material-symbols-outlined text-base">archive</span>
+            <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg" style="background: rgba(255,255,255,0.50);">
+                <span class="material-symbols-outlined text-sm">archive</span>
+            </div>
             <span class="flex-1 text-left">已归档</span>
             <span class="material-symbols-outlined text-sm transition-transform @(_showArchivedDropdown ? "rotate-180" : "")">expand_more</span>
         </button>
@@ -87,7 +95,7 @@
         @* 归档主题下拉列表 *@
         @if (_showArchivedDropdown)
         {
-            <div class="mt-0.5 space-y-0.5 pl-4">
+            <div class="mt-1 space-y-0.5 pl-3">
                 @if (_archivedTopics.Count == 0)
                 {
                     <div class="px-3 py-2 text-xs" style="color: var(--color-outline);">暂无归档主题</div>
@@ -101,7 +109,9 @@
                             type="button"
                             class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item opacity-70")"
                             @onclick="() => SelectTopicAsync(topic.Id)">
-                            <span class="material-symbols-outlined text-base" style="font-size: 14px;">archive</span>
+                            <div class="sidebar-item__icon" style="width:2rem; height:2rem;">
+                                <span class="material-symbols-outlined text-sm">archive</span>
+                            </div>
                             <span class="sidebar-item__name text-xs">@topic.Name</span>
                         </button>
                     }
@@ -110,45 +120,51 @@
         }
     </div>
 
-    @* ── 在线设备（占位，无实际实现）──────────────── *@
-    <div class="px-5 pt-4 pb-2">
+    @* ── 在线设备 ──────────────────────────────── *@
+    <div class="px-4 pt-4 pb-2">
         <p class="text-[10px] font-bold uppercase tracking-widest" style="color: var(--color-outline);">设备</p>
     </div>
-    <div class="px-3 pb-4 space-y-0.5">
-        <div class="flex items-center gap-3 px-3 py-2 rounded-xl text-on-surface-variant">
-            <div class="relative">
-                <span class="material-symbols-outlined text-lg">laptop_mac</span>
-                <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-low" style="background-color: var(--color-status-online);"></span>
+    <div class="px-4 pb-4 space-y-1">
+        <div class="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
+             style="color: var(--color-on-surface-variant);">
+            <div class="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+                 style="background: rgba(255,255,255,0.50);">
+                <span class="material-symbols-outlined text-base">laptop_mac</span>
+                <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2"
+                      style="background-color: var(--color-status-online); border-color: transparent;"></span>
             </div>
             <div class="flex flex-col min-w-0">
-                <span class="text-sm font-medium leading-none text-on-surface truncate">当前设备</span>
+                <span class="text-sm font-semibold leading-none text-on-surface truncate">当前设备</span>
                 <span class="text-[10px] font-bold mt-0.5" style="color: var(--color-status-online);">在线</span>
             </div>
         </div>
-        <div class="flex items-center gap-3 px-3 py-2 rounded-xl text-on-surface-variant opacity-50">
-            <div class="relative">
-                <span class="material-symbols-outlined text-lg">smartphone</span>
-                <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-container-low" style="background-color: var(--color-outline);"></span>
+        <div class="flex items-center gap-3 px-3 py-2.5 rounded-2xl opacity-50"
+             style="color: var(--color-on-surface-variant);">
+            <div class="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+                 style="background: rgba(255,255,255,0.50);">
+                <span class="material-symbols-outlined text-base">smartphone</span>
+                <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2"
+                      style="background-color: var(--color-outline); border-color: transparent;"></span>
             </div>
             <div class="flex flex-col min-w-0">
-                <span class="text-sm font-medium leading-none truncate">手机</span>
+                <span class="text-sm font-semibold leading-none truncate">手机</span>
                 <span class="text-[10px] font-bold mt-0.5">离线</span>
             </div>
         </div>
     </div>
 
     @* ── 底部功能按钮 ────────────────────────── *@
-    <div class="px-3 pb-4 pt-2 mt-auto space-y-0.5 border-t" style="border-color: var(--color-outline-variant);">
+    <div class="px-4 pb-6 pt-2 mt-auto space-y-1">
         <button type="button"
-                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-container"
-                style="color: var(--color-on-surface-variant);"
+                class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all hover:bg-white/40 active:scale-95"
+                style="color: var(--color-on-surface-variant); border: 1px solid transparent;"
                 @onclick="OpenSettings">
-            <span class="material-symbols-outlined text-base">settings</span>
+            <span class="material-symbols-outlined text-base" style="color: var(--color-outline);">settings</span>
             设置
         </button>
         <button type="button"
-                class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-error-container/20"
-                style="color: var(--color-error);"
+                class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all hover:bg-red-50/50 active:scale-95"
+                style="color: var(--color-error); border: 1px solid transparent;"
                 @onclick="LogoutAsync">
             <span class="material-symbols-outlined text-base">logout</span>
             登出

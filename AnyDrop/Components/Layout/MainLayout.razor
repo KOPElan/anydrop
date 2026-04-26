@@ -9,11 +9,11 @@
         <div class="sidebar-mobile-backdrop" @onclick="CloseMobileSidebar"></div>
     }
 
-    <aside class="sidebar border-r border-gray-200 bg-[var(--color-sidebar)] @(_sidebarMobileOpen ? "sidebar--mobile-open" : "")">
+    <aside class="sidebar glass-sidebar @(_sidebarMobileOpen ? "sidebar--mobile-open" : "")">
         <TopicSidebar />
     </aside>
 
-    <main class="flex flex-col overflow-hidden">
+    <main class="main-content-card flex flex-col overflow-hidden">
         <CascadingValue Value="TopicStateService.SelectedTopicId">
             <CascadingValue Value="@((Action)ToggleMobileSidebar)" Name="ToggleMobileSidebar">
                 @Body

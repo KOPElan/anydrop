@@ -132,8 +132,8 @@
 
 /* 侧边栏激活指示条扩展 */
 @keyframes pill-expand {
-    from { height: 0; opacity: 0; }
-    to   { height: 60%; opacity: 1; }
+    from { opacity: 0; transform: scaleY(0.2); }
+    to   { opacity: 1; transform: scaleY(1); }
 }
 
 /* 消息高亮闪烁（从搜索页跳回聊天后定位消息时使用） */
@@ -147,7 +147,8 @@
     html,
     body {
         @apply h-full antialiased;
-        background-color: var(--color-surface);
+        /* 整体渐变背景，侧边栏和主内容区在其上叠加玻璃层 */
+        background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
         font-family: var(--font-body);
     }
 }
@@ -181,21 +182,23 @@
 
     /* ─── 侧边栏主题项 ─── */
     .sidebar-item {
-        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-2.5 text-left;
+        @apply relative flex w-full cursor-pointer items-center gap-3 rounded-2xl p-3 text-left overflow-hidden;
         color: var(--color-on-surface-variant);
-        /* 过渡：背景色 + 颜色 + 轻微位移 */
-        transition: background-color 200ms ease, color 200ms ease, transform 150ms ease;
+        border: 1px solid transparent;
+        transition: background-color 200ms ease, border-color 200ms ease;
     }
 
     .sidebar-item:hover {
-        background-color: var(--color-surface-container);
-        transform: translateX(2px);
+        background-color: rgba(255, 255, 255, 0.4);
+        border-color: rgba(255, 255, 255, 0.4);
     }
 
     .sidebar-item--active {
         color: var(--color-primary);
         font-weight: 600;
-        background-color: var(--color-primary-fixed);
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+        border-color: rgba(147, 197, 253, 0.30);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
 
     /* 激活时的左侧指示条，带弹入动画 */
@@ -203,13 +206,27 @@
         content: "";
         position: absolute;
         left: 0;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 0.75rem;
+        bottom: 0.75rem;
         width: 4px;
-        height: 60%;
-        background-color: var(--color-primary);
+        background: linear-gradient(180deg, #6366f1, #3b82f6);
         border-radius: 0 4px 4px 0;
+        transform-origin: center;
         animation: pill-expand 250ms var(--ease-bounce) both;
+    }
+
+    /* ─── 侧边栏图标容器 ─── */
+    .sidebar-item__icon {
+        @apply flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl;
+        background: rgba(255, 255, 255, 0.50);
+        color: var(--color-on-surface-variant);
+        transition: background 200ms ease, color 200ms ease, box-shadow 200ms ease;
+    }
+
+    .sidebar-item--active .sidebar-item__icon {
+        background: linear-gradient(135deg, #6366f1, #3b82f6);
+        color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.30);
     }
 
     .sidebar-item__name {
@@ -303,34 +320,67 @@
 
     /* ─── 消息列表：使用 CSS 变量统一控制顶/底留白，与玻璃栏高度一致 ─── */
     .chat-message-list {
-        /* --chat-header-h 和 --chat-footer-h 的值需与实际玻璃栏高度匹配 */
-        --chat-header-h: 82px;
-        --chat-footer-h: 140px;
+        /* --chat-header-h 对应 h-20 (80px)；--chat-footer-h 对应梯度渐出区高度 */
+        --chat-header-h: 80px;
+        --chat-footer-h: 130px;
         padding-top: var(--chat-header-h);
         padding-bottom: var(--chat-footer-h);
     }
 
     /* ─── 磨砂玻璃顶栏 ─── */
     .chat-header-glass {
-        background: var(--glass-header-bg);
-        /* 直接内联值，避免 CSS 变量引用 backdrop-filter 函数时的浏览器兼容问题 */
-        backdrop-filter: blur(20px) saturate(180%);
-        -webkit-backdrop-filter: blur(20px) saturate(180%);
-        border-bottom: 1px solid var(--glass-border-color);
+        background: rgba(255, 255, 255, 0.30);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(203, 213, 225, 0.40);
     }
 
-    /* ─── 磨砂玻璃底部输入区 ─── */
+    /* ─── 底部输入区：渐出遮罩（非玻璃层，内部 card 自带玻璃）─── */
     .chat-footer-glass {
-        background: var(--glass-footer-bg);
-        backdrop-filter: blur(20px) saturate(180%);
-        -webkit-backdrop-filter: blur(20px) saturate(180%);
-        border-top: 1px solid var(--glass-border-color);
+        background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.80) 60%, transparent 100%);
+    }
+
+    /* ─── 输入卡片（floating glass card）─── */
+    .chat-input-card {
+        background: rgba(255, 255, 255, 0.90);
+        backdrop-filter: blur(20px) saturate(160%);
+        -webkit-backdrop-filter: blur(20px) saturate(160%);
+        border-radius: 1rem;
+        border: 1px solid rgba(203, 213, 225, 0.50);
+        box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.10);
     }
 
     /* 整体布局 */
     .app-shell {
         @apply grid h-screen;
-        grid-template-columns: 16rem 1fr;
+        grid-template-columns: 18rem 1fr;
+    }
+
+    /* ─── 侧边栏玻璃态 ─── */
+    .glass-sidebar {
+        background: rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(40px) saturate(180%);
+        -webkit-backdrop-filter: blur(40px) saturate(180%);
+        border-right: 1px solid rgba(255, 255, 255, 0.40);
+    }
+
+    /* ─── 可复用：玻璃按钮（侧边栏 [+]、设置、登出等）─── */
+    .glass-btn {
+        background: rgba(255, 255, 255, 0.40);
+        border: 1px solid rgba(255, 255, 255, 0.40);
+        transition: background 200ms ease, border-color 200ms ease;
+    }
+
+    .glass-btn:hover {
+        background: rgba(255, 255, 255, 0.60);
+        border-color: rgba(255, 255, 255, 0.60);
+    }
+
+    /* ─── 主内容区半透明卡片 ─── */
+    .main-content-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
     }
 
     @media (max-width: 768px) {
@@ -357,18 +407,16 @@
     /* ─── 输入框容器（桌面：行布局；移动：图标移至下方）─── */
     .input-wrapper {
         display: flex;
-        align-items: flex-end;
-        gap: 0.75rem;
+        align-items: center;
+        gap: 0;
     }
 
     .input-actions {
         display: flex;
-        gap: 0.25rem;
-        padding: 0 0.25rem;
-        margin-bottom: 0.25rem;
-        /* 桌面端：图标在最左侧 */
-        order: 0;
+        align-items: center;
+        gap: 0;
         flex-shrink: 0;
+        order: 0;
     }
 
     .input-textarea-wrap {
@@ -378,8 +426,6 @@
     }
 
     .input-send-wrap {
-        margin-bottom: 0.25rem;
-        margin-right: 0.25rem;
         order: 2;
         flex-shrink: 0;
     }
@@ -387,25 +433,25 @@
     @media (max-width: 768px) {
         .input-wrapper {
             flex-wrap: wrap;
+            align-items: flex-end;
         }
 
         /* 移动端：文本框 + 发送按钮在第一行，图标在第二行 */
         .input-textarea-wrap {
             order: 1;
-            flex-basis: calc(100% - 3rem - 0.75rem);
+            flex-basis: calc(100% - 3.5rem);
         }
 
         .input-send-wrap {
             order: 2;
-            margin-bottom: 0;
         }
 
         .input-actions {
             order: 3;
             width: 100%;
-            margin-bottom: 0;
-            padding: 0.25rem 0 0;
-            border-top: 1px solid var(--color-outline-variant);
+            padding: 0.5rem 0 0;
+            border-right: none !important;
+            border-top: 1px solid rgba(203, 213, 225, 0.50);
         }
     }
 
@@ -419,10 +465,10 @@
         color: var(--color-primary);
     }
 
-    /* ─── 文本消息气泡（蓝色 pill 样式）─── */
+    /* ─── 文本消息气泡 ─── */
     .bubble-text {
-        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
-        box-shadow: 0 4px 16px rgba(0, 80, 203, 0.25);
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.40);
     }
 
     /* ─── 登录页面 ─── */
