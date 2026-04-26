@@ -115,8 +115,7 @@ public static class SettingsEndpoints
     /// </summary>
     public static IResult SetCultureAsync(SetCultureRequest request, HttpContext httpContext)
     {
-        var validCultures = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "zh-CN", "zh-TW", "en" };
-        if (!validCultures.Contains(request.Culture))
+        if (!SupportedLanguages.All.Contains(request.Culture))
         {
             return Results.BadRequest(ApiEnvelope<object>.Fail("不支持的语言代码。"));
         }
@@ -124,7 +123,14 @@ public static class SettingsEndpoints
         httpContext.Response.Cookies.Append(
             CookieRequestCultureProvider.DefaultCookieName,
             CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(request.Culture)),
-            new CookieOptions { Expires = DateTimeOffset.UtcNow.AddYears(1), IsEssential = true, SameSite = SameSiteMode.Lax });
+            new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddYears(1),
+                IsEssential = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = httpContext.Request.IsHttps,
+                HttpOnly = true
+            });
 
         return Results.Ok(ApiEnvelope<object>.Ok(new { culture = request.Culture }));
     }

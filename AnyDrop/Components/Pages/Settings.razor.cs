@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Localization;
+using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Text.Json;
+using AnyDrop.Resources;
 
 namespace AnyDrop.Components.Pages;
 
@@ -9,6 +10,7 @@ public partial class Settings
 {
     [Inject] public required IJSRuntime JSRuntime { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
+    [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     private string _nickname = string.Empty;
     private string _currentPassword = string.Empty;
@@ -77,11 +79,11 @@ public partial class Settings
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/profile", new { nickname = _nickname });
         if (!result.ok)
         {
-            _error = result.body?.error ?? "保存昵称失败。";
+            _error = result.body?.error ?? L["Settings_SaveNicknameFailed"];
             return;
         }
 
-        _message = "昵称已更新。";
+        _message = L["Settings_NicknameSaved"];
     }
 
     private async Task SavePasswordAsync()
@@ -96,14 +98,14 @@ public partial class Settings
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/password", payload);
         if (!result.ok)
         {
-            _error = result.body?.error ?? "更新密码失败。";
+            _error = result.body?.error ?? L["Settings_UpdatePasswordFailed"];
             return;
         }
 
         _currentPassword = string.Empty;
         _newPassword = string.Empty;
         _confirmPassword = string.Empty;
-        _message = "密码已更新。";
+        _message = L["Settings_PasswordUpdated"];
     }
 
     private async Task SaveSecurityAsync()
@@ -119,16 +121,20 @@ public partial class Settings
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
         if (!result.ok)
         {
-            _error = result.body?.error ?? "保存设置失败。";
+            _error = result.body?.error ?? L["Settings_SaveSecurityFailed"];
             return;
         }
 
-        // 设置语言 Cookie 并强制刷新页面，以使新语言立即生效
-        await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/settings/set-culture",
+        // 设置语言 Cookie，失败时记录提示但不阻断流程
+        var cultureResult = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/settings/set-culture",
             new { culture = _language });
+        if (!cultureResult.ok)
+        {
+            _error = cultureResult.body?.error ?? L["Settings_SaveSecurityFailed"];
+            return;
+        }
 
-        _message = "设置已保存。";
-        // 使用 forceLoad 重新加载以应用新语言
+        // 强制刷新以应用新语言
         NavigationManager.NavigateTo("/settings", forceLoad: true);
     }
 

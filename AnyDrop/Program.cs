@@ -52,12 +52,11 @@ builder.Services.AddSwaggerGen();
 
 // 多语言本地化
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
-var supportedCultures = new[] { "zh-CN", "zh-TW", "en" };
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
-    options.DefaultRequestCulture = new RequestCulture("zh-CN");
-    options.SupportedCultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
-    options.SupportedUICultures = supportedCultures.Select(c => new CultureInfo(c)).ToList();
+    options.DefaultRequestCulture = new RequestCulture(AnyDrop.Models.SupportedLanguages.ZhCN);
+    options.SupportedCultures = AnyDrop.Models.SupportedLanguages.All.Select(c => new CultureInfo(c)).ToList();
+    options.SupportedUICultures = AnyDrop.Models.SupportedLanguages.All.Select(c => new CultureInfo(c)).ToList();
     options.RequestCultureProviders = [new CookieRequestCultureProvider()];
 });
 

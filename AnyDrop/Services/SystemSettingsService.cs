@@ -35,8 +35,7 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         }
 
         // 验证语言代码
-        var validLanguages = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "zh-CN", "zh-TW", "en" };
-        if (!validLanguages.Contains(request.Language))
+        if (!SupportedLanguages.All.Contains(request.Language))
         {
             return AuthResult<SecuritySettingsDto>.Failure("不支持的语言代码。", StatusCodes.Status400BadRequest);
         }
