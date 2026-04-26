@@ -461,19 +461,19 @@
         border-bottom: 1px solid rgba(203, 213, 225, 0.40);
     }
 
-    /* ─── 底部输入区：渐出遮罩（非玻璃层，内部 card 自带玻璃）─── */
+    /* ─── 底部输入区：轻度渐出遮罩，保留背景渐变透射，使 card 玻璃效果可见 ─── */
     .chat-footer-glass {
-        background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.80) 60%, transparent 100%);
+        background: linear-gradient(to top, rgba(203, 213, 225, 0.50) 0%, rgba(203, 213, 225, 0.20) 60%, transparent 100%);
     }
 
-    /* ─── 输入卡片（floating glass card）─── */
+    /* ─── 输入卡片（floating frosted glass card）─── */
     .chat-input-card {
-        background: rgba(255, 255, 255, 0.90);
-        backdrop-filter: blur(20px) saturate(160%);
-        -webkit-backdrop-filter: blur(20px) saturate(160%);
+        background: rgba(255, 255, 255, 0.70);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
         border-radius: 1rem;
-        border: 1px solid rgba(203, 213, 225, 0.50);
-        box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.60);
+        box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(203, 213, 225, 0.30);
     }
 
     /* 整体布局 */

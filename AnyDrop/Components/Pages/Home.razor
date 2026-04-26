@@ -148,7 +148,7 @@
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
-                                <div class="bubble-link bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm max-w-full transition-all duration-150">
+                                <div class="bubble-link bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm max-w-full transition-all duration-150">
                                 <div class="flex items-center gap-2 text-primary mb-3">
                                     <span class="material-symbols-outlined text-sm">link</span>
                                     <span class="text-xs font-semibold uppercase tracking-wide">链接</span>
@@ -179,7 +179,7 @@
                             break;
 
                         case ShareContentType.Image:
-                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm transition-all duration-150">
+                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm transition-all duration-150">
                                 @* 点击图片在 Modal 中预览原图 *@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
@@ -209,7 +209,7 @@
                             break;
 
                         case ShareContentType.Video:
-                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-b-2xl rounded-tr-2xl shadow-sm w-full max-w-lg transition-all duration-150">
+                                <div class="bubble-file bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm w-full max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
                                     <video class="w-full max-h-64 rounded-xl bg-on-surface"
                                            controls
@@ -237,7 +237,7 @@
                             break;
 
                         case ShareContentType.File:
-                                <div class="bubble-file bg-surface-container-lowest p-4 rounded-b-2xl rounded-tr-2xl shadow-sm flex items-center justify-between gap-4 w-full max-w-md transition-all duration-150">
+                                <div class="bubble-file bg-surface-container-lowest p-4 rounded-3xl rounded-tl-lg shadow-sm flex items-center justify-between gap-4 w-full max-w-md transition-all duration-150">
                                 <div class="flex items-center gap-4">
                                     <div class="w-12 h-12 bg-error-container/30 flex items-center justify-center rounded-xl text-error">
                                         <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>

@@ -37,8 +37,10 @@
                 @foreach (var topic in _topics)
                 {
                     var isActive = _selectedTopicId == topic.Id;
+                    var hasUnread = _unreadTopicIds.Contains(topic.Id);
                     <button
                         type="button"
+                        @key="topic.Id"
                         data-id="@topic.Id"
                         class="@(isActive ? "sidebar-item sidebar-item--active" : "sidebar-item")"
                         @onclick="() => SelectTopicAsync(topic.Id)">
@@ -53,10 +55,17 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-1">
                                 <span class="sidebar-item__name font-semibold">@topic.Name</span>
-                                @if (topic.LastMessageAt.HasValue)
-                                {
-                                    <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
-                                }
+                                <div class="flex items-center gap-1 flex-shrink-0">
+                                    @if (hasUnread)
+                                    {
+                                        <span class="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                                              style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 0 4px rgba(99,102,241,0.60);"></span>
+                                    }
+                                    @if (topic.LastMessageAt.HasValue)
+                                    {
+                                        <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
+                                    }
+                                </div>
                             </div>
                             @* 激活时显示「Active now」；否则显示消息预览 *@
                             @if (isActive)
@@ -65,7 +74,7 @@
                             }
                             else
                             {
-                                <div class="sidebar-item__preview">
+                                <div class="sidebar-item__preview @(hasUnread ? "font-semibold" : "")">
                                     @(topic.LastMessagePreview ?? "暂无消息")
                                 </div>
                             }

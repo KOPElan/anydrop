@@ -426,7 +426,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to pin/unpin topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "操作失败，请重试。";
+            _validationError = "置顶操作失败，请重试。";
         }
     }
 
@@ -451,7 +451,6 @@ public partial class Home : IAsyncDisposable
         try
         {
             await TopicService.ArchiveTopicAsync(_selectedTopicId.Value, archiving);
-            CloseTopicSettingsModal();
 
             // 归档后主题从普通列表消失，清空聊天区
             if (archiving)
@@ -477,7 +476,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to archive topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "操作失败，请重试。";
+            _validationError = "归档操作失败，请重试。";
         }
     }
 
@@ -507,7 +506,6 @@ public partial class Home : IAsyncDisposable
         try
         {
             await TopicService.DeleteTopicAsync(_selectedTopicId.Value);
-            CloseTopicSettingsModal();
 
             _selectedTopicId = null;
             _selectedTopicName = null;
@@ -520,7 +518,7 @@ public partial class Home : IAsyncDisposable
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to delete topic {TopicId}", _selectedTopicId);
-            _topicSettingsError = "删除失败，请重试。";
+            _validationError = "删除失败，请重试。";
         }
     }
 

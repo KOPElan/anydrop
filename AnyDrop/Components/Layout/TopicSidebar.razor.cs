@@ -34,6 +34,9 @@ public partial class TopicSidebar : IAsyncDisposable
     private readonly List<TopicDto> _archivedTopics = [];
     private string _nickname = "用户";
 
+    // 未读通知：记录收到新消息但未查看的主题 ID
+    private readonly HashSet<Guid> _unreadTopicIds = [];
+
     protected override async Task OnInitializedAsync()
     {
         TopicStateService.SelectedTopicChanged += HandleSelectedTopicChanged;
@@ -88,6 +91,7 @@ public partial class TopicSidebar : IAsyncDisposable
     private async Task SelectTopicAsync(Guid topicId)
     {
         _selectedTopicId = topicId;
+        _unreadTopicIds.Remove(topicId);
         await TopicStateService.SetSelectedTopicAsync(topicId);
         await InvokeAsync(StateHasChanged);
     }
@@ -179,8 +183,24 @@ public partial class TopicSidebar : IAsyncDisposable
 
         _topicsUpdatedSubscription = _hubConnection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", async topics =>
         {
+            // 对比旧列表，检测非活动主题是否有新消息（LastMessageAt 更新）
+            var previousLastMessageAt = _topics.ToDictionary(t => t.Id, t => t.LastMessageAt);
+
             _topics.Clear();
             _topics.AddRange(topics);
+
+            foreach (var topic in _topics)
+            {
+                if (topic.Id == _selectedTopicId) continue;
+                if (!topic.LastMessageAt.HasValue) continue;
+
+                var hadPrevious = previousLastMessageAt.TryGetValue(topic.Id, out var prev);
+                // 若是新主题或消息时间更新，则标记为未读
+                if (!hadPrevious || prev is null || topic.LastMessageAt > prev)
+                {
+                    _unreadTopicIds.Add(topic.Id);
+                }
+            }
 
             // 若已归档下拉列表正在显示，也同步刷新已归档主题列表
             if (_showArchivedDropdown)
@@ -215,6 +235,8 @@ public partial class TopicSidebar : IAsyncDisposable
         return InvokeAsync(() =>
         {
             _selectedTopicId = TopicStateService.SelectedTopicId;
+            if (_selectedTopicId.HasValue)
+                _unreadTopicIds.Remove(_selectedTopicId.Value);
             StateHasChanged();
         });
     }
