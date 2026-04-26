@@ -13,6 +13,7 @@ public partial class TopicSearch
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
+    [Inject] public required ISystemSettingsService SystemSettingsService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<TopicSearch> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
@@ -22,6 +23,9 @@ public partial class TopicSearch
 
     // 主题名称
     private string? _topicName;
+
+    // 用于时间显示的时区
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
 
     // ─── 文字搜索 ───
     private string _searchQuery = string.Empty;
@@ -55,6 +59,7 @@ public partial class TopicSearch
     protected override async Task OnInitializedAsync()
     {
         _calendarWindowStart = CalcDefaultWindowStart();
+        _displayTimeZone = await SystemSettingsService.GetDisplayTimeZoneAsync();
         await LoadTopicNameAsync();
     }
 
@@ -337,9 +342,9 @@ public partial class TopicSearch
 
     // ─────────────────────────── 工具方法 ───────────────────────────
 
-    private static IEnumerable<IGrouping<DateOnly, ShareItemDto>> GroupByDate(List<ShareItemDto> items)
+    private IEnumerable<IGrouping<DateOnly, ShareItemDto>> GroupByDate(List<ShareItemDto> items)
         => items
-            .GroupBy(m => DateOnly.FromDateTime(m.CreatedAt.ToLocalTime().DateTime))
+            .GroupBy(m => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(m.CreatedAt.UtcDateTime, _displayTimeZone)))
             .OrderByDescending(g => g.Key);
 
     private static string FormatGroupDate(DateOnly date)
@@ -366,6 +371,9 @@ public partial class TopicSearch
         };
     }
 
-    private static string FormatMessageTime(DateTimeOffset time)
-        => time.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+    private string FormatMessageTime(DateTimeOffset time)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
+        return local.ToString("yyyy/MM/dd HH:mm");
+    }
 }

@@ -15,7 +15,7 @@ public class SettingsEndpointsTests
     {
         var settingsService = new Mock<ISystemSettingsService>();
         settingsService.Setup(x => x.GetSecuritySettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SecuritySettingsDto(true));
+            .ReturnsAsync(new SecuritySettingsDto(true, "UTC", 10, "zh-CN"));
 
         var result = await SettingsEndpoints.GetSecurityAsync(settingsService.Object, CancellationToken.None);
 

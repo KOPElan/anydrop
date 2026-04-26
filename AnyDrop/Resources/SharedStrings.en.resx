@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Navigation -->
+  <data name="Nav_Settings"><value>Settings</value></data>
+  <data name="Nav_Back"><value>Back</value></data>
+
+  <!-- Settings Page -->
+  <data name="Settings_Title"><value>Settings</value></data>
+  <data name="Settings_Account"><value>Account</value></data>
+  <data name="Settings_Nickname"><value>Nickname</value></data>
+  <data name="Settings_SaveNickname"><value>Save Nickname</value></data>
+  <data name="Settings_ChangePassword"><value>Change Password</value></data>
+  <data name="Settings_CurrentPassword"><value>Current Password</value></data>
+  <data name="Settings_NewPassword"><value>New Password</value></data>
+  <data name="Settings_ConfirmPassword"><value>Confirm New Password</value></data>
+  <data name="Settings_UpdatePassword"><value>Update Password</value></data>
+  <data name="Settings_Security"><value>System Settings</value></data>
+  <data name="Settings_AutoFetchLink"><value>Auto-fetch link previews</value></data>
+  <data name="Settings_BurnDuration"><value>Burn-after-reading duration (minutes)</value></data>
+  <data name="Settings_BurnDurationHint"><value>Default retention in minutes for burn-after-reading messages (1–43200)</value></data>
+  <data name="Settings_Timezone"><value>Display timezone</value></data>
+  <data name="Settings_TimezoneHint"><value>All message timestamps will be shown in the selected timezone</value></data>
+  <data name="Settings_Language"><value>Interface language</value></data>
+  <data name="Settings_SaveSecurity"><value>Save Settings</value></data>
+  <data name="Settings_NicknameSaved"><value>Nickname updated.</value></data>
+  <data name="Settings_PasswordUpdated"><value>Password updated.</value></data>
+  <data name="Settings_SecuritySaved"><value>Settings saved.</value></data>
+  <data name="Settings_SaveNicknameFailed"><value>Failed to save nickname.</value></data>
+  <data name="Settings_UpdatePasswordFailed"><value>Failed to update password.</value></data>
+  <data name="Settings_SaveSecurityFailed"><value>Failed to save settings.</value></data>
+
+  <!-- Login Page -->
+  <data name="Login_Title"><value>AnyDrop</value></data>
+  <data name="Login_Subtitle"><value>Private cross-device content sharing</value></data>
+  <data name="Login_Prompt"><value>Enter your password to continue</value></data>
+  <data name="Login_PasswordPlaceholder"><value>Password</value></data>
+  <data name="Login_Submit"><value>Sign In</value></data>
+  <data name="Login_Submitting"><value>Signing in…</value></data>
+
+  <!-- Language Options -->
+  <data name="Lang_ZhCN"><value>简体中文</value></data>
+  <data name="Lang_ZhTW"><value>繁體中文</value></data>
+  <data name="Lang_En"><value>English</value></data>
+</root>

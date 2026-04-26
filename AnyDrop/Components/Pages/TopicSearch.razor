@@ -111,26 +111,23 @@
                     <p class="text-xs text-on-surface-variant/60 px-1">共 @_searchResults.Count 条结果@(_searchHasMore ? "（显示最新部分）" : "")</p>
                     @foreach (var msg in _searchResults)
                     {
-                        <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
+                        <div class="search-msg-card"
                              @key="msg.Id"
                              @onclick="() => NavigateToMessage(msg.Id)">
-                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                                 style="background: var(--color-primary-fixed);">
-                                <span class="material-symbols-outlined text-sm"
-                                      style="color: var(--color-primary);">
+                            <div class="search-msg-icon">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">
                                     @GetContentTypeIcon(msg.ContentType)
                                 </span>
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm text-on-surface leading-relaxed line-clamp-2 break-words">
+                            <div class="search-msg-content">
+                                <p class="search-msg-text">
                                     @(msg.FileName ?? msg.LinkTitle ?? msg.Content)
                                 </p>
-                                <p class="mt-1 text-[11px] font-medium" style="color: var(--color-primary);">
+                                <p class="search-msg-meta">
                                     @FormatMessageTime(msg.CreatedAt)
                                 </p>
                             </div>
-                            <span class="material-symbols-outlined shrink-0 self-center text-on-surface-variant/40 transition-colors group-hover:text-primary"
-                                  style="font-size: 18px;">
+                            <span class="material-symbols-outlined search-msg-arrow">
                                 open_in_new
                             </span>
                         </div>
@@ -300,26 +297,23 @@
                         @* 其他消息：通用列表行 *@
                         else
                         {
-                            <div class="group flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-surface-container cursor-pointer"
+                            <div class="search-msg-card"
                                  @key="msg.Id"
                                  @onclick="() => NavigateToMessage(msg.Id)">
-                                <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                                     style="background: var(--color-primary-fixed);">
-                                    <span class="material-symbols-outlined text-sm"
-                                          style="color: var(--color-primary);">
+                                <div class="search-msg-icon">
+                                    <span class="material-symbols-outlined" style="font-size: 16px;">
                                         @GetContentTypeIcon(msg.ContentType)
                                     </span>
                                 </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm text-on-surface leading-relaxed line-clamp-2 break-words">
+                                <div class="search-msg-content">
+                                    <p class="search-msg-text">
                                         @(msg.FileName ?? msg.LinkTitle ?? msg.Content)
                                     </p>
-                                    <p class="mt-1 text-[11px] font-medium" style="color: var(--color-primary);">
+                                    <p class="search-msg-meta">
                                         @FormatMessageTime(msg.CreatedAt)
                                     </p>
                                 </div>
-                                <span class="material-symbols-outlined shrink-0 self-center text-on-surface-variant/40 transition-colors group-hover:text-primary"
-                                      style="font-size: 18px;">
+                                <span class="material-symbols-outlined search-msg-arrow">
                                     open_in_new
                                 </span>
                             </div>

@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Security.Claims;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Localization;
 
 namespace AnyDrop.Api;
 
@@ -16,6 +18,7 @@ public static class SettingsEndpoints
         group.MapPut("/password", UpdatePasswordAsync);
         group.MapGet("/security", GetSecurityAsync);
         group.MapPut("/security", UpdateSecurityAsync);
+        group.MapPost("/set-culture", SetCultureAsync);
 
         return app;
     }
@@ -101,10 +104,29 @@ public static class SettingsEndpoints
         ISystemSettingsService systemSettingsService,
         CancellationToken ct)
     {
-        var result = await systemSettingsService.UpdateSecuritySettingsAsync(request.AutoFetchLinkPreview, ct);
+        var result = await systemSettingsService.UpdateSecuritySettingsAsync(request, ct);
         return result.Succeeded
             ? Results.Ok(ApiEnvelope<SecuritySettingsDto>.Ok(result.Data!))
             : Results.Json(ApiEnvelope<SecuritySettingsDto>.Fail(result.Error ?? "更新失败。"), statusCode: result.StatusCode);
+    }
+
+    /// <summary>
+    /// 设置 ASP.NET Core 文化 Cookie，使下次页面加载时使用指定语言。
+    /// </summary>
+    public static IResult SetCultureAsync(SetCultureRequest request, HttpContext httpContext)
+    {
+        var validCultures = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "zh-CN", "zh-TW", "en" };
+        if (!validCultures.Contains(request.Culture))
+        {
+            return Results.BadRequest(ApiEnvelope<object>.Fail("不支持的语言代码。"));
+        }
+
+        httpContext.Response.Cookies.Append(
+            CookieRequestCultureProvider.DefaultCookieName,
+            CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(request.Culture)),
+            new CookieOptions { Expires = DateTimeOffset.UtcNow.AddYears(1), IsEssential = true, SameSite = SameSiteMode.Lax });
+
+        return Results.Ok(ApiEnvelope<object>.Ok(new { culture = request.Culture }));
     }
 
     private static Guid? GetUserId(ClaimsPrincipal principal)
@@ -113,3 +135,5 @@ public static class SettingsEndpoints
         return Guid.TryParse(id, out var userId) ? userId : null;
     }
 }
+
+public sealed record SetCultureRequest(string Culture);

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- 導航 / Navigation -->
+  <data name="Nav_Settings"><value>系統設置</value></data>
+  <data name="Nav_Back"><value>返回</value></data>
+
+  <!-- 設置頁 / Settings Page -->
+  <data name="Settings_Title"><value>系統設置</value></data>
+  <data name="Settings_Account"><value>帳號設置</value></data>
+  <data name="Settings_Nickname"><value>暱稱</value></data>
+  <data name="Settings_SaveNickname"><value>儲存暱稱</value></data>
+  <data name="Settings_ChangePassword"><value>修改密碼</value></data>
+  <data name="Settings_CurrentPassword"><value>目前密碼</value></data>
+  <data name="Settings_NewPassword"><value>新密碼</value></data>
+  <data name="Settings_ConfirmPassword"><value>確認新密碼</value></data>
+  <data name="Settings_UpdatePassword"><value>更新密碼</value></data>
+  <data name="Settings_Security"><value>系統設置</value></data>
+  <data name="Settings_AutoFetchLink"><value>自動獲取連結預覽</value></data>
+  <data name="Settings_BurnDuration"><value>閱後即焚時長（分鐘）</value></data>
+  <data name="Settings_BurnDurationHint"><value>新建閱後即焚訊息時預設保留的分鐘數（1–43200）</value></data>
+  <data name="Settings_Timezone"><value>顯示時區</value></data>
+  <data name="Settings_TimezoneHint"><value>所有訊息時間將以所選時區顯示</value></data>
+  <data name="Settings_Language"><value>介面語言</value></data>
+  <data name="Settings_SaveSecurity"><value>儲存設置</value></data>
+  <data name="Settings_NicknameSaved"><value>暱稱已更新。</value></data>
+  <data name="Settings_PasswordUpdated"><value>密碼已更新。</value></data>
+  <data name="Settings_SecuritySaved"><value>設置已儲存。</value></data>
+  <data name="Settings_SaveNicknameFailed"><value>儲存暱稱失敗。</value></data>
+  <data name="Settings_UpdatePasswordFailed"><value>更新密碼失敗。</value></data>
+  <data name="Settings_SaveSecurityFailed"><value>儲存設置失敗。</value></data>
+
+  <!-- 登入頁 / Login Page -->
+  <data name="Login_Title"><value>AnyDrop</value></data>
+  <data name="Login_Subtitle"><value>私有跨裝置內容共享平台</value></data>
+  <data name="Login_Prompt"><value>輸入密碼繼續使用</value></data>
+  <data name="Login_PasswordPlaceholder"><value>請輸入密碼</value></data>
+  <data name="Login_Submit"><value>登 入</value></data>
+  <data name="Login_Submitting"><value>登入中…</value></data>
+
+  <!-- 語言選項 / Language Options -->
+  <data name="Lang_ZhCN"><value>简体中文</value></data>
+  <data name="Lang_ZhTW"><value>繁體中文</value></data>
+  <data name="Lang_En"><value>English</value></data>
+</root>
