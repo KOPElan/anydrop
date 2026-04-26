@@ -617,26 +617,27 @@
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        /* 优雅的多层渐变：深蓝-紫-靛蓝，配合纯色光晕形成深度感 */
-        background: linear-gradient(
-            135deg,
-            #0d1b3e 0%,
-            #1a2a5e 25%,
-            #1e3a7a 50%,
-            #283593 75%,
-            #1565c0 100%
-        );
+        /* 认证页浅色氛围，与首页保持同一视觉家族 */
+        background:
+            radial-gradient(circle at 12% 18%, rgba(0, 80, 203, 0.12) 0%, transparent 44%),
+            radial-gradient(circle at 85% 82%, rgba(66, 92, 160, 0.10) 0%, transparent 42%),
+            linear-gradient(135deg, #eef3ff 0%, #f7f9ff 45%, #f3f6fb 100%);
     }
 
-    /* 模拟网格/星空纹理 */
+    /* 轻纹理层，避免平面化背景 */
     .login-shell::before {
         content: "";
         position: absolute;
         inset: 0;
-        background-image:
-            radial-gradient(ellipse at 20% 20%, rgba(99, 179, 237, 0.12) 0%, transparent 55%),
-            radial-gradient(ellipse at 80% 80%, rgba(147, 112, 219, 0.14) 0%, transparent 55%),
-            radial-gradient(ellipse at 60% 10%, rgba(56, 189, 248, 0.08) 0%, transparent 40%);
+        background:
+            linear-gradient(115deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.15)),
+            repeating-linear-gradient(
+                -45deg,
+                rgba(194, 198, 216, 0.10) 0,
+                rgba(194, 198, 216, 0.10) 1px,
+                transparent 1px,
+                transparent 12px
+            );
         pointer-events: none;
     }
 
@@ -649,53 +650,80 @@
     }
 
     .login-card {
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(194, 198, 216, 0.65);
         border-radius: 1.75rem;
         padding: 2.25rem;
         box-shadow:
-            0 32px 64px rgba(0, 0, 0, 0.45),
-            0 0 0 1px rgba(255, 255, 255, 0.06) inset;
-        backdrop-filter: blur(32px) saturate(180%);
-        -webkit-backdrop-filter: blur(32px) saturate(180%);
+            0 20px 40px rgba(66, 92, 160, 0.14),
+            0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+        -webkit-backdrop-filter: blur(20px) saturate(140%);
+        backdrop-filter: blur(20px) saturate(140%);
         animation: login-card-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
     .login-logo-icon {
-        background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(147, 112, 219, 0.25));
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(56, 189, 248, 0.2) inset;
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        border: 1px solid rgba(0, 80, 203, 0.2);
+        box-shadow: 0 10px 24px rgba(0, 80, 203, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+    }
+
+    .login-logo-symbol {
+        font-size: 32px;
+        font-variation-settings: 'FILL' 1;
+    }
+
+    .login-title {
+        color: var(--color-on-surface);
+    }
+
+    .login-subtitle {
+        color: var(--color-on-surface-variant);
+        opacity: 0.8;
+    }
+
+    .login-divider {
+        border-top: 1px solid rgba(194, 198, 216, 0.65);
+    }
+
+    .login-prompt {
+        color: var(--color-on-surface-variant);
     }
 
     .login-input {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(194, 198, 216, 0.9);
+        color: var(--color-on-surface);
         outline: none;
         transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
     }
 
     .login-input::placeholder {
-        color: rgba(255, 255, 255, 0.35);
+        color: rgba(66, 70, 86, 0.52);
+    }
+
+    .login-input-icon {
+        font-size: 18px;
+        color: rgba(66, 70, 86, 0.55);
     }
 
     .login-input:focus {
-        border-color: rgba(255, 255, 255, 0.6);
-        background: rgba(255, 255, 255, 0.14);
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+        border-color: rgba(0, 80, 203, 0.55);
+        background: rgba(255, 255, 255, 1);
+        box-shadow: 0 0 0 3px rgba(0, 80, 203, 0.14);
     }
 
     .login-btn {
-        background: white;
-        color: var(--color-primary);
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        color: var(--color-on-primary);
         font-weight: 600;
         letter-spacing: 0.025em;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 22px rgba(0, 80, 203, 0.3);
     }
 
     .login-btn:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 12px 28px rgba(0, 80, 203, 0.34);
     }
 
     .login-btn:active:not(:disabled) {
@@ -707,18 +735,36 @@
         cursor: not-allowed;
     }
 
+    .login-spinner-icon {
+        font-size: 16px;
+    }
+
+    .login-error {
+        background: var(--color-error-container);
+        border: 1px solid rgba(186, 26, 26, 0.25);
+    }
+
+    .login-error-icon {
+        font-size: 16px;
+        color: var(--color-error);
+    }
+
+    .login-error-text {
+        color: #8b1b1b;
+    }
+
     .login-glow {
         position: absolute;
         border-radius: 50%;
-        filter: blur(80px);
-        opacity: 0.4;
+        filter: blur(96px);
+        opacity: 0.5;
         pointer-events: none;
     }
 
     .login-glow--1 {
         width: 600px;
         height: 600px;
-        background: radial-gradient(circle, rgba(56, 189, 248, 0.6), transparent);
+        background: radial-gradient(circle, rgba(0, 102, 255, 0.24), transparent 70%);
         top: -200px;
         right: -150px;
     }
@@ -726,10 +772,10 @@
     .login-glow--2 {
         width: 500px;
         height: 500px;
-        background: radial-gradient(circle, rgba(147, 112, 219, 0.5), transparent);
+        background: radial-gradient(circle, rgba(66, 92, 160, 0.22), transparent 72%);
         bottom: -150px;
         left: -100px;
-        opacity: 0.3;
+        opacity: 0.38;
     }
 
     /* ─── spinner 动画（用于登录中状态）─── */
@@ -757,6 +803,67 @@
         font-weight: 600;
         color: var(--color-on-surface);
         font-family: var(--font-headline);
+    }
+
+    /* ─── Setup 认证表单（浅色主题）─── */
+    .setup-card {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(194, 198, 216, 0.65);
+        background: rgba(255, 255, 255, 0.88);
+        -webkit-backdrop-filter: blur(18px) saturate(145%);
+        backdrop-filter: blur(18px) saturate(145%);
+        padding: 1.5rem;
+        box-shadow: 0 16px 36px rgba(66, 92, 160, 0.14);
+    }
+
+    .setup-title {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+        font-weight: 700;
+        color: var(--color-on-surface);
+        font-family: var(--font-headline);
+    }
+
+    .setup-subtitle {
+        color: var(--color-on-surface-variant);
+    }
+
+    .auth-label {
+        color: var(--color-on-surface-variant);
+    }
+
+    .auth-input {
+        border: 1px solid rgba(194, 198, 216, 0.9);
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--color-on-surface);
+        outline: none;
+        transition: border-color 200ms ease, box-shadow 200ms ease;
+    }
+
+    .auth-input:focus {
+        border-color: rgba(0, 80, 203, 0.55);
+        box-shadow: 0 0 0 3px rgba(0, 80, 203, 0.14);
+    }
+
+    .auth-submit-btn {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+        color: var(--color-on-primary);
+        transition: transform 180ms ease, box-shadow 180ms ease;
+        box-shadow: 0 8px 20px rgba(0, 80, 203, 0.28);
+    }
+
+    .auth-submit-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(0, 80, 203, 0.32);
+    }
+
+    .auth-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .auth-error-text {
+        color: var(--color-error);
     }
 
     .settings-label {
