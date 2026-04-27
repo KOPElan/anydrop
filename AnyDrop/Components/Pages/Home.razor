@@ -285,90 +285,6 @@
             @foreach (var pending in _pendingUploads)
             {
                 <div class="flex flex-col items-start max-w-2xl message-bubble m-6" @key="pending.TempId">
-                @if (pending.IsCompleted && pending.CompletedDto is ShareItemDto completedMsg)
-                {
-                    @* 上传完成 — 在原气泡上直接渲染完整预览，与正式消息气泡保持一致，无闪烁过渡 *@
-                    @switch (completedMsg.ContentType)
-                    {
-                        case ShareContentType.Image:
-                            <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-lg transition-all duration-150">
-                                <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
-                                     @onclick="() => OpenImagePreview(GetFileUrl(completedMsg.Id))">
-                                    <img class="max-h-72 w-full object-contain transition-transform duration-200 hover:scale-[1.02]"
-                                         src="@GetFileUrl(completedMsg.Id)"
-                                         alt="@completedMsg.FileName" />
-                                </div>
-                                <div class="flex items-center justify-between px-1">
-                                    <div class="flex items-center gap-3">
-                                        <div class="p-2 rounded-lg bg-white/20">
-                                            <span class="material-symbols-outlined text-lg text-white">image</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-semibold text-sm text-white">@(completedMsg.FileName ?? L["Home_Image"])</h4>
-                                            @if (completedMsg.FileSize.HasValue)
-                                            {
-                                                <p class="text-[11px] text-white/70">@FormatFileSize(completedMsg.FileSize.Value)</p>
-                                            }
-                                        </div>
-                                    </div>
-                                    <a href="@GetFileUrl(completedMsg.Id, true)" class="p-2 text-white/70 hover:text-white transition-colors">
-                                        <span class="material-symbols-outlined">download</span>
-                                    </a>
-                                </div>
-                            </div>
-                            break;
-
-                        case ShareContentType.Video:
-                            <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-lg transition-all duration-150">
-                                <div class="rounded-xl overflow-hidden mb-3">
-                                    <video class="w-full max-h-64 rounded-xl" controls src="@GetFileUrl(completedMsg.Id)"></video>
-                                </div>
-                                <div class="flex items-center justify-between px-1">
-                                    <div class="flex items-center gap-3">
-                                        <div class="p-2 rounded-lg bg-white/20">
-                                            <span class="material-symbols-outlined text-lg text-white">videocam</span>
-                                        </div>
-                                        <div>
-                                            <h4 class="font-semibold text-sm text-white">@(completedMsg.FileName ?? L["Home_Video"])</h4>
-                                            @if (completedMsg.FileSize.HasValue)
-                                            {
-                                                <p class="text-[11px] text-white/70">@FormatFileSize(completedMsg.FileSize.Value)</p>
-                                            }
-                                        </div>
-                                    </div>
-                                    <a href="@GetFileUrl(completedMsg.Id, true)" class="p-2 text-white/70 hover:text-white transition-colors">
-                                        <span class="material-symbols-outlined">download</span>
-                                    </a>
-                                </div>
-                            </div>
-                            break;
-
-                        default:
-                            <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg flex items-center gap-4 w-full max-w-md transition-all duration-150">
-                                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 flex-shrink-0">
-                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h4 class="font-semibold text-sm text-white truncate">@(completedMsg.FileName ?? L["Home_File"])</h4>
-                                    @if (completedMsg.FileSize.HasValue)
-                                    {
-                                        <p class="text-[11px] text-white/70">@FormatFileSize(completedMsg.FileSize.Value)</p>
-                                    }
-                                </div>
-                                <a href="@GetFileUrl(completedMsg.Id, true)" class="p-2 text-white/70 hover:text-white flex-shrink-0 transition-colors">
-                                    <span class="material-symbols-outlined">download</span>
-                                </a>
-                            </div>
-                            break;
-                    }
-                    <div class="mt-3 flex items-center gap-1.5 text-[11px] font-semibold pl-2" style="color: var(--color-outline);">
-                        <span class="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style="background-color: rgba(59,130,246,0.50);"></span>
-                        <span>@FormatMessageTime(completedMsg.CreatedAt)</span>
-                    </div>
-                }
-                else
-                {
-                    @* 上传中或失败 — 显示文件信息 + 进度条/错误提示 *@
                     <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg w-full max-w-md flex flex-col gap-3">
                         @* 文件信息行 *@
                         <div class="flex items-center gap-3">
@@ -408,7 +324,6 @@
                             <span>@L["Home_Uploading"]</span>
                         }
                     </div>
-                }
                 </div>
             }
             </div>

@@ -28,7 +28,7 @@ public partial class TopicSearch
 
     // 用于时间显示的浏览器时区（IANA ID）
     private string _browserTimeZoneId = "UTC";
-    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
 
     // ─── 文字搜索 ───
     private string _searchQuery = string.Empty;
@@ -72,7 +72,7 @@ public partial class TopicSearch
         {
             _browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
             try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZoneId); }
-            catch { _displayTimeZone = TimeZoneInfo.Utc; }
+            catch { _displayTimeZone = TimeZoneInfo.Local; }
         }
         catch { /* JS interop failure - keep UTC */ }
         await InvokeAsync(StateHasChanged);
