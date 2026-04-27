@@ -65,7 +65,8 @@ public partial class Settings
         }
 
         // 从 localStorage 读取主题设置
-        _isDarkMode = await JSRuntime.InvokeAsync<bool>("AnyDropTheme.get");
+        try { _isDarkMode = await JSRuntime.InvokeAsync<bool>("AnyDropTheme.get"); }
+        catch { _isDarkMode = false; }
     }
 
     private async Task SaveNicknameAsync()

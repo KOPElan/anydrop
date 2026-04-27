@@ -51,6 +51,8 @@ public partial class Home : IAsyncDisposable
     // 浏览器时区（IANA），在首次渲染后从 JS 获取
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
+    // 组件已销毁标志，防止销毁后继续更新 UI
+    private bool _isDisposed;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -604,12 +606,8 @@ public partial class Home : IAsyncDisposable
             }
             finally
             {
-                // 无论成功或失败，短暂延迟后移除占位条目
-                _ = Task.Delay(pending.IsFailed ? 3000 : 200).ContinueWith(_ =>
-                {
-                    _pendingUploads.Remove(pending);
-                    _ = InvokeAsync(StateHasChanged);
-                });
+                // 无论成功或失败，短暂延迟后移除占位条目（捕获 ObjectDisposedException 防止组件已销毁）
+                _ = RemovePendingAfterDelayAsync(pending, pending.IsFailed ? 3000 : 200);
             }
 
             StateHasChanged();
@@ -678,14 +676,20 @@ public partial class Home : IAsyncDisposable
         }
         finally
         {
-            _ = Task.Delay(pending.IsFailed ? 3000 : 200).ContinueWith(_ =>
-            {
-                _pendingUploads.Remove(pending);
-                _ = InvokeAsync(StateHasChanged);
-            });
+            _ = RemovePendingAfterDelayAsync(pending, pending.IsFailed ? 3000 : 200);
         }
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>延迟后安全移除待上传占位条目，忽略组件已销毁的情况。</summary>
+    private async Task RemovePendingAfterDelayAsync(PendingUpload pending, int delayMs)
+    {
+        await Task.Delay(delayMs).ConfigureAwait(false);
+        if (_isDisposed) return;
+        _pendingUploads.Remove(pending);
+        try { await InvokeAsync(StateHasChanged).ConfigureAwait(false); }
+        catch (ObjectDisposedException) { /* 组件已销毁，忽略 */ }
     }
 
     /// <summary>切换阅后即焚模式。</summary>
@@ -708,6 +712,8 @@ public partial class Home : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _isDisposed = true;
+
         // 清理 JS 拖放事件监听器，防止内存泄漏
         try
         {
@@ -974,6 +980,12 @@ public partial class Home : IAsyncDisposable
         {
             if (disposing) inner.Dispose();
             base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await inner.DisposeAsync().ConfigureAwait(false);
+            GC.SuppressFinalize(this);
         }
     }
 }
