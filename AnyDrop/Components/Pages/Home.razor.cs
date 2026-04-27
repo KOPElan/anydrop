@@ -51,8 +51,6 @@ public partial class Home : IAsyncDisposable
     // 浏览器时区（IANA），在首次渲染后从 JS 获取
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
-    // 组件已销毁标志，防止销毁后继续更新 UI
-    private bool _isDisposed;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -261,10 +259,24 @@ public partial class Home : IAsyncDisposable
                         return;
                     }
 
+                    // 若当前消息是由本端上传完成的占位条目，移除占位并将正式消息加入列表（原位无闪烁过渡）
+                    var completedPending = _pendingUploads.Find(p => p.IsCompleted && p.CompletedDto?.Id == dto.Id);
+                    if (completedPending is not null)
+                    {
+                        _pendingUploads.Remove(completedPending);
+                    }
+
                     // 新消息：O(1) 去重后追加到末尾，保持时间升序
                     // 仅当用户处于底部附近时才触发自动滚动（避免打断用户翻阅历史记录）
                     if (_messageIds.Add(dto.Id))
                     {
+                        _messages.Add(dto);
+                        _shouldScrollIfNearBottom = true;
+                        StateHasChanged();
+                    }
+                    else if (completedPending is not null)
+                    {
+                        // ID 已在 _messageIds（上传时预注册），直接加入并刷新
                         _messages.Add(dto);
                         _shouldScrollIfNearBottom = true;
                         StateHasChanged();
@@ -587,12 +599,13 @@ public partial class Home : IAsyncDisposable
                 var dto = await ShareService.SendFileAsync(progressStream, file.Name, file.ContentType,
                     _selectedTopicId.Value, knownFileSize: file.Size, burnAfterReading: _burnAfterReading);
 
-                // 上传成功：将真实 DTO 加入消息列表（避免等待 SignalR 重复推送）
-                if (_messageIds.Add(dto.Id))
-                {
-                    _messages.Add(dto);
-                    _shouldScrollIfNearBottom = true;
-                }
+                // 上传成功：将 ID 加入去重集合（防止 SignalR 重复），并在原气泡上标记完成状态
+                // 不直接加入 _messages，等待 SignalR 推送或 polling 刷新时再原位替换，避免闪烁
+                _messageIds.Add(dto.Id);
+                pending.CompletedDto = dto;
+                pending.IsCompleted = true;
+                pending.ProgressPercent = 100;
+                _shouldScrollIfNearBottom = true;
             }
             catch (IOException ex) when (ex.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
             {
@@ -603,11 +616,6 @@ public partial class Home : IAsyncDisposable
             {
                 pending.IsFailed = true;
                 _validationError = L["Home_FileUploadFailed", file.Name];
-            }
-            finally
-            {
-                // 无论成功或失败，短暂延迟后移除占位条目（捕获 ObjectDisposedException 防止组件已销毁）
-                _ = RemovePendingAfterDelayAsync(pending, pending.IsFailed ? 3000 : 200);
             }
 
             StateHasChanged();
@@ -661,12 +669,12 @@ public partial class Home : IAsyncDisposable
             var dto = await ShareService.SendFileAsync(progressStream, fileName, safeMimeType, _selectedTopicId.Value,
                 knownFileSize: fileSize, burnAfterReading: _burnAfterReading);
 
-            // 上传成功：将真实 DTO 加入消息列表
-            if (_messageIds.Add(dto.Id))
-            {
-                _messages.Add(dto);
-                _shouldScrollIfNearBottom = true;
-            }
+            // 上传成功：原气泡就地标记完成，等 SignalR 推送时再移除占位并加入正式列表
+            _messageIds.Add(dto.Id);
+            pending.CompletedDto = dto;
+            pending.IsCompleted = true;
+            pending.ProgressPercent = 100;
+            _shouldScrollIfNearBottom = true;
         }
         catch (Exception ex)
         {
@@ -674,22 +682,8 @@ public partial class Home : IAsyncDisposable
             pending.IsFailed = true;
             _validationError = L["Home_DropFileUploadFailed"];
         }
-        finally
-        {
-            _ = RemovePendingAfterDelayAsync(pending, pending.IsFailed ? 3000 : 200);
-        }
 
         await InvokeAsync(StateHasChanged);
-    }
-
-    /// <summary>延迟后安全移除待上传占位条目，忽略组件已销毁的情况。</summary>
-    private async Task RemovePendingAfterDelayAsync(PendingUpload pending, int delayMs)
-    {
-        await Task.Delay(delayMs).ConfigureAwait(false);
-        if (_isDisposed) return;
-        _pendingUploads.Remove(pending);
-        try { await InvokeAsync(StateHasChanged).ConfigureAwait(false); }
-        catch (ObjectDisposedException) { /* 组件已销毁，忽略 */ }
     }
 
     /// <summary>切换阅后即焚模式。</summary>
@@ -712,8 +706,6 @@ public partial class Home : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _isDisposed = true;
-
         // 清理 JS 拖放事件监听器，防止内存泄漏
         try
         {
@@ -834,6 +826,9 @@ public partial class Home : IAsyncDisposable
             }
         }
 
+        // 轮询降级场景：移除已由服务端确认的完成态占位条目，避免与正式消息重叠
+        _pendingUploads.RemoveAll(p => p.IsCompleted && p.CompletedDto is not null && _messageIds.Contains(p.CompletedDto.Id));
+
         _shouldScrollToBottom = true;
     }
 
@@ -917,6 +912,10 @@ public partial class Home : IAsyncDisposable
         public ShareContentType ContentType { get; } = contentType;
         public int ProgressPercent { get; set; }
         public bool IsFailed { get; set; }
+        /// <summary>上传完成时为 true，此时 <see cref="CompletedDto"/> 包含服务端返回的消息数据。</summary>
+        public bool IsCompleted { get; set; }
+        /// <summary>上传成功后由服务端返回的消息 DTO，用于在原气泡上直接渲染预览。</summary>
+        public ShareItemDto? CompletedDto { get; set; }
 
         public static ShareContentType ResolveContentType(string mime)
         {
