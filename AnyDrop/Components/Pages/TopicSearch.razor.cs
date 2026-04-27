@@ -15,7 +15,6 @@ public partial class TopicSearch
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
-    [Inject] public required ISystemSettingsService SystemSettingsService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required ILogger<TopicSearch> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
@@ -27,7 +26,8 @@ public partial class TopicSearch
     // 主题名称
     private string? _topicName;
 
-    // 用于时间显示的时区
+    // 用于时间显示的浏览器时区（IANA ID）
+    private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
 
     // ─── 文字搜索 ───
@@ -62,8 +62,20 @@ public partial class TopicSearch
     protected override async Task OnInitializedAsync()
     {
         _calendarWindowStart = CalcDefaultWindowStart();
-        _displayTimeZone = await SystemSettingsService.GetDisplayTimeZoneAsync();
         await LoadTopicNameAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
+            try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZoneId); }
+            catch { _displayTimeZone = TimeZoneInfo.Utc; }
+        }
+        catch { /* JS interop failure - keep UTC */ }
+        await InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnParametersSetAsync()

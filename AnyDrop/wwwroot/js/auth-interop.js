@@ -26,6 +26,23 @@ window.authInterop = {
     }
 };
 
+/**
+ * 主题管理：读取/写入 localStorage，并同步切换 <html> 上的 .dark 类。
+ */
+window.AnyDropTheme = {
+  init: function () {
+    var dark = localStorage.getItem('theme') === 'dark';
+    document.documentElement.classList.toggle('dark', dark);
+  },
+  set: function (isDark) {
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', isDark);
+  },
+  get: function () {
+    return localStorage.getItem('theme') === 'dark';
+  }
+};
+
 async function toResult(response) {
     let body = null;
     try {

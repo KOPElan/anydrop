@@ -58,8 +58,8 @@
   <data name="Settings_AutoFetchLink"><value>自動獲取連結預覽</value></data>
   <data name="Settings_BurnDuration"><value>閱後即焚時長（分鐘）</value></data>
   <data name="Settings_BurnDurationHint"><value>新建閱後即焚訊息時預設保留的分鐘數（1–43200）</value></data>
-  <data name="Settings_Timezone"><value>顯示時區</value></data>
-  <data name="Settings_TimezoneHint"><value>所有訊息時間將以所選時區顯示</value></data>
+  <data name="Settings_DarkMode"><value>暗色主題</value></data>
+  <data name="Settings_DarkModeHint"><value>啟用後將切換為暗色介面</value></data>
   <data name="Settings_Language"><value>介面語言</value></data>
   <data name="Settings_SaveSecurity"><value>儲存設置</value></data>
   <data name="Settings_NicknameSaved"><value>暱稱已更新。</value></data>
@@ -196,6 +196,8 @@
   <data name="Home_ExpiringSoon"><value>即將刪除</value></data>
   <data name="Home_DeleteAfterMinutes"><value>{0} 分鐘後刪除</value></data>
   <data name="Home_DeleteAfterSeconds"><value>{0} 秒後刪除</value></data>
+  <data name="Home_Uploading"><value>上傳中…</value></data>
+  <data name="Home_UploadFailed"><value>上傳失敗</value></data>
 
   <data name="Search_PageTitle"><value>搜尋 · {0}</value></data>
   <data name="Search_DefaultTopicName"><value>主題</value></data>

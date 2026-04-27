@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="@Assets["AnyDrop.styles.css"]" />
     <ImportMap />
     <HeadOutlet @rendermode="InteractiveServer" />
+    @* 尽早恢复主题，避免出现白色/暗色闪烁（FOUC） *@
+    <script>(function(){var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');})()</script>
 </head>
 
 <body>

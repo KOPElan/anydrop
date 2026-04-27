@@ -16,13 +16,11 @@ public sealed record UpdatePasswordRequest(string CurrentPassword, string NewPas
 
 public sealed record SecuritySettingsDto(
     bool AutoFetchLinkPreview,
-    string TimeZoneId,
     int BurnAfterReadingMinutes,
     string Language);
 
 public sealed record UpdateSecuritySettingsRequest(
     bool AutoFetchLinkPreview,
-    string TimeZoneId,
     int BurnAfterReadingMinutes,
     string Language);
 

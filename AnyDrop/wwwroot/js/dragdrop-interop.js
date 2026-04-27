@@ -169,3 +169,15 @@ AnyDropInterop.showDatePicker = function (inputId) {
     el.showPicker();
   }
 };
+
+/**
+ * 返回浏览器当前的 IANA 时区 ID（如 "Asia/Shanghai"）。
+ * @returns {string} 浏览器时区 ID
+ */
+AnyDropInterop.getBrowserTimeZone = function () {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+};

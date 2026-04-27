@@ -31,6 +31,8 @@ public partial class Home : IAsyncDisposable
     private readonly List<ShareItemDto> _messages = [];
     // O(1) 消息去重：避免 SignalR 推送与主动刷新产生重复条目
     private readonly HashSet<Guid> _messageIds = [];
+    // 待上传占位条目列表
+    private readonly List<PendingUpload> _pendingUploads = [];
     private HubConnection? _hubConnection;
     private CancellationTokenSource? _pollingCts;
     private Task? _pollingTask;
@@ -45,6 +47,10 @@ public partial class Home : IAsyncDisposable
     private bool _selectedTopicArchived;
     private bool _selectedTopicIsBuiltIn;
     private int _selectedTopicMessageCount;
+
+    // 浏览器时区（IANA），在首次渲染后从 JS 获取
+    private string _browserTimeZoneId = "UTC";
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Utc;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -207,6 +213,18 @@ public partial class Home : IAsyncDisposable
 
         if (firstRender)
         {
+            // 获取浏览器时区，用于正确显示消息时间
+            try
+            {
+                _browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
+                try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZoneId); }
+                catch { _displayTimeZone = TimeZoneInfo.Utc; }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Failed to get browser timezone, falling back to UTC.");
+            }
+
             // 设置聊天区域拖放处理（JS 端负责消抖，仅在状态变化时回调 .NET）
             _dotNetRef = DotNetObjectReference.Create(this);
             try
@@ -535,29 +553,67 @@ public partial class Home : IAsyncDisposable
 
         _validationError = null;
 
-        foreach (var file in args.GetMultipleFiles())
+        var files = args.GetMultipleFiles().ToList();
+        var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
+
+        // 为每个文件立即创建占位条目并渲染，给用户即时反馈
+        var pendingList = new List<(PendingUpload Pending, IBrowserFile File)>();
+        foreach (var file in files)
+        {
+            var contentType = PendingUpload.ResolveContentType(file.ContentType);
+            var pending = new PendingUpload(file.Name, file.ContentType, file.Size, contentType);
+            _pendingUploads.Add(pending);
+            pendingList.Add((pending, file));
+        }
+
+        // 显示占位符并请求滚动到底部
+        _shouldScrollIfNearBottom = true;
+        StateHasChanged();
+
+        // 依次上传文件（占位符保持显示并更新进度）
+        foreach (var (pending, file) in pendingList)
         {
             try
             {
-                var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-                await using var stream = file.OpenReadStream(maxAllowedSize: maxFileSize);
-                await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value,
-                    burnAfterReading: _burnAfterReading);
+                await using var rawStream = file.OpenReadStream(maxAllowedSize: maxFileSize);
+                await using var progressStream = new ProgressStream(rawStream, file.Size, percent =>
+                {
+                    pending.ProgressPercent = percent;
+                    _ = InvokeAsync(StateHasChanged);
+                });
+
+                var dto = await ShareService.SendFileAsync(progressStream, file.Name, file.ContentType,
+                    _selectedTopicId.Value, knownFileSize: file.Size, burnAfterReading: _burnAfterReading);
+
+                // 上传成功：将真实 DTO 加入消息列表（避免等待 SignalR 重复推送）
+                if (_messageIds.Add(dto.Id))
+                {
+                    _messages.Add(dto);
+                    _shouldScrollIfNearBottom = true;
+                }
             }
             catch (IOException ex) when (ex.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
             {
+                pending.IsFailed = true;
                 _validationError = L["Home_FileTooLargeSkipped", file.Name];
-                StateHasChanged();
             }
             catch (Exception)
             {
+                pending.IsFailed = true;
                 _validationError = L["Home_FileUploadFailed", file.Name];
-                StateHasChanged();
             }
-        }
+            finally
+            {
+                // 无论成功或失败，短暂延迟后移除占位条目
+                _ = Task.Delay(pending.IsFailed ? 3000 : 200).ContinueWith(_ =>
+                {
+                    _pendingUploads.Remove(pending);
+                    _ = InvokeAsync(StateHasChanged);
+                });
+            }
 
-        // 主动刷新，确保在 SignalR 降级场景下也能立即呈现
-        await LoadSelectedTopicMessagesAsync();
+            StateHasChanged();
+        }
     }
 
     /// <summary>
@@ -584,28 +640,49 @@ public partial class Home : IAsyncDisposable
         }
 
         _validationError = null;
-        _isSending = true;
+
+        // 立即创建占位条目，给用户即时反馈
+        var safeMimeType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType;
+        var contentType = PendingUpload.ResolveContentType(safeMimeType);
+        var pending = new PendingUpload(fileName, safeMimeType, fileSize, contentType);
+        _pendingUploads.Add(pending);
+        _shouldScrollIfNearBottom = true;
         await InvokeAsync(StateHasChanged);
 
         try
         {
             var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-            var safeMimeType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType;
 
-            await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
-            await ShareService.SendFileAsync(stream, fileName, safeMimeType, _selectedTopicId.Value,
+            await using var rawStream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
+            await using var progressStream = new ProgressStream(rawStream, fileSize, percent =>
+            {
+                pending.ProgressPercent = percent;
+                _ = InvokeAsync(StateHasChanged);
+            });
+
+            var dto = await ShareService.SendFileAsync(progressStream, fileName, safeMimeType, _selectedTopicId.Value,
                 knownFileSize: fileSize, burnAfterReading: _burnAfterReading);
 
-            await LoadSelectedTopicMessagesAsync();
+            // 上传成功：将真实 DTO 加入消息列表
+            if (_messageIds.Add(dto.Id))
+            {
+                _messages.Add(dto);
+                _shouldScrollIfNearBottom = true;
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to receive dropped file {FileName}", fileName);
+            pending.IsFailed = true;
             _validationError = L["Home_DropFileUploadFailed"];
         }
         finally
         {
-            _isSending = false;
+            _ = Task.Delay(pending.IsFailed ? 3000 : 200).ContinueWith(_ =>
+            {
+                _pendingUploads.Remove(pending);
+                _ = InvokeAsync(StateHasChanged);
+            });
         }
 
         await InvokeAsync(StateHasChanged);
@@ -795,10 +872,10 @@ public partial class Home : IAsyncDisposable
         };
     }
 
-    /// <summary>将消息时间格式化为「日期 + 时间」字符串。</summary>
-    private static string FormatMessageTime(DateTimeOffset time)
+    /// <summary>将消息时间格式化为「日期 + 时间」字符串（使用浏览器时区）。</summary>
+    private string FormatMessageTime(DateTimeOffset time)
     {
-        var local = time.ToLocalTime();
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
         return local.ToString("yyyy/MM/dd HH:mm");
     }
 
@@ -814,5 +891,89 @@ public partial class Home : IAsyncDisposable
         return remaining.TotalMinutes >= 1
             ? L["Home_DeleteAfterMinutes", (int)remaining.TotalMinutes]
             : L["Home_DeleteAfterSeconds", (int)remaining.TotalSeconds];
+    }
+
+    /// <summary>返回待上传条目对应的 Material Symbol 图标名称。</summary>
+    private static string GetPendingUploadIcon(ShareContentType contentType) => contentType switch
+    {
+        ShareContentType.Image => "image",
+        ShareContentType.Video => "videocam",
+        _ => "attach_file"
+    };
+
+    /// <summary>待上传占位条目，跟踪单个文件的上传进度与状态。</summary>
+    private sealed class PendingUpload(string fileName, string mimeType, long fileSize, ShareContentType contentType)
+    {
+        public Guid TempId { get; } = Guid.NewGuid();
+        public string FileName { get; } = fileName;
+        public string MimeType { get; } = mimeType;
+        public long FileSize { get; } = fileSize;
+        public ShareContentType ContentType { get; } = contentType;
+        public int ProgressPercent { get; set; }
+        public bool IsFailed { get; set; }
+
+        public static ShareContentType ResolveContentType(string mime)
+        {
+            if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return ShareContentType.Image;
+            if (mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase)) return ShareContentType.Video;
+            return ShareContentType.File;
+        }
+    }
+
+    /// <summary>包装流并在读取时汇报上传进度百分比（每变化 ≥1% 触发一次回调）。</summary>
+    private sealed class ProgressStream(Stream inner, long totalBytes, Action<int> onProgress) : Stream
+    {
+        private long _bytesRead;
+        private int _lastPercent = -1;
+
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => totalBytes > 0 ? totalBytes : inner.Length;
+        public override long Position { get => inner.Position; set => throw new NotSupportedException(); }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var n = inner.Read(buffer, offset, count);
+            Report(n);
+            return n;
+        }
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+        {
+            var n = await inner.ReadAsync(buffer, offset, count, ct).ConfigureAwait(false);
+            Report(n);
+            return n;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            var n = await inner.ReadAsync(buffer, ct).ConfigureAwait(false);
+            Report(n);
+            return n;
+        }
+
+        private void Report(int bytes)
+        {
+            if (bytes <= 0 || totalBytes <= 0) return;
+            _bytesRead += bytes;
+            var percent = (int)Math.Min(100L, _bytesRead * 100L / totalBytes);
+            if (percent != _lastPercent)
+            {
+                _lastPercent = percent;
+                onProgress(percent);
+            }
+        }
+
+        public override void Flush() => inner.Flush();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) inner.Dispose();
+            base.Dispose(disposing);
+        }
     }
 }
