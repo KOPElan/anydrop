@@ -285,6 +285,12 @@
   .z-50 {
     z-index: 50;
   }
+  .m-6 {
+    margin: calc(var(--spacing) * 6);
+  }
+  .m-8 {
+    margin: calc(var(--spacing) * 8);
+  }
   .mx-1 {
     margin-inline: calc(var(--spacing) * 1);
   }

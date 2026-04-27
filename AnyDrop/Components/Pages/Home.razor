@@ -144,7 +144,7 @@
             {
                 var isBurnMessage = message.ExpiresAt.HasValue;
                 var bubbleClass = isBurnMessage ? "burn-after-reading" : "";
-                <div class="flex flex-col items-start max-w-2xl message-bubble @bubbleClass" @key="message.Id" data-message-id="@message.Id">
+                <div class="flex flex-col items-start max-w-2xl message-bubble m-6 @bubbleClass" @key="message.Id" data-message-id="@message.Id">
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
@@ -343,7 +343,7 @@
     }
 
     @* ─────────── 输入区（渐出遮罩 + 浮动玻璃卡片）─────────── *@
-    <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-16 chat-footer-glass" style="pointer-events: none;">
+    <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
         <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
         <div class="input-wrapper chat-input-card px-4 py-3">
             @* 附件按钮（带右侧分割线）*@
@@ -351,13 +351,13 @@
                 <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
                        style="color: var(--color-on-surface-variant);"
                       title="@L["Home_UploadImageOrVideo"]">
-                    <span class="material-symbols-outlined text-xl">image</span>
+                        <span class="material-symbols-outlined text-base">image</span>
                     <InputFile class="hidden" multiple accept="image/*,video/*" OnChange="OnFilesSelected" />
                 </label>
                 <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
                        style="color: var(--color-on-surface-variant);"
                       title="@L["Home_UploadAttachment"]">
-                    <span class="material-symbols-outlined text-xl">attach_file</span>
+                        <span class="material-symbols-outlined text-base">attach_file</span>
                     <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
                 </label>
                 @* 阅后即焚切换按钮 *@
@@ -366,7 +366,7 @@
                         style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
                     title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
                         @onclick="ToggleBurnAfterReading">
-                    <span class="material-symbols-outlined text-xl"
+                        <span class="material-symbols-outlined text-base"
                           style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
                         timer
                     </span>
