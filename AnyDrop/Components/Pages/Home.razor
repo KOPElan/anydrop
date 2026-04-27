@@ -402,13 +402,13 @@
                        style="color: var(--color-on-surface-variant);"
                       title="@L["Home_UploadImageOrVideo"]">
                         <span class="material-symbols-outlined text-base">image</span>
-                    <InputFile class="hidden" multiple accept="image/*,video/*" OnChange="OnFilesSelected" />
+                    <input @ref="_imageInputRef" type="file" class="hidden" multiple accept="image/*,video/*" />
                 </label>
                 <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
                        style="color: var(--color-on-surface-variant);"
                       title="@L["Home_UploadAttachment"]">
                         <span class="material-symbols-outlined text-base">attach_file</span>
-                    <InputFile class="hidden" multiple OnChange="OnFilesSelected" />
+                    <input @ref="_attachmentInputRef" type="file" class="hidden" multiple />
                 </label>
                 @* 阅后即焚切换按钮 *@
                 <button type="button"

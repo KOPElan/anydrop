@@ -6,9 +6,119 @@ window.AnyDropInterop = window.AnyDropInterop || {
 const _dropZoneCleanups = new WeakMap();
 
 /**
+ * 通过 XMLHttpRequest 上传文件列表到 /api/v1/files，支持进度报告。
+ * 上传前先通过 GetUploadContext() 从 Blazor 获取当前的 topicId 和 burnAfterReading 设置。
+ *
+ * @param {File[]} files - 待上传的文件列表
+ * @param {DotNetObjectReference} dotNetRef - Blazor 组件的 .NET 引用
+ */
+AnyDropInterop._uploadFiles = async function (files, dotNetRef) {
+  // 从 Blazor 获取当前上传上下文（主题 ID + 阅后即焚状态）
+  const context = await dotNetRef.invokeMethodAsync('GetUploadContext');
+  if (!context || !context.topicId) {
+    // 未选择主题，通知 Blazor 显示错误提示
+    await dotNetRef.invokeMethodAsync('OnNoTopicSelected');
+    return;
+  }
+
+  for (const file of files) {
+    // crypto.randomUUID 在所有现代浏览器中可用；为极少数老旧环境提供简单回退
+    const tempId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    // 通知 Blazor 创建占位气泡
+    await dotNetRef.invokeMethodAsync(
+      'OnFileUploadStarted',
+      tempId,
+      file.name,
+      file.type || 'application/octet-stream',
+      file.size
+    );
+
+    // 通过 XHR 上传，以获得 upload.onprogress 事件（fetch API 目前不支持上传进度）
+    await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/v1/files');
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          dotNetRef.invokeMethodAsync('OnFileUploadProgress', tempId, percent).catch((err) => {
+            console.warn('[AnyDrop] Failed to report upload progress:', err);
+          });
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          dotNetRef.invokeMethodAsync('OnFileUploadCompleted', tempId, xhr.responseText).catch((err) => {
+            console.warn('[AnyDrop] Failed to notify upload completion:', err);
+          });
+        } else {
+          let msg = `HTTP ${xhr.status}`;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            if (body && body.error) msg = body.error;
+          } catch {}
+          console.warn('[AnyDrop] Upload failed:', msg);
+          dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, msg).catch((err) => {
+            console.warn('[AnyDrop] Failed to notify upload failure:', err);
+          });
+        }
+        resolve();
+      };
+
+      xhr.onerror = () => {
+        console.warn('[AnyDrop] XHR network error during upload of', file.name);
+        dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Network error').catch((err) => {
+          console.warn('[AnyDrop] Failed to notify upload error:', err);
+        });
+        resolve();
+      };
+
+      xhr.onabort = () => {
+        console.warn('[AnyDrop] Upload aborted for', file.name);
+        dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Upload aborted').catch((err) => {
+          console.warn('[AnyDrop] Failed to notify upload abort:', err);
+        });
+        resolve();
+      };
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('topicId', context.topicId);
+      formData.append('burnAfterReading', context.burnAfterReading ? 'true' : 'false');
+
+      xhr.send(formData);
+    });
+  }
+};
+
+/**
+ * 为原生 <input type="file"> 元素绑定 change 事件，触发 HTTP 上传流程。
+ * 应在 OnAfterRenderAsync(firstRender) 中调用一次。
+ *
+ * @param {HTMLInputElement} element - 文件输入元素
+ * @param {DotNetObjectReference} dotNetRef - Blazor 组件的 .NET 引用
+ */
+AnyDropInterop.setupFileInput = function (element, dotNetRef) {
+  if (!element || element._anyDropHandlerAttached) return;
+  element._anyDropHandlerAttached = true;
+
+  element.addEventListener('change', () => {
+    const files = Array.from(element.files || []);
+    // 重置 value，允许用户重复选择同一个文件
+    element.value = '';
+    if (files.length === 0) return;
+    AnyDropInterop._uploadFiles(files, dotNetRef);
+  });
+};
+
+/**
  * 在指定容器上设置文件拖放区域。
  * 使用 50ms 延迟消抖，避免子元素 dragenter/dragleave 导致的频繁状态切换。
- * 松手后通过 IJSStreamReference 将文件流式传输到 .NET，无需文件对话框。
+ * 松手后直接通过 HTTP multipart 上传文件，不再使用 SignalR 流。
  * @param {HTMLElement} element - 作为拖放目标的容器
  * @param {DotNetObjectReference} dotNetRef - Blazor 组件的 .NET 引用
  */
@@ -64,23 +174,8 @@ AnyDropInterop.setupDropZone = function (element, dotNetRef) {
     const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
     if (files.length === 0) return;
 
-    // 逐文件通过 IJSStreamReference 流式传输到 .NET，避免弹出文件对话框
-    (async () => {
-      for (const file of files) {
-        try {
-          const streamRef = DotNet.createJSStreamReference(file);
-          await dotNetRef.invokeMethodAsync(
-            'ReceiveDroppedFile',
-            file.name,
-            file.type || 'application/octet-stream',
-            file.size,
-            streamRef
-          );
-        } catch (err) {
-          console.error('[AnyDrop] Failed to send dropped file:', file.name, err);
-        }
-      }
-    })();
+    // 直接通过 HTTP multipart 上传，不再使用 SignalR 流式传输
+    AnyDropInterop._uploadFiles(files, dotNetRef);
   }
 
   element.addEventListener('dragenter', onDragEnter);

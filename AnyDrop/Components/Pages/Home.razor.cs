@@ -1,18 +1,19 @@
+using AnyDrop.Api;
 using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Text.Json;
 
 namespace AnyDrop.Components.Pages;
 
 public partial class Home : IAsyncDisposable
 {
-    private const long DefaultMaxFileSizeBytes = 100L * 1024 * 1024;
+    private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
     private const int HubInitialDelayMs = 300;
     private const int HubRetryDelayMs = 500;
     private const int MaxHubConnectionAttempts = 2;
@@ -87,6 +88,8 @@ public partial class Home : IAsyncDisposable
 
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
+    private ElementReference _imageInputRef;
+    private ElementReference _attachmentInputRef;
     private DotNetObjectReference<Home>? _dotNetRef;
     // 强制滚到底（初次加载、主题切换、手动发消息）
     private bool _shouldScrollToBottom;
@@ -234,6 +237,17 @@ public partial class Home : IAsyncDisposable
             catch (Exception ex)
             {
                 Logger.LogWarning(ex, "Failed to initialize drop zone JS interop.");
+            }
+
+            // 绑定文件选择输入框的 change 事件，使文件选择后直接通过 HTTP 上传
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.setupFileInput", _imageInputRef, _dotNetRef);
+                await JS.InvokeVoidAsync("AnyDropInterop.setupFileInput", _attachmentInputRef, _dotNetRef);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to initialize file input JS interop.");
             }
 
             // 启动 SignalR 连接
@@ -543,69 +557,113 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    private async Task OnFilesSelected(InputFileChangeEventArgs args)
+    // ── JS 上传回调（JS → .NET） ──────────────────────────────────────────────
+
+    /// <summary>
+    /// 由 JS 调用：返回当前的上传上下文（主题 ID + 阅后即焚）。
+    /// JS 在发起 HTTP 上传前调用此方法，以获取正确的请求参数。
+    /// </summary>
+    [JSInvokable]
+    public UploadContext? GetUploadContext()
+        => _selectedTopicId.HasValue
+            ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading)
+            : null;
+
+    /// <summary>由 JS 调用：用户未选择主题时显示提示。</summary>
+    [JSInvokable]
+    public Task OnNoTopicSelected()
     {
-        if (!_selectedTopicId.HasValue)
-        {
-            _validationError = L["Home_SelectTopicFirst"];
-            return;
-        }
+        _validationError = L["Home_SelectTopicFirst"];
+        return InvokeAsync(StateHasChanged);
+    }
 
+    /// <summary>
+    /// 由 JS 调用：文件上传开始，立即在 UI 中插入占位气泡。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadStarted(string tempId, string fileName, string mimeType, long fileSize)
+    {
         _validationError = null;
+        var contentType = PendingUpload.ResolveContentType(mimeType);
+        var pending = new PendingUpload(tempId, fileName, mimeType, fileSize, contentType);
+        _pendingUploads.Add(pending);
+        _shouldScrollToBottom = true;
+        return InvokeAsync(StateHasChanged);
+    }
 
-        var files = args.GetMultipleFiles().ToList();
-        var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-
-        // 为每个文件立即创建占位条目并渲染，给用户即时反馈
-        var pendingList = new List<(PendingUpload Pending, IBrowserFile File)>();
-        foreach (var file in files)
+    /// <summary>
+    /// 由 JS 调用：更新指定文件的上传进度百分比。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadProgress(string tempId, int percent)
+    {
+        var pending = _pendingUploads.Find(p => p.TempId == tempId);
+        if (pending is not null)
         {
-            var contentType = PendingUpload.ResolveContentType(file.ContentType);
-            var pending = new PendingUpload(file.Name, file.ContentType, file.Size, contentType);
-            _pendingUploads.Add(pending);
-            pendingList.Add((pending, file));
+            pending.ProgressPercent = percent;
         }
 
-        // 显示占位符并强制滚到底部（用户主动上传，应始终可见进度）
-        _shouldScrollToBottom = true;
-        StateHasChanged();
+        return InvokeAsync(StateHasChanged);
+    }
 
-        // 依次上传文件（占位符保持显示并更新进度）
-        foreach (var (pending, file) in pendingList)
+    /// <summary>
+    /// 由 JS 调用：文件上传成功。将服务端返回的 DTO 反序列化后替换占位气泡。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadCompleted(string tempId, string dtoJson)
+    {
+        return InvokeAsync(() =>
         {
             try
             {
-                await using var rawStream = file.OpenReadStream(maxAllowedSize: maxFileSize);
-                await using var progressStream = new ProgressStream(rawStream, file.Size, percent =>
+                var envelope = JsonSerializer.Deserialize<ApiEnvelope<ShareItemDto>>(dtoJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var dto = envelope?.Data;
+                if (dto is null) return;
+
+                // 在同一帧内移除占位并加入正式消息，避免两者短暂共存
+                var pending = _pendingUploads.Find(p => p.TempId == tempId);
+                if (pending is not null) _pendingUploads.Remove(pending);
+
+                if (_messageIds.Add(dto.Id))
                 {
-                    pending.ProgressPercent = percent;
-                    _ = InvokeAsync(StateHasChanged);
-                });
+                    _messages.Add(dto);
+                }
 
-                var dto = await ShareService.SendFileAsync(progressStream, file.Name, file.ContentType,
-                    _selectedTopicId.Value, knownFileSize: file.Size, burnAfterReading: _burnAfterReading);
-
-                // 上传成功：在同一帧内移除占位并加入正式消息，避免两者短暂共存产生的闪烁
-                // 先注册 ID 再追加消息，确保后续 SignalR 推送被正确去重
-                _pendingUploads.Remove(pending);
-                _messageIds.Add(dto.Id);
-                _messages.Add(dto);
                 _shouldScrollIfNearBottom = true;
             }
-            catch (IOException ex) when (ex.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
+            catch (Exception ex)
             {
-                pending.IsFailed = true;
-                _validationError = L["Home_FileTooLargeSkipped", file.Name];
-            }
-            catch (Exception)
-            {
-                pending.IsFailed = true;
-                _validationError = L["Home_FileUploadFailed", file.Name];
+                Logger.LogWarning(ex, "Failed to deserialize upload completion DTO for {TempId}", tempId);
+                var pending = _pendingUploads.Find(p => p.TempId == tempId);
+                if (pending is not null) pending.IsFailed = true;
             }
 
             StateHasChanged();
-        }
+        });
     }
+
+    /// <summary>
+    /// 由 JS 调用：文件上传失败，将占位气泡标记为失败状态（永久保留）。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadFailed(string tempId, string? errorMessage)
+    {
+        return InvokeAsync(() =>
+        {
+            var pending = _pendingUploads.Find(p => p.TempId == tempId);
+            if (pending is not null)
+            {
+                pending.IsFailed = true;
+            }
+
+            _validationError = (string?)L["Home_FileUploadFailed", pending?.FileName ?? string.Empty];
+
+            StateHasChanged();
+        });
+    }
+
+    // ── 拖放覆盖层 ──────────────────────────────────────────────────────────────
 
     /// <summary>
     /// 由 JS 拖放处理逻辑回调，通知 .NET 端切换拖放覆盖层显示状态。
@@ -615,59 +673,6 @@ public partial class Home : IAsyncDisposable
     {
         _isDragging = isDragging;
         return InvokeAsync(StateHasChanged);
-    }
-
-    /// <summary>
-    /// 由 JS 拖放事件回调：将拖入的文件通过 IJSStreamReference 流式发送，不触发文件对话框。
-    /// </summary>
-    [JSInvokable]
-    public async Task ReceiveDroppedFile(string fileName, string mimeType, long fileSize, IJSStreamReference streamRef)
-    {
-        if (!_selectedTopicId.HasValue)
-        {
-            _validationError = L["Home_SelectTopicFirst"];
-            await InvokeAsync(StateHasChanged);
-            return;
-        }
-
-        _validationError = null;
-
-        // 立即创建占位条目，给用户即时反馈
-        var safeMimeType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType;
-        var contentType = PendingUpload.ResolveContentType(safeMimeType);
-        var pending = new PendingUpload(fileName, safeMimeType, fileSize, contentType);
-        _pendingUploads.Add(pending);
-        _shouldScrollToBottom = true;  // 用户主动拖入文件，强制滚到底部确保进度可见
-        await InvokeAsync(StateHasChanged);
-
-        try
-        {
-            var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-
-            await using var rawStream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
-            await using var progressStream = new ProgressStream(rawStream, fileSize, percent =>
-            {
-                pending.ProgressPercent = percent;
-                _ = InvokeAsync(StateHasChanged);
-            });
-
-            var dto = await ShareService.SendFileAsync(progressStream, fileName, safeMimeType, _selectedTopicId.Value,
-                knownFileSize: fileSize, burnAfterReading: _burnAfterReading);
-
-            // 上传成功：在同一帧内移除占位并加入正式消息，避免两者短暂共存产生的闪烁
-            _pendingUploads.Remove(pending);
-            _messageIds.Add(dto.Id);
-            _messages.Add(dto);
-            _shouldScrollIfNearBottom = true;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to receive dropped file {FileName}", fileName);
-            pending.IsFailed = true;
-            _validationError = L["Home_DropFileUploadFailed"];
-        }
-
-        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>切换阅后即焚模式。</summary>
@@ -883,10 +888,14 @@ public partial class Home : IAsyncDisposable
         _ => "attach_file"
     };
 
+    /// <summary>JS 上传时传递给 HTTP 端点的上下文信息。</summary>
+    public sealed record UploadContext(string TopicId, bool BurnAfterReading);
+
     /// <summary>待上传占位条目，跟踪单个文件的上传进度与状态。</summary>
-    private sealed class PendingUpload(string fileName, string mimeType, long fileSize, ShareContentType contentType)
+    private sealed class PendingUpload(string tempId, string fileName, string mimeType, long fileSize, ShareContentType contentType)
     {
-        public Guid TempId { get; } = Guid.NewGuid();
+        /// <summary>与 JS 端约定的临时 ID（crypto.randomUUID() 生成），用于关联进度回调。</summary>
+        public string TempId { get; } = tempId;
         public string FileName { get; } = fileName;
         public string MimeType { get; } = mimeType;
         public long FileSize { get; } = fileSize;
@@ -899,69 +908,6 @@ public partial class Home : IAsyncDisposable
             if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return ShareContentType.Image;
             if (mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase)) return ShareContentType.Video;
             return ShareContentType.File;
-        }
-    }
-
-    /// <summary>包装流并在读取时汇报上传进度百分比（每变化 ≥1% 触发一次回调）。</summary>
-    private sealed class ProgressStream(Stream inner, long totalBytes, Action<int> onProgress) : Stream
-    {
-        private long _bytesRead;
-        private int _lastPercent = -1;
-
-        public override bool CanRead => inner.CanRead;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => totalBytes > 0 ? totalBytes : inner.Length;
-        public override long Position { get => inner.Position; set => throw new NotSupportedException(); }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var n = inner.Read(buffer, offset, count);
-            Report(n);
-            return n;
-        }
-
-        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
-        {
-            var n = await inner.ReadAsync(buffer, offset, count, ct).ConfigureAwait(false);
-            Report(n);
-            return n;
-        }
-
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
-        {
-            var n = await inner.ReadAsync(buffer, ct).ConfigureAwait(false);
-            Report(n);
-            return n;
-        }
-
-        private void Report(int bytes)
-        {
-            if (bytes <= 0 || totalBytes <= 0) return;
-            _bytesRead += bytes;
-            var percent = (int)Math.Min(100L, _bytesRead * 100L / totalBytes);
-            if (percent != _lastPercent)
-            {
-                _lastPercent = percent;
-                onProgress(percent);
-            }
-        }
-
-        public override void Flush() => inner.Flush();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) inner.Dispose();
-            base.Dispose(disposing);
-        }
-
-        public override async ValueTask DisposeAsync()
-        {
-            await inner.DisposeAsync().ConfigureAwait(false);
-            GC.SuppressFinalize(this);
         }
     }
 }
