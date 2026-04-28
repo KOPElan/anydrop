@@ -17,17 +17,6 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
 
     public async Task<AuthResult<SecuritySettingsDto>> UpdateSecuritySettingsAsync(UpdateSecuritySettingsRequest request, CancellationToken ct = default)
     {
-        // 验证时区 ID 合法性
-        TimeZoneInfo? tz;
-        try
-        {
-            tz = TimeZoneInfo.FindSystemTimeZoneById(request.TimeZoneId);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return AuthResult<SecuritySettingsDto>.Failure("无效的时区 ID。", StatusCodes.Status400BadRequest);
-        }
-
         // 验证阅后即焚时长范围（1–43200 分钟，即 1 分钟到 30 天）
         if (request.BurnAfterReadingMinutes is < 1 or > 43200)
         {
@@ -42,7 +31,6 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
 
         var settings = await EnsureSettingsAsync(ct);
         settings.AutoFetchLinkPreview = request.AutoFetchLinkPreview;
-        settings.TimeZoneId = tz.Id;
         settings.BurnAfterReadingMinutes = request.BurnAfterReadingMinutes;
         settings.Language = request.Language;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
@@ -80,26 +68,8 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         return settings.BurnAfterReadingMinutes;
     }
 
-    public async Task<TimeZoneInfo> GetDisplayTimeZoneAsync(CancellationToken ct = default)
-    {
-        var projection = await dbContext.SystemSettings
-            .AsNoTracking()
-            .Select(x => new { x.TimeZoneId })
-            .FirstOrDefaultAsync(ct);
-
-        var tzId = projection?.TimeZoneId ?? "UTC";
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById(tzId);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static SecuritySettingsDto MapToDto(SystemSettings s)
-        => new(s.AutoFetchLinkPreview, s.TimeZoneId, s.BurnAfterReadingMinutes, s.Language);
+        => new(s.AutoFetchLinkPreview, s.BurnAfterReadingMinutes, s.Language);
 
     private async Task<SystemSettings> EnsureSettingsAsync(CancellationToken ct)
     {

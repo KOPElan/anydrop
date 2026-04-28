@@ -58,8 +58,8 @@
   <data name="Settings_AutoFetchLink"><value>Auto-fetch link previews</value></data>
   <data name="Settings_BurnDuration"><value>Burn-after-reading duration (minutes)</value></data>
   <data name="Settings_BurnDurationHint"><value>Default retention in minutes for burn-after-reading messages (1–43200)</value></data>
-  <data name="Settings_Timezone"><value>Display timezone</value></data>
-  <data name="Settings_TimezoneHint"><value>All message timestamps will be shown in the selected timezone</value></data>
+  <data name="Settings_DarkMode"><value>Dark theme</value></data>
+  <data name="Settings_DarkModeHint"><value>Enable dark interface</value></data>
   <data name="Settings_Language"><value>Interface language</value></data>
   <data name="Settings_SaveSecurity"><value>Save Settings</value></data>
   <data name="Settings_NicknameSaved"><value>Nickname updated.</value></data>
@@ -204,6 +204,8 @@
   <data name="Home_ExpiringSoon"><value>Deleting soon</value></data>
   <data name="Home_DeleteAfterMinutes"><value>Delete in {0} min</value></data>
   <data name="Home_DeleteAfterSeconds"><value>Delete in {0} sec</value></data>
+  <data name="Home_Uploading"><value>Uploading…</value></data>
+  <data name="Home_UploadFailed"><value>Upload failed</value></data>
 
   <!-- Search -->
   <data name="Search_PageTitle"><value>Search · {0}</value></data>

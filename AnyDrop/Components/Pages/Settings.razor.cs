@@ -18,13 +18,10 @@ public partial class Settings
     private string _confirmPassword = string.Empty;
     private bool _autoFetchLinkPreview = true;
     private int _burnAfterReadingMinutes = 10;
-    private string _timeZoneId = "UTC";
+    private bool _isDarkMode;
     private string _language = "zh-CN";
     private string? _message;
     private string? _error;
-
-    // 所有可用系统时区列表，在 OnAfterRenderAsync 中加载
-    private IReadOnlyList<TimeZoneInfo> _systemTimeZones = [];
 
     /// <summary>返回首页。</summary>
     private void GoBack() => NavigationManager.NavigateTo("/");
@@ -36,7 +33,6 @@ public partial class Settings
             return;
         }
 
-        _systemTimeZones = [.. TimeZoneInfo.GetSystemTimeZones()];
         await LoadAsync();
         await InvokeAsync(StateHasChanged);
     }
@@ -62,15 +58,15 @@ public partial class Settings
             {
                 _burnAfterReadingMinutes = burn.GetInt32();
             }
-            if (data.TryGetProperty("timeZoneId", out var tz))
-            {
-                _timeZoneId = tz.GetString() ?? "UTC";
-            }
             if (data.TryGetProperty("language", out var lang))
             {
                 _language = lang.GetString() ?? "zh-CN";
             }
         }
+
+        // 从 localStorage 读取主题设置
+        try { _isDarkMode = await JSRuntime.InvokeAsync<bool>("AnyDropTheme.get"); }
+        catch { _isDarkMode = false; }
     }
 
     private async Task SaveNicknameAsync()
@@ -114,7 +110,6 @@ public partial class Settings
         var payload = new
         {
             autoFetchLinkPreview = _autoFetchLinkPreview,
-            timeZoneId = _timeZoneId,
             burnAfterReadingMinutes = _burnAfterReadingMinutes,
             language = _language
         };
@@ -136,6 +131,13 @@ public partial class Settings
 
         // 强制刷新以应用新语言
         NavigationManager.NavigateTo("/settings", forceLoad: true);
+    }
+
+    /// <summary>切换暗色/亮色主题，立即应用并持久化到 localStorage。</summary>
+    private async Task ToggleThemeAsync()
+    {
+        _isDarkMode = !_isDarkMode;
+        await JSRuntime.InvokeVoidAsync("AnyDropTheme.set", _isDarkMode);
     }
 
     private void ResetMessages()

@@ -58,8 +58,8 @@
   <data name="Settings_AutoFetchLink"><value>自动获取链接预览</value></data>
   <data name="Settings_BurnDuration"><value>阅后即焚时长（分钟）</value></data>
   <data name="Settings_BurnDurationHint"><value>新建阅后即焚消息时默认保留的分钟数（1–43200）</value></data>
-  <data name="Settings_Timezone"><value>显示时区</value></data>
-  <data name="Settings_TimezoneHint"><value>所有消息时间将以所选时区显示</value></data>
+  <data name="Settings_DarkMode"><value>暗色主题</value></data>
+  <data name="Settings_DarkModeHint"><value>启用后将切换为暗色界面</value></data>
   <data name="Settings_Language"><value>界面语言</value></data>
   <data name="Settings_SaveSecurity"><value>保存设置</value></data>
   <data name="Settings_NicknameSaved"><value>昵称已更新。</value></data>
@@ -206,6 +206,8 @@
   <data name="Home_ExpiringSoon"><value>即将删除</value></data>
   <data name="Home_DeleteAfterMinutes"><value>{0}分钟后删除</value></data>
   <data name="Home_DeleteAfterSeconds"><value>{0}秒后删除</value></data>
+  <data name="Home_Uploading"><value>上传中…</value></data>
+  <data name="Home_UploadFailed"><value>上传失败</value></data>
 
   <!-- 搜索页 / Search -->
   <data name="Search_PageTitle"><value>搜索 · {0}</value></data>

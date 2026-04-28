@@ -7,6 +7,7 @@ using AnyDrop.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -15,6 +16,22 @@ using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 文件上传大小限制：优先从配置读取，回退到 1 GB
+const long defaultMaxUploadBytes = 1L * 1024 * 1024 * 1024;
+var maxUploadBytes = builder.Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? defaultMaxUploadBytes;
+
+// 放宽 Kestrel 的最大请求体限制（默认 30 MB），确保能接收大文件上传
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = maxUploadBytes;
+});
+
+// 放宽 ASP.NET Core 表单（multipart）解析器的大小限制（默认 128 MB）
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = maxUploadBytes;
+});
 const string appAuthenticationScheme = "AnyDrop";
 
 // Add services to the container.
@@ -252,6 +269,7 @@ app.UseAuthorization();
 app.MapStaticAssets().AllowAnonymous();
 app.MapHub<ShareHub>("/hubs/share");
 app.MapShareItemEndpoints();
+app.MapFileEndpoints();
 app.MapTopicEndpoints();
 app.MapAuthEndpoints();
 app.MapSettingsEndpoints();

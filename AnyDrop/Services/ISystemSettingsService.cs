@@ -8,5 +8,4 @@ public interface ISystemSettingsService
     Task<AuthResult<SecuritySettingsDto>> UpdateSecuritySettingsAsync(UpdateSecuritySettingsRequest request, CancellationToken ct = default);
     Task<bool> IsAutoFetchLinkPreviewEnabledAsync(CancellationToken ct = default);
     Task<int> GetBurnAfterReadingMinutesAsync(CancellationToken ct = default);
-    Task<TimeZoneInfo> GetDisplayTimeZoneAsync(CancellationToken ct = default);
 }

@@ -1,18 +1,19 @@
+using AnyDrop.Api;
 using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Text.Json;
 
 namespace AnyDrop.Components.Pages;
 
 public partial class Home : IAsyncDisposable
 {
-    private const long DefaultMaxFileSizeBytes = 100L * 1024 * 1024;
+    private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
     private const int HubInitialDelayMs = 300;
     private const int HubRetryDelayMs = 500;
     private const int MaxHubConnectionAttempts = 2;
@@ -31,6 +32,8 @@ public partial class Home : IAsyncDisposable
     private readonly List<ShareItemDto> _messages = [];
     // O(1) 消息去重：避免 SignalR 推送与主动刷新产生重复条目
     private readonly HashSet<Guid> _messageIds = [];
+    // 待上传占位条目列表
+    private readonly List<PendingUpload> _pendingUploads = [];
     private HubConnection? _hubConnection;
     private CancellationTokenSource? _pollingCts;
     private Task? _pollingTask;
@@ -45,6 +48,10 @@ public partial class Home : IAsyncDisposable
     private bool _selectedTopicArchived;
     private bool _selectedTopicIsBuiltIn;
     private int _selectedTopicMessageCount;
+
+    // 浏览器时区（IANA），在首次渲染后从 JS 获取；初始值用服务器本地时区减少首帧 UTC 闪烁
+    private string _browserTimeZoneId = "UTC";
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -81,6 +88,8 @@ public partial class Home : IAsyncDisposable
 
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
+    private ElementReference _imageInputRef;
+    private ElementReference _attachmentInputRef;
     private DotNetObjectReference<Home>? _dotNetRef;
     // 强制滚到底（初次加载、主题切换、手动发消息）
     private bool _shouldScrollToBottom;
@@ -207,6 +216,18 @@ public partial class Home : IAsyncDisposable
 
         if (firstRender)
         {
+            // 获取浏览器时区，用于正确显示消息时间
+            try
+            {
+                _browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
+                try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZoneId); }
+                catch { _displayTimeZone = TimeZoneInfo.Local; }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Failed to get browser timezone, falling back to UTC.");
+            }
+
             // 设置聊天区域拖放处理（JS 端负责消抖，仅在状态变化时回调 .NET）
             _dotNetRef = DotNetObjectReference.Create(this);
             try
@@ -216,6 +237,17 @@ public partial class Home : IAsyncDisposable
             catch (Exception ex)
             {
                 Logger.LogWarning(ex, "Failed to initialize drop zone JS interop.");
+            }
+
+            // 绑定文件选择输入框的 change 事件，使文件选择后直接通过 HTTP 上传
+            try
+            {
+                await JS.InvokeVoidAsync("AnyDropInterop.setupFileInput", _imageInputRef, _dotNetRef);
+                await JS.InvokeVoidAsync("AnyDropInterop.setupFileInput", _attachmentInputRef, _dotNetRef);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to initialize file input JS interop.");
             }
 
             // 启动 SignalR 连接
@@ -525,40 +557,113 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    private async Task OnFilesSelected(InputFileChangeEventArgs args)
+    // ── JS 上传回调（JS → .NET） ──────────────────────────────────────────────
+
+    /// <summary>
+    /// 由 JS 调用：返回当前的上传上下文（主题 ID + 阅后即焚）。
+    /// JS 在发起 HTTP 上传前调用此方法，以获取正确的请求参数。
+    /// </summary>
+    [JSInvokable]
+    public UploadContext? GetUploadContext()
+        => _selectedTopicId.HasValue
+            ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading)
+            : null;
+
+    /// <summary>由 JS 调用：用户未选择主题时显示提示。</summary>
+    [JSInvokable]
+    public Task OnNoTopicSelected()
     {
-        if (!_selectedTopicId.HasValue)
+        _validationError = L["Home_SelectTopicFirst"];
+        return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// 由 JS 调用：文件上传开始，立即在 UI 中插入占位气泡。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadStarted(string tempId, string fileName, string mimeType, long fileSize)
+    {
+        _validationError = null;
+        var contentType = PendingUpload.ResolveContentType(mimeType);
+        var pending = new PendingUpload(tempId, fileName, mimeType, fileSize, contentType);
+        _pendingUploads.Add(pending);
+        _shouldScrollToBottom = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// 由 JS 调用：更新指定文件的上传进度百分比。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadProgress(string tempId, int percent)
+    {
+        var pending = _pendingUploads.Find(p => p.TempId == tempId);
+        if (pending is not null)
         {
-            _validationError = L["Home_SelectTopicFirst"];
-            return;
+            pending.ProgressPercent = percent;
         }
 
-        _validationError = null;
+        return InvokeAsync(StateHasChanged);
+    }
 
-        foreach (var file in args.GetMultipleFiles())
+    /// <summary>
+    /// 由 JS 调用：文件上传成功。将服务端返回的 DTO 反序列化后替换占位气泡。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadCompleted(string tempId, string dtoJson)
+    {
+        return InvokeAsync(() =>
         {
             try
             {
-                var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-                await using var stream = file.OpenReadStream(maxAllowedSize: maxFileSize);
-                await ShareService.SendFileAsync(stream, file.Name, file.ContentType, _selectedTopicId.Value,
-                    burnAfterReading: _burnAfterReading);
-            }
-            catch (IOException ex) when (ex.Message.Contains("exceeded", StringComparison.OrdinalIgnoreCase))
-            {
-                _validationError = L["Home_FileTooLargeSkipped", file.Name];
-                StateHasChanged();
-            }
-            catch (Exception)
-            {
-                _validationError = L["Home_FileUploadFailed", file.Name];
-                StateHasChanged();
-            }
-        }
+                var envelope = JsonSerializer.Deserialize<ApiEnvelope<ShareItemDto>>(dtoJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var dto = envelope?.Data;
+                if (dto is null) return;
 
-        // 主动刷新，确保在 SignalR 降级场景下也能立即呈现
-        await LoadSelectedTopicMessagesAsync();
+                // 在同一帧内移除占位并加入正式消息，避免两者短暂共存
+                var pending = _pendingUploads.Find(p => p.TempId == tempId);
+                if (pending is not null) _pendingUploads.Remove(pending);
+
+                if (_messageIds.Add(dto.Id))
+                {
+                    _messages.Add(dto);
+                }
+
+                _shouldScrollIfNearBottom = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to deserialize upload completion DTO for {TempId}", tempId);
+                var pending = _pendingUploads.Find(p => p.TempId == tempId);
+                if (pending is not null) pending.IsFailed = true;
+            }
+
+            StateHasChanged();
+        });
     }
+
+    /// <summary>
+    /// 由 JS 调用：文件上传失败，将占位气泡标记为失败状态（永久保留）。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFileUploadFailed(string tempId, string? errorMessage)
+    {
+        return InvokeAsync(() =>
+        {
+            var pending = _pendingUploads.Find(p => p.TempId == tempId);
+            if (pending is not null)
+            {
+                pending.IsFailed = true;
+            }
+
+            _validationError = (string?)L["Home_FileUploadFailed", pending?.FileName ?? string.Empty];
+
+            StateHasChanged();
+        });
+    }
+
+    // ── 拖放覆盖层 ──────────────────────────────────────────────────────────────
 
     /// <summary>
     /// 由 JS 拖放处理逻辑回调，通知 .NET 端切换拖放覆盖层显示状态。
@@ -568,47 +673,6 @@ public partial class Home : IAsyncDisposable
     {
         _isDragging = isDragging;
         return InvokeAsync(StateHasChanged);
-    }
-
-    /// <summary>
-    /// 由 JS 拖放事件回调：将拖入的文件通过 IJSStreamReference 流式发送，不触发文件对话框。
-    /// </summary>
-    [JSInvokable]
-    public async Task ReceiveDroppedFile(string fileName, string mimeType, long fileSize, IJSStreamReference streamRef)
-    {
-        if (!_selectedTopicId.HasValue)
-        {
-            _validationError = L["Home_SelectTopicFirst"];
-            await InvokeAsync(StateHasChanged);
-            return;
-        }
-
-        _validationError = null;
-        _isSending = true;
-        await InvokeAsync(StateHasChanged);
-
-        try
-        {
-            var maxFileSize = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
-            var safeMimeType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType;
-
-            await using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: maxFileSize);
-            await ShareService.SendFileAsync(stream, fileName, safeMimeType, _selectedTopicId.Value,
-                knownFileSize: fileSize, burnAfterReading: _burnAfterReading);
-
-            await LoadSelectedTopicMessagesAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to receive dropped file {FileName}", fileName);
-            _validationError = L["Home_DropFileUploadFailed"];
-        }
-        finally
-        {
-            _isSending = false;
-        }
-
-        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>切换阅后即焚模式。</summary>
@@ -795,10 +859,10 @@ public partial class Home : IAsyncDisposable
         };
     }
 
-    /// <summary>将消息时间格式化为「日期 + 时间」字符串。</summary>
-    private static string FormatMessageTime(DateTimeOffset time)
+    /// <summary>将消息时间格式化为「日期 + 时间」字符串（使用浏览器时区）。</summary>
+    private string FormatMessageTime(DateTimeOffset time)
     {
-        var local = time.ToLocalTime();
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
         return local.ToString("yyyy/MM/dd HH:mm");
     }
 
@@ -814,5 +878,36 @@ public partial class Home : IAsyncDisposable
         return remaining.TotalMinutes >= 1
             ? L["Home_DeleteAfterMinutes", (int)remaining.TotalMinutes]
             : L["Home_DeleteAfterSeconds", (int)remaining.TotalSeconds];
+    }
+
+    /// <summary>返回待上传条目对应的 Material Symbol 图标名称。</summary>
+    private static string GetPendingUploadIcon(ShareContentType contentType) => contentType switch
+    {
+        ShareContentType.Image => "image",
+        ShareContentType.Video => "videocam",
+        _ => "attach_file"
+    };
+
+    /// <summary>JS 上传时传递给 HTTP 端点的上下文信息。</summary>
+    public sealed record UploadContext(string TopicId, bool BurnAfterReading);
+
+    /// <summary>待上传占位条目，跟踪单个文件的上传进度与状态。</summary>
+    private sealed class PendingUpload(string tempId, string fileName, string mimeType, long fileSize, ShareContentType contentType)
+    {
+        /// <summary>与 JS 端约定的临时 ID（crypto.randomUUID() 生成），用于关联进度回调。</summary>
+        public string TempId { get; } = tempId;
+        public string FileName { get; } = fileName;
+        public string MimeType { get; } = mimeType;
+        public long FileSize { get; } = fileSize;
+        public ShareContentType ContentType { get; } = contentType;
+        public int ProgressPercent { get; set; }
+        public bool IsFailed { get; set; }
+
+        public static ShareContentType ResolveContentType(string mime)
+        {
+            if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return ShareContentType.Image;
+            if (mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase)) return ShareContentType.Video;
+            return ShareContentType.File;
+        }
     }
 }

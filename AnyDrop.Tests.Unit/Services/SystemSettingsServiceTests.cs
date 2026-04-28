@@ -25,7 +25,7 @@ public class SystemSettingsServiceTests
         await using var db = CreateDbContext();
         var sut = new SystemSettingsService(db);
 
-        var request = new AnyDrop.Models.UpdateSecuritySettingsRequest(false, "UTC", 10, "zh-CN");
+        var request = new AnyDrop.Models.UpdateSecuritySettingsRequest(false, 10, "zh-CN");
         var result = await sut.UpdateSecuritySettingsAsync(request);
 
         result.Succeeded.Should().BeTrue();

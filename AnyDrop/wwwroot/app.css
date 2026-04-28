@@ -965,3 +965,239 @@
         color: var(--color-primary);
     }
 }
+
+/* ═══════════════════════════════════════
+   暗色主题 — html.dark 覆盖
+   ─────────────────────────────────────
+   所有亮色模式中硬编码为 rgba(255,255,255,…) 或特定浅色背景的
+   组件，在此集中覆盖为暗色版本。
+═══════════════════════════════════════ */
+
+html.dark {
+    /* ── 语义色：主色（保留蓝色，稍亮以满足暗底对比度）── */
+    --color-primary: #7baaf7;
+    --color-primary-container: #4f7de0;
+    --color-primary-fixed: #1a2e55;
+    --color-primary-fixed-dim: #243d70;
+    --color-on-primary: #ffffff;
+    --color-on-primary-fixed: #ccdcff;
+
+    /* ── 语义色：次色 ── */
+    --color-secondary: #9bb4fe;
+    --color-secondary-container: #2a3d6e;
+    --color-on-secondary: #ffffff;
+
+    /* ── 错误色 ── */
+    --color-error: #ff8f87;
+    --color-error-container: #4a0a0a;
+    --color-on-error: #ffffff;
+
+    /* ── 表面 ── */
+    --color-surface: #1a1b1d;
+    --color-surface-dim: #111213;
+    --color-surface-variant: #2a2d30;
+    --color-surface-container-lowest: #0f1011;
+    --color-surface-container-low: #1c1e20;
+    --color-surface-container: #212325;
+    --color-surface-container-high: #282b2e;
+    --color-surface-container-highest: #2f3235;
+
+    /* ── 文字 ── */
+    --color-on-surface: #dde1e5;
+    --color-on-surface-variant: #b0b5c4;
+    --color-inverse-surface: #dde1e5;
+    --color-inverse-on-surface: #2a2d30;
+
+    /* ── 轮廓线 ── */
+    --color-outline: #7a7f90;
+    --color-outline-variant: #363a45;
+
+    /* ── 背景 ── */
+    --color-background: #1a1b1d;
+    --color-on-background: #dde1e5;
+
+    /* ── 品牌色 ── */
+    --color-brand: #7baaf7;
+    --color-brand-hover: #9dc3ff;
+    --color-sidebar: #1c1e20;
+    --color-status-online: #34d058;
+
+    /* ── 磨砂玻璃公共变量 ── */
+    --glass-border-color: rgba(60, 68, 80, 0.55);
+    --glass-header-bg: rgba(26, 27, 29, 0.80);
+    --glass-footer-bg: rgba(28, 30, 32, 0.85);
+}
+
+/* ── 暗色背景渐变 ── */
+html.dark body {
+    background: linear-gradient(135deg, #151617 0%, #1d1f22 100%);
+}
+
+/* ── 暗色滚动条 ── */
+html.dark ::-webkit-scrollbar-thumb { background: #363a45; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #4a4f5e; }
+
+/* ── 磨砂玻璃顶栏 ── */
+html.dark .chat-header-glass {
+    background: rgba(26, 27, 29, 0.72);
+    border-bottom-color: rgba(60, 68, 80, 0.45);
+}
+
+/* ── 底部输入区渐出遮罩 ── */
+html.dark .chat-footer-glass {
+    background: linear-gradient(to top, rgba(22, 24, 26, 0.85) 0%, rgba(22, 24, 26, 0.40) 60%, transparent 100%);
+}
+
+/* ── 输入卡片 ── */
+html.dark .chat-input-card {
+    background: rgba(32, 34, 37, 0.88);
+    border-color: rgba(60, 68, 80, 0.50);
+    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(60, 68, 80, 0.35);
+}
+
+/* ── 侧边栏 ── */
+html.dark .glass-sidebar {
+    background: rgba(28, 30, 32, 0.75);
+    border-right-color: rgba(60, 68, 80, 0.40);
+}
+
+/* ── 玻璃按钮 ── */
+html.dark .glass-btn {
+    background: rgba(50, 54, 60, 0.55);
+    border-color: rgba(70, 76, 88, 0.45);
+}
+
+html.dark .glass-btn:hover {
+    background: rgba(60, 65, 72, 0.75);
+    border-color: rgba(80, 88, 100, 0.55);
+}
+
+/* ── 主内容区半透明卡片 ── */
+html.dark .main-content-card {
+    background: rgba(26, 27, 29, 0.90);
+}
+
+/* ── 主题菜单面板 ── */
+html.dark .topic-menu-panel {
+    background: rgba(30, 33, 37, 0.95);
+    border-color: rgba(60, 68, 80, 0.55);
+    box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.45);
+}
+
+/* ── 设置页卡片 ── */
+html.dark .settings-card {
+    background: rgba(30, 32, 35, 0.80);
+    border-color: rgba(60, 68, 80, 0.45);
+}
+
+/* ── 搜索结果卡片 ── */
+html.dark .search-msg-card:hover {
+    background: rgba(40, 43, 47, 0.90);
+    border-color: rgba(60, 68, 80, 0.50);
+}
+
+/* ── 输入框（settings 页）── */
+html.dark .settings-input {
+    background: rgba(40, 43, 47, 0.90);
+    border-color: rgba(70, 76, 88, 0.55);
+    color: var(--color-on-surface);
+}
+
+/* ── 登录页 ── */
+html.dark .login-shell {
+    background:
+        radial-gradient(circle at 12% 18%, rgba(60, 100, 220, 0.12) 0%, transparent 44%),
+        radial-gradient(circle at 85% 82%, rgba(50, 75, 140, 0.10) 0%, transparent 42%),
+        linear-gradient(135deg, #151618 0%, #1a1c20 45%, #181b1f 100%);
+}
+
+html.dark .login-shell::before {
+    background:
+        linear-gradient(115deg, rgba(0, 0, 0, 0.30), rgba(0, 0, 0, 0.05)),
+        repeating-linear-gradient(
+            -45deg,
+            rgba(80, 88, 110, 0.06) 0,
+            rgba(80, 88, 110, 0.06) 1px,
+            transparent 1px,
+            transparent 12px
+        );
+}
+
+html.dark .login-card {
+    background: rgba(28, 30, 34, 0.90);
+    border-color: rgba(60, 68, 80, 0.60);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(80, 90, 110, 0.15) inset;
+}
+
+html.dark .login-input {
+    background: rgba(40, 43, 48, 0.90);
+    border-color: rgba(70, 78, 94, 0.80);
+    color: var(--color-on-surface);
+}
+
+html.dark .login-input::placeholder {
+    color: rgba(176, 181, 196, 0.45);
+}
+
+html.dark .login-input:focus {
+    border-color: rgba(123, 170, 247, 0.55);
+    background: rgba(40, 43, 48, 1);
+    box-shadow: 0 0 0 3px rgba(123, 170, 247, 0.14);
+}
+
+html.dark .login-error {
+    background: rgba(74, 10, 10, 0.80);
+    border-color: rgba(255, 143, 135, 0.30);
+}
+
+html.dark .login-error-text {
+    color: #ffb4ab;
+}
+
+/* ── 设置页 Setup 卡片 ── */
+html.dark .setup-card {
+    background: rgba(28, 30, 34, 0.90);
+    border-color: rgba(60, 68, 80, 0.60);
+}
+
+html.dark .auth-input {
+    background: rgba(40, 43, 48, 0.90);
+    border-color: rgba(70, 78, 94, 0.80);
+    color: var(--color-on-surface);
+}
+
+html.dark .auth-input:focus {
+    border-color: rgba(123, 170, 247, 0.55);
+    box-shadow: 0 0 0 3px rgba(123, 170, 247, 0.14);
+}
+
+/* ── Modal ── */
+html.dark .modal-overlay {
+    background: rgba(0, 0, 0, 0.65);
+}
+
+html.dark .modal-content {
+    background: rgba(28, 30, 34, 0.96);
+    border-color: rgba(60, 68, 80, 0.55);
+}
+
+/* ── 侧边栏项目悬停 ── */
+html.dark .sidebar-item:hover {
+    background: rgba(50, 55, 62, 0.60);
+}
+
+/* ── 输入区域分割线（移动端）── */
+html.dark .input-actions {
+    border-color: rgba(60, 68, 80, 0.45) !important;
+}
+
+/* ── textarea 暗色文字 ── */
+html.dark textarea,
+html.dark input[type="text"],
+html.dark input[type="password"],
+html.dark input[type="number"] {
+    color: var(--color-on-surface);
+}
+html.dark textarea::placeholder {
+    color: rgba(176, 181, 196, 0.45);
+}

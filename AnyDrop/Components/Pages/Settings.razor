@@ -57,6 +57,20 @@
                         </button>
                     </div>
 
+                    @* 暗色主题 *@
+                    <div class="settings-row">
+                        <div>
+                            <p class="text-sm font-medium text-on-surface">@L["Settings_DarkMode"]</p>
+                            <p class="text-xs text-on-surface-variant/70">@L["Settings_DarkModeHint"]</p>
+                        </div>
+                        <button type="button"
+                                class="topic-menu-toggle @(_isDarkMode ? "topic-menu-toggle--on" : "")"
+                                @onclick="ToggleThemeAsync"
+                                aria-pressed="@_isDarkMode">
+                            <span class="topic-menu-toggle__knob"></span>
+                        </button>
+                    </div>
+
                     @* 阅后即焚时长 *@
                     <div>
                         <label class="settings-label">@L["Settings_BurnDuration"]</label>
@@ -66,18 +80,6 @@
                                min="1"
                                max="43200"
                                @bind="_burnAfterReadingMinutes" />
-                    </div>
-
-                    @* 时区设置 *@
-                    <div>
-                        <label class="settings-label">@L["Settings_Timezone"]</label>
-                        <p class="mb-1.5 text-xs text-on-surface-variant/70">@L["Settings_TimezoneHint"]</p>
-                        <select class="settings-input w-full" @bind="_timeZoneId">
-                            @foreach (var tz in _systemTimeZones)
-                            {
-                                <option value="@tz.Id">@tz.DisplayName</option>
-                            }
-                        </select>
                     </div>
 
                     @* 语言设置 *@
