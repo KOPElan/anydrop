@@ -189,6 +189,7 @@ public class ShareServiceTests
             fileStorageServiceMock.Object,
             linkMetadataService,
             systemSettingsMock.Object,
-            scopeFactoryMock.Object);
+            scopeFactoryMock.Object,
+            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }
 }

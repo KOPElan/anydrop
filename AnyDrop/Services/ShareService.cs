@@ -3,6 +3,7 @@ using AnyDrop.Hubs;
 using AnyDrop.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AnyDrop.Services;
 
@@ -13,7 +14,8 @@ public sealed class ShareService(
     IFileStorageService fileStorageService,
     LinkMetadataService linkMetadataService,
     ISystemSettingsService systemSettingsService,
-    IServiceScopeFactory scopeFactory) : IShareService
+    IServiceScopeFactory scopeFactory,
+    ILogger<ShareService> logger) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
     {
@@ -392,9 +394,10 @@ public sealed class ShareService(
                 {
                     await fileStorageService.DeleteFileAsync(item.Content, ct);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // 文件删除失败不阻断整体清理流程
+                    // 文件删除失败不阻断整体清理流程，但记录警告以便排查孤儿文件
+                    logger.LogWarning(ex, "Failed to delete file {StoragePath} for item {ItemId} during cleanup.", item.Content, item.Id);
                 }
             }
 
@@ -443,9 +446,10 @@ public sealed class ShareService(
                 {
                     await fileStorageService.DeleteFileAsync(item.Content, ct);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // 文件删除失败不阻断整体删除流程
+                    // 文件删除失败不阻断整体删除流程，但记录警告以便排查孤儿文件
+                    logger.LogWarning(ex, "Failed to delete file {StoragePath} for item {ItemId} during batch delete.", item.Content, item.Id);
                 }
             }
 
@@ -455,7 +459,7 @@ public sealed class ShareService(
         await dbContext.SaveChangesAsync(ct);
 
         // 广播被删除的消息 ID，让所有客户端同步移除对应气泡
-        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", idList, CancellationToken.None);
+        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", idList, ct);
 
         if (affectedTopicIds.Count > 0)
         {

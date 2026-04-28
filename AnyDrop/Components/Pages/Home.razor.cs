@@ -777,12 +777,14 @@ public partial class Home : IAsyncDisposable
 
         try
         {
-            await ShareService.DeleteShareItemsAsync(_selectedMessageIds.ToList());
+            var toDelete = _selectedMessageIds.ToList();
+            await ShareService.DeleteShareItemsAsync(toDelete);
 
             // 服务端会广播 ShareItemsDeleted，但本地也直接移除，避免等待延迟
-            foreach (var id in _selectedMessageIds)
+            var toDeleteSet = new HashSet<Guid>(toDelete);
+            _messages.RemoveAll(m => toDeleteSet.Contains(m.Id));
+            foreach (var id in toDelete)
             {
-                _messages.RemoveAll(m => m.Id == id);
                 _messageIds.Remove(id);
             }
 
@@ -793,7 +795,7 @@ public partial class Home : IAsyncDisposable
         {
             Logger.LogWarning(ex, "Batch delete failed.");
             _validationError = L["Home_BatchDeleteFailed"];
-            _showBatchDeleteConfirmModal = false;
+            // 保留选择模式，让用户可以重试
         }
         finally
         {

@@ -186,9 +186,9 @@ public partial class Settings
             // 从 data.deletedCount 读取实际删除数量
             var deleted = 0;
             if (result.body?.data.ValueKind == JsonValueKind.Object &&
-                result.body.data.TryGetProperty("deletedCount", out var cnt))
+                result.body.data.TryGetProperty("deletedCount", out var deletedCountProp))
             {
-                deleted = cnt.GetInt32();
+                deleted = deletedCountProp.GetInt32();
             }
 
             _message = deleted == 0
