@@ -2,6 +2,7 @@ using AnyDrop.Data;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnyDrop.Api;
@@ -120,7 +121,7 @@ public static class ShareItemEndpoints
     /// 批量删除指定 ID 的消息，同时清理相关文件资源。
     /// </summary>
     public static async Task<Results<Ok<ApiEnvelope<object>>, BadRequest<ApiEnvelope<object>>>> BatchDeleteAsync(
-        BatchDeleteRequest request,
+        [FromBody] BatchDeleteRequest request,
         IShareService shareService,
         CancellationToken cancellationToken)
     {
