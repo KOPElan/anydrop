@@ -358,6 +358,142 @@ public sealed class ShareService(
         => Uri.TryCreate(content, UriKind.Absolute, out var uri)
            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
+    public async Task<int> CleanupOldMessagesAsync(int months, Guid? topicId = null, CancellationToken ct = default)
+    {
+        var safeMonths = months is 1 or 3 or 6 ? months : 1;
+        var cutoff = DateTimeOffset.UtcNow.AddMonths(-safeMonths);
+
+        var query = dbContext.ShareItems
+            .Where(x => x.CreatedAt < cutoff);
+
+        if (topicId.HasValue)
+        {
+            query = query.Where(x => x.TopicId == topicId.Value);
+        }
+
+        var items = await query.ToListAsync(ct);
+        if (items.Count == 0)
+        {
+            return 0;
+        }
+
+        // 收集受影响的主题 ID，以便更新预览
+        var affectedTopicIds = items
+            .Where(x => x.TopicId.HasValue)
+            .Select(x => x.TopicId!.Value)
+            .Distinct()
+            .ToHashSet();
+
+        foreach (var item in items)
+        {
+            if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
+            {
+                try
+                {
+                    await fileStorageService.DeleteFileAsync(item.Content, ct);
+                }
+                catch (Exception)
+                {
+                    // 文件删除失败不阻断整体清理流程
+                }
+            }
+
+            dbContext.ShareItems.Remove(item);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        // 更新受影响主题的预览并广播
+        if (affectedTopicIds.Count > 0)
+        {
+            await RefreshTopicsAndBroadcastAsync(affectedTopicIds, ct);
+        }
+
+        return items.Count;
+    }
+
+    public async Task DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0)
+        {
+            return;
+        }
+
+        var items = await dbContext.ShareItems
+            .Where(x => idList.Contains(x.Id))
+            .ToListAsync(ct);
+
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var affectedTopicIds = items
+            .Where(x => x.TopicId.HasValue)
+            .Select(x => x.TopicId!.Value)
+            .Distinct()
+            .ToHashSet();
+
+        foreach (var item in items)
+        {
+            if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
+            {
+                try
+                {
+                    await fileStorageService.DeleteFileAsync(item.Content, ct);
+                }
+                catch (Exception)
+                {
+                    // 文件删除失败不阻断整体删除流程
+                }
+            }
+
+            dbContext.ShareItems.Remove(item);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        // 广播被删除的消息 ID，让所有客户端同步移除对应气泡
+        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", idList, CancellationToken.None);
+
+        if (affectedTopicIds.Count > 0)
+        {
+            await RefreshTopicsAndBroadcastAsync(affectedTopicIds, ct);
+        }
+    }
+
+    /// <summary>
+    /// 刷新指定主题的最新消息预览，并通过 SignalR 广播 TopicsUpdated。
+    /// </summary>
+    private async Task RefreshTopicsAndBroadcastAsync(HashSet<Guid> topicIds, CancellationToken ct)
+    {
+        var topics = await dbContext.Topics
+            .Where(t => topicIds.Contains(t.Id))
+            .ToListAsync(ct);
+
+        foreach (var topic in topics)
+        {
+            var latest = await dbContext.ShareItems
+                .Where(x => x.TopicId == topic.Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            topic.LastMessageAt = latest?.CreatedAt;
+            topic.LastMessagePreview = latest is null
+                ? null
+                : (latest.FileName ?? latest.Content) is { } preview
+                    ? preview.Length > 80 ? preview[..80] + "…" : preview
+                    : null;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+
+        var allTopics = await topicService.GetAllTopicsAsync(ct);
+        await hubContext.Clients.All.SendAsync("TopicsUpdated", allTopics, CancellationToken.None);
+    }
+
+
     private static ShareContentType ResolveContentType(string mimeType)
     {
         if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))

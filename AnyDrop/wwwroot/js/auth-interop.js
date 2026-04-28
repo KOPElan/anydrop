@@ -23,6 +23,18 @@ window.authInterop = {
             credentials: "include"
         });
         return await toResult(response);
+    },
+    deleteJson: async function (url, payload) {
+        const options = {
+            method: "DELETE",
+            credentials: "include"
+        };
+        if (payload !== undefined && payload !== null) {
+            options.headers = { "Content-Type": "application/json" };
+            options.body = JSON.stringify(payload);
+        }
+        const response = await fetch(url, options);
+        return await toResult(response);
     }
 };
 

@@ -17,12 +17,16 @@ public sealed record UpdatePasswordRequest(string CurrentPassword, string NewPas
 public sealed record SecuritySettingsDto(
     bool AutoFetchLinkPreview,
     int BurnAfterReadingMinutes,
-    string Language);
+    string Language,
+    bool AutoCleanupEnabled,
+    int AutoCleanupMonths);
 
 public sealed record UpdateSecuritySettingsRequest(
     bool AutoFetchLinkPreview,
     int BurnAfterReadingMinutes,
-    string Language);
+    string Language,
+    bool AutoCleanupEnabled,
+    int AutoCleanupMonths);
 
 public sealed record SetupStatusDto(bool RequiresSetup);
 

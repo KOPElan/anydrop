@@ -97,6 +97,8 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             entity.Property(e => e.TimeZoneId).HasMaxLength(100).HasDefaultValue("UTC");
             entity.Property(e => e.BurnAfterReadingMinutes).HasDefaultValue(10);
             entity.Property(e => e.Language).HasMaxLength(10).HasDefaultValue("zh-CN");
+            entity.Property(e => e.AutoCleanupEnabled).HasDefaultValue(false);
+            entity.Property(e => e.AutoCleanupMonths).HasDefaultValue(1);
             entity.Property(e => e.UpdatedAt)
                 .HasConversion(
                     value => value.UtcDateTime,
@@ -108,6 +110,8 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 TimeZoneId = "UTC",
                 BurnAfterReadingMinutes = 10,
                 Language = "zh-CN",
+                AutoCleanupEnabled = false,
+                AutoCleanupMonths = 1,
                 UpdatedAt = DateTimeOffset.Parse("2026-04-19T00:00:00Z")
             });
         });

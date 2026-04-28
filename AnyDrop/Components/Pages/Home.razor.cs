@@ -86,6 +86,12 @@ public partial class Home : IAsyncDisposable
     private Guid? _pendingHighlightId;
     private bool _shouldHighlight;
 
+    // 批量选择模式
+    private bool _isSelectMode;
+    private readonly HashSet<Guid> _selectedMessageIds = [];
+    private bool _showBatchDeleteConfirmModal;
+    private bool _isBatchDeleting;
+
     private ElementReference _chatSectionRef;
     private ElementReference _messageListRef;
     private ElementReference _imageInputRef;
@@ -123,6 +129,9 @@ public partial class Home : IAsyncDisposable
             _selectedTopicId = SelectedTopicId;
             await LoadSelectedTopicMessagesAsync();
             await LoadSelectedTopicMetaAsync();
+
+            // 主题切换时退出选择模式
+            ExitSelectMode();
 
             // 若有待高亮消息（从搜索页跳转而来），撤销自动滚到底的请求，保留高亮定位
             if (_shouldHighlight)
@@ -279,6 +288,29 @@ public partial class Home : IAsyncDisposable
                     {
                         _messages.Add(dto);
                         _shouldScrollIfNearBottom = true;
+                        StateHasChanged();
+                    }
+                });
+            });
+
+            // 监听批量/清理删除事件：移除本地已删除的消息气泡
+            _hubConnection.On<List<Guid>>("ShareItemsDeleted", deletedIds =>
+            {
+                return InvokeAsync(() =>
+                {
+                    var changed = false;
+                    foreach (var id in deletedIds)
+                    {
+                        if (_messageIds.Remove(id))
+                        {
+                            _messages.RemoveAll(m => m.Id == id);
+                            _selectedMessageIds.Remove(id);
+                            changed = true;
+                        }
+                    }
+
+                    if (changed)
+                    {
                         StateHasChanged();
                     }
                 });
@@ -679,6 +711,94 @@ public partial class Home : IAsyncDisposable
     private void ToggleBurnAfterReading()
     {
         _burnAfterReading = !_burnAfterReading;
+    }
+
+    // ── 批量选择模式 ──────────────────────────────────────────────────────────────
+
+    /// <summary>进入批量选择模式。</summary>
+    private void EnterSelectMode()
+    {
+        _isSelectMode = true;
+        _selectedMessageIds.Clear();
+    }
+
+    /// <summary>退出批量选择模式并清空已选集合。</summary>
+    private void ExitSelectMode()
+    {
+        _isSelectMode = false;
+        _selectedMessageIds.Clear();
+        _showBatchDeleteConfirmModal = false;
+    }
+
+    /// <summary>在选择模式下点击消息行：切换该消息的选中状态。</summary>
+    private void OnMessageRowClick(Guid messageId)
+    {
+        if (!_isSelectMode)
+        {
+            return;
+        }
+
+        if (!_selectedMessageIds.Remove(messageId))
+        {
+            _selectedMessageIds.Add(messageId);
+        }
+    }
+
+    /// <summary>显示批量删除二次确认对话框。</summary>
+    private void RequestBatchDelete()
+    {
+        if (_selectedMessageIds.Count == 0)
+        {
+            return;
+        }
+
+        _showBatchDeleteConfirmModal = true;
+    }
+
+    /// <summary>取消批量删除。</summary>
+    private void CancelBatchDeleteConfirm()
+    {
+        _showBatchDeleteConfirmModal = false;
+    }
+
+    /// <summary>
+    /// 执行批量删除：调用 API 删除所选消息及相关文件资源，
+    /// 服务端通过 SignalR 广播 ShareItemsDeleted，前端移除对应气泡。
+    /// </summary>
+    private async Task ConfirmBatchDeleteAsync()
+    {
+        if (_selectedMessageIds.Count == 0)
+        {
+            return;
+        }
+
+        _isBatchDeleting = true;
+        _showBatchDeleteConfirmModal = false;
+
+        try
+        {
+            await ShareService.DeleteShareItemsAsync(_selectedMessageIds.ToList());
+
+            // 服务端会广播 ShareItemsDeleted，但本地也直接移除，避免等待延迟
+            foreach (var id in _selectedMessageIds)
+            {
+                _messages.RemoveAll(m => m.Id == id);
+                _messageIds.Remove(id);
+            }
+
+            ExitSelectMode();
+            _shouldScrollIfNearBottom = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Batch delete failed.");
+            _validationError = L["Home_BatchDeleteFailed"];
+            _showBatchDeleteConfirmModal = false;
+        }
+        finally
+        {
+            _isBatchDeleting = false;
+        }
     }
 
     /// <summary>打开图片大图预览 Modal。</summary>

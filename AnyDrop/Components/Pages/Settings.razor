@@ -96,6 +96,53 @@
                 </div>
             </div>
 
+            @* ── 消息管理 ── *@
+            <div class="settings-card">
+                <h2 class="settings-section-title">@L["Settings_MessageManagement"]</h2>
+                <div class="mt-4 space-y-5">
+
+                    @* 手动清理 *@
+                    <div>
+                        <p class="text-sm font-medium text-on-surface">@L["Settings_ManualCleanup"]</p>
+                        <p class="mb-3 text-xs text-on-surface-variant/70">@L["Settings_ManualCleanupHint"]</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="btn-secondary text-sm" @onclick="() => RequestCleanup(1)">@L["Settings_Cleanup1Month"]</button>
+                            <button type="button" class="btn-secondary text-sm" @onclick="() => RequestCleanup(3)">@L["Settings_Cleanup3Months"]</button>
+                            <button type="button" class="btn-secondary text-sm" @onclick="() => RequestCleanup(6)">@L["Settings_Cleanup6Months"]</button>
+                        </div>
+                    </div>
+
+                    @* 自动清理开关 *@
+                    <div class="settings-row">
+                        <div>
+                            <p class="text-sm font-medium text-on-surface">@L["Settings_AutoCleanup"]</p>
+                            <p class="text-xs text-on-surface-variant/70">@L["Settings_AutoCleanupHint"]</p>
+                        </div>
+                        <button type="button"
+                                class="topic-menu-toggle @(_autoCleanupEnabled ? "topic-menu-toggle--on" : "")"
+                                @onclick="() => _autoCleanupEnabled = !_autoCleanupEnabled"
+                                aria-pressed="@_autoCleanupEnabled">
+                            <span class="topic-menu-toggle__knob"></span>
+                        </button>
+                    </div>
+
+                    @* 自动清理阈值 *@
+                    @if (_autoCleanupEnabled)
+                    {
+                        <div>
+                            <label class="settings-label">@L["Settings_AutoCleanupMonths"]</label>
+                            <select class="settings-input w-full" @bind="_autoCleanupMonths">
+                                <option value="1">@L["Settings_AutoCleanupMonths1"]</option>
+                                <option value="3">@L["Settings_AutoCleanupMonths3"]</option>
+                                <option value="6">@L["Settings_AutoCleanupMonths6"]</option>
+                            </select>
+                        </div>
+                    }
+
+                    <button type="button" class="btn-primary w-fit" @onclick="SaveSecurityAsync">@L["Settings_SaveSecurity"]</button>
+                </div>
+            </div>
+
             @if (!string.IsNullOrWhiteSpace(_message))
             {
                 <div class="flex items-center gap-2 rounded-2xl px-4 py-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.25);">
@@ -114,3 +161,27 @@
         </section>
     </div>
 </div>
+
+@* ── 手动清理二次确认 Modal ── *@
+@if (_showCleanupConfirmModal)
+{
+    <div class="modal-overlay" @onclick="CancelCleanupConfirm">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-cleanup-confirm-title" @onclick:stopPropagation>
+            <div class="flex items-center gap-3 mb-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full" style="background: var(--color-error-container);">
+                    <span class="material-symbols-outlined" style="color: var(--color-error);">delete_sweep</span>
+                </div>
+                <h3 id="modal-cleanup-confirm-title" class="modal-title mb-0">@L["Settings_CleanupConfirmTitle"]</h3>
+            </div>
+            <p class="text-sm text-on-surface-variant">@L["Settings_CleanupConfirmMessage", _pendingCleanupMonths]</p>
+            <div class="modal-actions mt-4">
+                <button type="button" class="btn-secondary" @onclick="CancelCleanupConfirm">@L["Common_Cancel"]</button>
+                <button type="button"
+                        class="rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors"
+                        style="background: var(--color-error);"
+                        disabled="@_isCleaningUp"
+                        @onclick="ConfirmCleanupAsync">@L["Settings_CleanupConfirmAction"]</button>
+            </div>
+        </div>
+    </div>
+}
