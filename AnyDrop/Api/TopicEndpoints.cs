@@ -13,7 +13,22 @@ public static class TopicEndpoints
         group.MapGet("/archived", GetArchivedTopicsAsync);
         group.MapPost("/", CreateTopicAsync);
         group.MapPut("/reorder", ReorderTopicsAsync);
+        group.MapGet("/{id:guid}", GetTopicByIdAsync)
+            .WithName("GetTopicById")
+            .WithSummary("Get a single topic by ID");
         group.MapGet("/{id:guid}/messages", GetTopicMessagesAsync);
+        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync)
+            .WithName("SearchTopicMessages")
+            .WithSummary("Search messages in a topic by text content");
+        group.MapGet("/{id:guid}/messages/by-date", GetTopicMessagesByDateAsync)
+            .WithName("GetTopicMessagesByDate")
+            .WithSummary("Get all messages in a topic for a specific date");
+        group.MapGet("/{id:guid}/active-dates", GetTopicActiveDatesAsync)
+            .WithName("GetTopicActiveDates")
+            .WithSummary("Get dates that have messages within a date range");
+        group.MapGet("/{id:guid}/messages/by-type", GetTopicMessagesByTypeAsync)
+            .WithName("GetTopicMessagesByType")
+            .WithSummary("Get messages in a topic filtered by content type");
         group.MapPut("/{id:guid}", UpdateTopicAsync);
         group.MapPut("/{id:guid}/pin", PinTopicAsync);
         group.MapPut("/{id:guid}/archive", ArchiveTopicAsync);
@@ -150,5 +165,68 @@ public static class TopicEndpoints
         {
             return Results.BadRequest(ApiEnvelope<object>.Fail(ex.Message));
         }
+    }
+
+    private static async Task<IResult> GetTopicByIdAsync(Guid id, ITopicService topicService, CancellationToken ct)
+    {
+        var topic = await topicService.GetTopicByIdAsync(id, ct);
+        return topic is null
+            ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"))
+            : Results.Ok(ApiEnvelope<TopicDto>.Ok(topic));
+    }
+
+    private static async Task<IResult> SearchTopicMessagesAsync(
+        Guid id,
+        string q,
+        int? limit,
+        DateTimeOffset? before,
+        IShareService shareService,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            return Results.BadRequest(ApiEnvelope<TopicMessagesResponse>.Fail("搜索关键词不能为空"));
+        }
+
+        var result = await shareService.SearchTopicMessagesAsync(id, q, limit ?? 50, before, ct);
+        return Results.Ok(ApiEnvelope<TopicMessagesResponse>.Ok(result));
+    }
+
+    private static async Task<IResult> GetTopicMessagesByDateAsync(
+        Guid id,
+        DateOnly date,
+        IShareService shareService,
+        CancellationToken ct)
+    {
+        var messages = await shareService.GetTopicMessagesByDateAsync(id, date, ct);
+        return Results.Ok(ApiEnvelope<IReadOnlyList<ShareItemDto>>.Ok(messages));
+    }
+
+    private static async Task<IResult> GetTopicActiveDatesAsync(
+        Guid id,
+        DateOnly start,
+        DateOnly end,
+        IShareService shareService,
+        CancellationToken ct)
+    {
+        if (end < start)
+        {
+            return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail("end 不能早于 start"));
+        }
+
+        var dates = await shareService.GetTopicActiveDatesAsync(id, start, end, ct);
+        return Results.Ok(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Ok(dates));
+    }
+
+    private static async Task<IResult> GetTopicMessagesByTypeAsync(
+        Guid id,
+        ShareContentType contentType,
+        int? limit,
+        DateTimeOffset? before,
+        IShareService shareService,
+        CancellationToken ct)
+    {
+        var result = await shareService.GetTopicMessagesByTypeAsync(id, contentType, limit ?? 50, before, ct);
+        return Results.Ok(ApiEnvelope<TopicMessagesResponse>.Ok(result));
     }
 }
