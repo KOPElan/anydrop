@@ -106,9 +106,9 @@
                         <p class="text-sm font-medium text-on-surface">@L["Settings_ManualCleanup"]</p>
                         <p class="mb-3 text-xs text-on-surface-variant/70">@L["Settings_ManualCleanupHint"]</p>
                         <div class="flex flex-wrap gap-2">
-                            <button type="button" class="btn-secondary text-sm" @onclick="() => RequestCleanup(1)">@L["Settings_Cleanup1Month"]</button>
-                            <button type="button" class="btn-secondary text-sm" @onclick="() => RequestCleanup(3)">@L["Settings_Cleanup3Months"]</button>
-                            <button type="button" class="btn-secondary text-sm" @onclick="() => RequestCleanup(6)">@L["Settings_Cleanup6Months"]</button>
+                            <button type="button" class="btn-secondary text-sm" disabled="@_isCleaningUp" @onclick="() => RequestCleanup(1)">@L["Settings_Cleanup1Month"]</button>
+                            <button type="button" class="btn-secondary text-sm" disabled="@_isCleaningUp" @onclick="() => RequestCleanup(3)">@L["Settings_Cleanup3Months"]</button>
+                            <button type="button" class="btn-secondary text-sm" disabled="@_isCleaningUp" @onclick="() => RequestCleanup(6)">@L["Settings_Cleanup6Months"]</button>
                         </div>
                     </div>
 

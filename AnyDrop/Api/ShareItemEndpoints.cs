@@ -135,8 +135,8 @@ public static class ShareItemEndpoints
             return TypedResults.BadRequest(ApiEnvelope<object>.Fail("单次批量删除不能超过 500 条。"));
         }
 
-        await shareService.DeleteShareItemsAsync(request.Ids, cancellationToken);
-        return TypedResults.Ok(ApiEnvelope<object>.Ok(new { deleted = request.Ids.Count }));
+        var deletedCount = await shareService.DeleteShareItemsAsync(request.Ids, cancellationToken);
+        return TypedResults.Ok(ApiEnvelope<object>.Ok(new { deleted = deletedCount }));
     }
 
     private static bool ShouldForceAttachment(string mimeType)

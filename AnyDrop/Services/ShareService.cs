@@ -386,6 +386,8 @@ public sealed class ShareService(
             .Distinct()
             .ToHashSet();
 
+        var deletedIds = new List<Guid>(items.Count);
+
         foreach (var item in items)
         {
             if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
@@ -402,9 +404,13 @@ public sealed class ShareService(
             }
 
             dbContext.ShareItems.Remove(item);
+            deletedIds.Add(item.Id);
         }
 
         await dbContext.SaveChangesAsync(ct);
+
+        // 广播被清理的消息 ID，让已打开的客户端同步移除对应气泡
+        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", deletedIds, CancellationToken.None);
 
         // 更新受影响主题的预览并广播
         if (affectedTopicIds.Count > 0)
@@ -415,12 +421,12 @@ public sealed class ShareService(
         return items.Count;
     }
 
-    public async Task DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    public async Task<int> DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
     {
         var idList = ids.ToList();
         if (idList.Count == 0)
         {
-            return;
+            return 0;
         }
 
         var items = await dbContext.ShareItems
@@ -429,7 +435,7 @@ public sealed class ShareService(
 
         if (items.Count == 0)
         {
-            return;
+            return 0;
         }
 
         var affectedTopicIds = items
@@ -437,6 +443,8 @@ public sealed class ShareService(
             .Select(x => x.TopicId!.Value)
             .Distinct()
             .ToHashSet();
+
+        var deletedIds = new List<Guid>(items.Count);
 
         foreach (var item in items)
         {
@@ -454,17 +462,21 @@ public sealed class ShareService(
             }
 
             dbContext.ShareItems.Remove(item);
+            deletedIds.Add(item.Id);
         }
 
         await dbContext.SaveChangesAsync(ct);
 
-        // 广播被删除的消息 ID，让所有客户端同步移除对应气泡
-        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", idList, ct);
+        // 广播被删除的消息 ID，让所有客户端同步移除对应气泡；
+        // 使用 CancellationToken.None 确保请求取消不影响其他客户端的同步
+        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", deletedIds, CancellationToken.None);
 
         if (affectedTopicIds.Count > 0)
         {
             await RefreshTopicsAndBroadcastAsync(affectedTopicIds, ct);
         }
+
+        return deletedIds.Count;
     }
 
     /// <summary>
@@ -476,13 +488,20 @@ public sealed class ShareService(
             .Where(t => topicIds.Contains(t.Id))
             .ToListAsync(ct);
 
+        // 一次性加载所有受影响主题的全部剩余消息并在内存中取最新一条，避免 foreach 内逐主题查询（N+1）
+        var remainingItems = await dbContext.ShareItems
+            .Where(x => x.TopicId.HasValue && topicIds.Contains(x.TopicId.Value))
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .ToListAsync(ct);
+
+        var latestByTopic = remainingItems
+            .GroupBy(x => x.TopicId!.Value)
+            .ToDictionary(g => g.Key, g => g.FirstOrDefault());
+
         foreach (var topic in topics)
         {
-            var latest = await dbContext.ShareItems
-                .Where(x => x.TopicId == topic.Id)
-                .OrderByDescending(x => x.CreatedAt)
-                .FirstOrDefaultAsync(ct);
-
+            latestByTopic.TryGetValue(topic.Id, out var latest);
             topic.LastMessageAt = latest?.CreatedAt;
             topic.LastMessagePreview = latest is null
                 ? null

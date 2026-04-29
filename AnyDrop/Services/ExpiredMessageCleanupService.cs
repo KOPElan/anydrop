@@ -37,10 +37,11 @@ public sealed class ExpiredMessageCleanupService(
             var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
             if (todayUtc > _lastAutoCleanupDate)
             {
-                _lastAutoCleanupDate = todayUtc;
                 try
                 {
                     await RunAutoCleanupIfEnabledAsync(stoppingToken);
+                    // 仅在成功后更新日期，确保失败时下个周期可以重试
+                    _lastAutoCleanupDate = todayUtc;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

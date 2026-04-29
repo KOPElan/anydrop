@@ -69,5 +69,6 @@ public interface IShareService
     /// 批量删除指定 ID 的消息（同时删除相关文件资源）。
     /// </summary>
     /// <param name="ids">要删除的消息 ID 列表。</param>
-    Task DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
+    /// <returns>实际删除的消息数量。</returns>
+    Task<int> DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
 }

@@ -29,8 +29,8 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return AuthResult<SecuritySettingsDto>.Failure("不支持的语言代码。", StatusCodes.Status400BadRequest);
         }
 
-        // 验证自动清理月数（仅允许 1 / 3 / 6）
-        if (request.AutoCleanupMonths is not (1 or 3 or 6))
+        // 仅在启用自动清理时才校验月数（未启用时月数无实际影响，避免破坏旧客户端请求）
+        if (request.AutoCleanupEnabled && request.AutoCleanupMonths is not (1 or 3 or 6))
         {
             return AuthResult<SecuritySettingsDto>.Failure("自动清理月数必须为 1、3 或 6。", StatusCodes.Status400BadRequest);
         }
