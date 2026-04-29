@@ -133,6 +133,125 @@ public class ShareServiceTests
         dto.ContentType.Should().Be(ShareContentType.Link);
     }
 
+    [Fact]
+    public async Task CleanupOldMessagesAsync_WithOldMessages_DeletesAndReturnsCount()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.ShareItems.AddRange(
+            new ShareItem { Content = "old", CreatedAt = DateTimeOffset.UtcNow.AddMonths(-2), ContentType = ShareContentType.Text },
+            new ShareItem { Content = "new", CreatedAt = DateTimeOffset.UtcNow.AddHours(-1), ContentType = ShareContentType.Text });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _, out _);
+        var count = await service.CleanupOldMessagesAsync(1);
+
+        count.Should().Be(1);
+        dbContext.ShareItems.Should().ContainSingle(x => x.Content == "new");
+    }
+
+    [Fact]
+    public async Task CleanupOldMessagesAsync_WithNoOldMessages_ReturnsZero()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.ShareItems.Add(new ShareItem { Content = "new", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _, out _);
+        var count = await service.CleanupOldMessagesAsync(1);
+
+        count.Should().Be(0);
+        dbContext.ShareItems.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task CleanupOldMessagesAsync_WithOldMessages_BroadcastsShareItemsDeleted()
+    {
+        await using var dbContext = CreateDbContext();
+        var oldItem = new ShareItem { Content = "old", CreatedAt = DateTimeOffset.UtcNow.AddMonths(-2), ContentType = ShareContentType.Text };
+        dbContext.ShareItems.Add(oldItem);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out var clientProxyMock, out _);
+        await service.CleanupOldMessagesAsync(1);
+
+        clientProxyMock.Verify(
+            proxy => proxy.SendCoreAsync(
+                "ShareItemsDeleted",
+                It.Is<object?[]>(args =>
+                    args.Length == 1 &&
+                    args[0] != null &&
+                    ((List<Guid>)args[0]!).Contains(oldItem.Id)),
+                CancellationToken.None),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteShareItemsAsync_WithExistingIds_DeletesAndReturnsActualCount()
+    {
+        await using var dbContext = CreateDbContext();
+        var item1 = new ShareItem { Content = "a", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text };
+        var item2 = new ShareItem { Content = "b", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text };
+        dbContext.ShareItems.AddRange(item1, item2);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _, out _);
+        // item2.Id 不存在于请求中，只删除 item1
+        var nonExistentId = Guid.NewGuid();
+        var count = await service.DeleteShareItemsAsync([item1.Id, nonExistentId]);
+
+        count.Should().Be(1);
+        dbContext.ShareItems.Should().ContainSingle(x => x.Content == "b");
+    }
+
+    [Fact]
+    public async Task DeleteShareItemsAsync_WithEmptyIds_ReturnsZero()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _, out _);
+
+        var count = await service.DeleteShareItemsAsync([]);
+
+        count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeleteShareItemsAsync_WithExistingIds_BroadcastsShareItemsDeleted()
+    {
+        await using var dbContext = CreateDbContext();
+        var item = new ShareItem { Content = "x", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text };
+        dbContext.ShareItems.Add(item);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out var clientProxyMock, out _);
+        await service.DeleteShareItemsAsync([item.Id]);
+
+        clientProxyMock.Verify(
+            proxy => proxy.SendCoreAsync(
+                "ShareItemsDeleted",
+                It.Is<object?[]>(args =>
+                    args.Length == 1 &&
+                    args[0] != null &&
+                    ((List<Guid>)args[0]!).Contains(item.Id)),
+                CancellationToken.None),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteShareItemsAsync_FileItem_DeletesFileAndDoesNotThrow()
+    {
+        await using var dbContext = CreateDbContext();
+        var item = new ShareItem { Content = "files/photo.png", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Image, FileName = "photo.png", MimeType = "image/png" };
+        dbContext.ShareItems.Add(item);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, out _, out var fileStorageMock);
+        fileStorageMock.Setup(x => x.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await service.DeleteShareItemsAsync([item.Id]);
+
+        fileStorageMock.Verify(x => x.DeleteFileAsync("files/photo.png", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static AnyDropDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
@@ -189,6 +308,7 @@ public class ShareServiceTests
             fileStorageServiceMock.Object,
             linkMetadataService,
             systemSettingsMock.Object,
-            scopeFactoryMock.Object);
+            scopeFactoryMock.Object,
+            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }
 }

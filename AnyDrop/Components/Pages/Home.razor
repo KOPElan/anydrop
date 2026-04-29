@@ -35,15 +35,38 @@
         @if (_selectedTopicId.HasValue)
         {
             <div class="flex items-center gap-1">
-                @* 搜索按钮 *@
-                <a href="/search/@_selectedTopicId"
-                   class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
-                   style="color: var(--color-on-surface-variant);"
-                         title="@L["Home_SearchTopic"]">
-                    <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
-                </a>
-                @* 主题操作下拉菜单 *@
-                <div class="relative">
+                @if (_isSelectMode)
+                {
+                    @* 选择模式下显示"取消选择"按钮 *@
+                    <button type="button"
+                            class="flex h-10 items-center gap-1 rounded-full px-3 transition-colors hover:bg-white/40 active:scale-90"
+                            style="color: var(--color-primary); font-size: 14px; font-weight: 600;"
+                            title="@L["Home_ExitSelect"]"
+                            @onclick="ExitSelectMode">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+                        <span>@L["Home_ExitSelect"]</span>
+                    </button>
+                }
+                else
+                {
+                    @* 选择按钮 *@
+                    <button type="button"
+                            class="flex h-10 items-center gap-1 rounded-full px-3 transition-colors hover:bg-white/40 active:scale-90"
+                            style="color: var(--color-on-surface-variant); font-size: 14px;"
+                            title="@L["Home_SelectMessages"]"
+                            @onclick="EnterSelectMode">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">checklist</span>
+                        <span>@L["Home_SelectMessages"]</span>
+                    </button>
+                    @* 搜索按钮 *@
+                    <a href="/search/@_selectedTopicId"
+                       class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
+                       style="color: var(--color-on-surface-variant);"
+                             title="@L["Home_SearchTopic"]">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">search</span>
+                    </a>
+                    @* 主题操作下拉菜单 *@
+                    <div class="relative">
                     <button type="button"
                             class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/40 active:scale-90"
                             style="color: var(--color-on-surface-variant);"
@@ -114,6 +137,7 @@
                         <div class="fixed inset-0 z-50" role="presentation" aria-hidden="true" @onclick="CloseTopicMenu"></div>
                     }
                 </div>
+                }
             </div>
         }
     </header>
@@ -144,7 +168,21 @@
             {
                 var isBurnMessage = message.ExpiresAt.HasValue;
                 var bubbleClass = isBurnMessage ? "burn-after-reading" : "";
-                <div class="flex flex-col items-start max-w-2xl message-bubble m-6 @bubbleClass" @key="message.Id" data-message-id="@message.Id">
+                var isSelected = _selectedMessageIds.Contains(message.Id);
+                <div class="flex items-start gap-3 m-6 @(_isSelectMode ? "cursor-pointer select-none" : "")"
+                     @key="message.Id"
+                     data-message-id="@message.Id"
+                     @onclick="() => OnMessageRowClick(message.Id)">
+                    @if (_isSelectMode)
+                    {
+                        <div class="flex-shrink-0 flex items-center justify-center w-6 h-6 mt-2">
+                            <span class="material-symbols-outlined"
+                                  style="font-size: 22px; color: @(isSelected ? "var(--color-primary)" : "var(--color-outline)"); font-variation-settings: 'FILL' @(isSelected ? "1" : "0");">
+                                check_circle
+                            </span>
+                        </div>
+                    }
+                    <div class="flex flex-col items-start max-w-2xl message-bubble @bubbleClass @(isSelected ? "ring-2 ring-primary/60" : "")">
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
@@ -274,7 +312,8 @@
                             </span>
                         }
                     </div>
-                </div>
+                    </div>@* end message-bubble inner *@
+                </div>@* end flex items-start gap-3 wrapper *@
             }
             </div>
         }
@@ -393,7 +432,30 @@
     }
 
     @* ─────────── 输入区（渐出遮罩 + 浮动玻璃卡片）─────────── *@
-    <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
+    @if (_isSelectMode)
+    {
+        @* 批量操作工具栏：选择模式下替换输入框 *@
+        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
+            <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
+                <div class="input-wrapper chat-input-card px-4 py-3 flex items-center justify-between">
+                    <span class="text-sm font-semibold" style="color: var(--color-on-surface);">
+                        @L["Home_SelectedCount", _selectedMessageIds.Count]
+                    </span>
+                    <button type="button"
+                            class="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+                            style="background: @(_selectedMessageIds.Count > 0 ? "var(--color-error, #ba1a1a)" : "var(--color-outline-variant)");"
+                            disabled="@(_selectedMessageIds.Count == 0)"
+                            @onclick="RequestBatchDelete">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
+                        @L["Home_BatchDelete"]
+                    </button>
+                </div>
+            </div>
+        </footer>
+    }
+    else
+    {
+        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
         <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
         <div class="input-wrapper chat-input-card px-4 py-3">
             @* 附件按钮（带右侧分割线）*@
@@ -453,6 +515,30 @@
         </div>
         </div>
     </footer>
+    }
+
+    @* ─────────── 批量删除二次确认 Modal ─────────── *@
+    @if (_showBatchDeleteConfirmModal)
+    {
+        <div class="modal-overlay" @onclick="CancelBatchDeleteConfirm">
+            <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-batch-delete-title" @onclick:stopPropagation>
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full" style="background: var(--color-error-container);">
+                        <span class="material-symbols-outlined" style="color: var(--color-error);">delete_forever</span>
+                    </div>
+                    <h3 id="modal-batch-delete-title" class="modal-title mb-0">@L["Home_BatchDeleteConfirmTitle"]</h3>
+                </div>
+                <p class="text-sm text-on-surface-variant">@L["Home_BatchDeleteConfirmMessage", _selectedMessageIds.Count]</p>
+                <div class="modal-actions mt-4">
+                    <button type="button" class="btn-secondary" @onclick="CancelBatchDeleteConfirm">@L["Common_Cancel"]</button>
+                    <button type="button"
+                            class="rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors"
+                            style="background: var(--color-error);"
+                            disabled="@_isBatchDeleting"
+                            @onclick="ConfirmBatchDeleteAsync">@L["Home_BatchDeleteConfirmAction"]</button>
+                </div>
+            </div>
+        </div>
+    }
 
 </section>
-

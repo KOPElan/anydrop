@@ -56,4 +56,19 @@ public interface IShareService
         int limit = 50,
         DateTimeOffset? before = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// 清理指定月数前的消息（同时删除相关文件资源）。
+    /// </summary>
+    /// <param name="months">清理多少月前的消息（支持 1 / 3 / 6）。</param>
+    /// <param name="topicId">可选的主题 ID，为 null 时清理所有主题的消息。</param>
+    /// <returns>实际删除的消息数量。</returns>
+    Task<int> CleanupOldMessagesAsync(int months, Guid? topicId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// 批量删除指定 ID 的消息（同时删除相关文件资源）。
+    /// </summary>
+    /// <param name="ids">要删除的消息 ID 列表。</param>
+    /// <returns>实际删除的消息数量。</returns>
+    Task<int> DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
 }

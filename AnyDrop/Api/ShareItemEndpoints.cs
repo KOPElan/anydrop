@@ -2,6 +2,7 @@ using AnyDrop.Data;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnyDrop.Api;
@@ -23,6 +24,14 @@ public static class ShareItemEndpoints
         group.MapGet("/{id:guid}/file", GetFileAsync)
             .WithName("GetShareItemFile")
             .WithSummary("Get a shared file");
+
+        group.MapDelete("/cleanup", CleanupOldMessagesAsync)
+            .WithName("CleanupOldMessages")
+            .WithSummary("Manually clean up messages older than the specified number of months");
+
+        group.MapDelete("/batch", BatchDeleteAsync)
+            .WithName("BatchDeleteShareItems")
+            .WithSummary("Batch delete share items by IDs");
 
         return app;
     }
@@ -91,6 +100,45 @@ public static class ShareItemEndpoints
         }
     }
 
+    /// <summary>
+    /// 手动清理指定月数前的消息，同时清理相关文件资源。
+    /// </summary>
+    public static async Task<Results<Ok<ApiEnvelope<CleanupResult>>, BadRequest<ApiEnvelope<object>>>> CleanupOldMessagesAsync(
+        int months,
+        IShareService shareService,
+        CancellationToken cancellationToken)
+    {
+        if (months is not (1 or 3 or 6))
+        {
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("months 参数必须为 1、3 或 6。"));
+        }
+
+        var deletedCount = await shareService.CleanupOldMessagesAsync(months, null, cancellationToken);
+        return TypedResults.Ok(ApiEnvelope<CleanupResult>.Ok(new CleanupResult(deletedCount)));
+    }
+
+    /// <summary>
+    /// 批量删除指定 ID 的消息，同时清理相关文件资源。
+    /// </summary>
+    public static async Task<Results<Ok<ApiEnvelope<object>>, BadRequest<ApiEnvelope<object>>>> BatchDeleteAsync(
+        [FromBody] BatchDeleteRequest request,
+        IShareService shareService,
+        CancellationToken cancellationToken)
+    {
+        if (request.Ids is null || request.Ids.Count == 0)
+        {
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("ids 不能为空。"));
+        }
+
+        if (request.Ids.Count > 500)
+        {
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("单次批量删除不能超过 500 条。"));
+        }
+
+        var deletedCount = await shareService.DeleteShareItemsAsync(request.Ids, cancellationToken);
+        return TypedResults.Ok(ApiEnvelope<object>.Ok(new { deleted = deletedCount }));
+    }
+
     private static bool ShouldForceAttachment(string mimeType)
     {
         return mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
@@ -99,3 +147,9 @@ public static class ShareItemEndpoints
                || mimeType.Equals("text/javascript", StringComparison.OrdinalIgnoreCase);
     }
 }
+
+/// <summary>清理操作结果 DTO。</summary>
+public sealed record CleanupResult(int DeletedCount);
+
+/// <summary>批量删除请求 DTO。</summary>
+public sealed record BatchDeleteRequest(List<Guid> Ids);

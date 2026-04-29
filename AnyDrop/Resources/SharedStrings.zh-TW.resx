@@ -69,6 +69,26 @@
   <data name="Settings_UpdatePasswordFailed"><value>更新密碼失敗。</value></data>
   <data name="Settings_SaveSecurityFailed"><value>儲存設置失敗。</value></data>
 
+  <!-- 訊息管理 / Message Cleanup -->
+  <data name="Settings_MessageManagement"><value>訊息管理</value></data>
+  <data name="Settings_ManualCleanup"><value>手動清理</value></data>
+  <data name="Settings_ManualCleanupHint"><value>清理指定時間之前的所有訊息及相關檔案資源</value></data>
+  <data name="Settings_Cleanup1Month"><value>清理 1 個月前</value></data>
+  <data name="Settings_Cleanup3Months"><value>清理 3 個月前</value></data>
+  <data name="Settings_Cleanup6Months"><value>清理 6 個月前</value></data>
+  <data name="Settings_AutoCleanup"><value>自動清理</value></data>
+  <data name="Settings_AutoCleanupHint"><value>啟用後每天自動清理超過指定時長的訊息</value></data>
+  <data name="Settings_AutoCleanupMonths"><value>自動清理時間閾值</value></data>
+  <data name="Settings_AutoCleanupMonths1"><value>1 個月前</value></data>
+  <data name="Settings_AutoCleanupMonths3"><value>3 個月前</value></data>
+  <data name="Settings_AutoCleanupMonths6"><value>6 個月前</value></data>
+  <data name="Settings_CleanupSuccess"><value>已成功清理 {0} 條訊息。</value></data>
+  <data name="Settings_CleanupNone"><value>沒有需要清理的訊息。</value></data>
+  <data name="Settings_CleanupFailed"><value>清理失敗，請重試。</value></data>
+  <data name="Settings_CleanupConfirmTitle"><value>確認清理</value></data>
+  <data name="Settings_CleanupConfirmMessage"><value>將刪除 {0} 個月前的所有訊息及相關檔案，此操作不可撤銷，確認繼續？</value></data>
+  <data name="Settings_CleanupConfirmAction"><value>確認清理</value></data>
+
   <!-- 登入頁 / Login Page -->
   <data name="Login_Title"><value>AnyDrop</value></data>
   <data name="Login_Subtitle"><value>私有跨裝置內容共享平台</value></data>
@@ -198,6 +218,16 @@
   <data name="Home_DeleteAfterSeconds"><value>{0} 秒後刪除</value></data>
   <data name="Home_Uploading"><value>上傳中…</value></data>
   <data name="Home_UploadFailed"><value>上傳失敗</value></data>
+
+  <!-- 批量選擇 / Selection Mode -->
+  <data name="Home_SelectMessages"><value>選擇</value></data>
+  <data name="Home_ExitSelect"><value>取消選擇</value></data>
+  <data name="Home_SelectedCount"><value>已選 {0} 條</value></data>
+  <data name="Home_BatchDelete"><value>刪除</value></data>
+  <data name="Home_BatchDeleteConfirmTitle"><value>確認批量刪除</value></data>
+  <data name="Home_BatchDeleteConfirmMessage"><value>確定要刪除所選的 {0} 條訊息？此操作不可撤銷，相關檔案也會被刪除。</value></data>
+  <data name="Home_BatchDeleteConfirmAction"><value>確認刪除</value></data>
+  <data name="Home_BatchDeleteFailed"><value>批量刪除失敗，請重試。</value></data>
 
   <data name="Search_PageTitle"><value>搜尋 · {0}</value></data>
   <data name="Search_DefaultTopicName"><value>主題</value></data>

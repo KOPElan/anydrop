@@ -20,8 +20,15 @@ public partial class Settings
     private int _burnAfterReadingMinutes = 10;
     private bool _isDarkMode;
     private string _language = "zh-CN";
+    private bool _autoCleanupEnabled;
+    private int _autoCleanupMonths = 1;
     private string? _message;
     private string? _error;
+
+    // 手动清理相关
+    private bool _showCleanupConfirmModal;
+    private int _pendingCleanupMonths;
+    private bool _isCleaningUp;
 
     /// <summary>返回首页。</summary>
     private void GoBack() => NavigationManager.NavigateTo("/");
@@ -61,6 +68,14 @@ public partial class Settings
             if (data.TryGetProperty("language", out var lang))
             {
                 _language = lang.GetString() ?? "zh-CN";
+            }
+            if (data.TryGetProperty("autoCleanupEnabled", out var autoCleanup))
+            {
+                _autoCleanupEnabled = autoCleanup.GetBoolean();
+            }
+            if (data.TryGetProperty("autoCleanupMonths", out var months))
+            {
+                _autoCleanupMonths = months.GetInt32();
             }
         }
 
@@ -111,7 +126,9 @@ public partial class Settings
         {
             autoFetchLinkPreview = _autoFetchLinkPreview,
             burnAfterReadingMinutes = _burnAfterReadingMinutes,
-            language = _language
+            language = _language,
+            autoCleanupEnabled = _autoCleanupEnabled,
+            autoCleanupMonths = _autoCleanupMonths
         };
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
         if (!result.ok)
@@ -131,6 +148,57 @@ public partial class Settings
 
         // 强制刷新以应用新语言
         NavigationManager.NavigateTo("/settings", forceLoad: true);
+    }
+
+    /// <summary>显示手动清理二次确认对话框。</summary>
+    private void RequestCleanup(int months)
+    {
+        _pendingCleanupMonths = months;
+        _showCleanupConfirmModal = true;
+        ResetMessages();
+    }
+
+    /// <summary>取消手动清理。</summary>
+    private void CancelCleanupConfirm()
+    {
+        _showCleanupConfirmModal = false;
+    }
+
+    /// <summary>执行手动清理：调用 API 删除旧消息及文件资源。</summary>
+    private async Task ConfirmCleanupAsync()
+    {
+        _isCleaningUp = true;
+        _showCleanupConfirmModal = false;
+        ResetMessages();
+
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<JsApiResult>(
+                "authInterop.deleteJson",
+                $"/api/v1/share-items/cleanup?months={_pendingCleanupMonths}");
+
+            if (!result.ok)
+            {
+                _error = result.body?.error ?? L["Settings_CleanupFailed"];
+                return;
+            }
+
+            // 从 data.deletedCount 读取实际删除数量
+            var deleted = 0;
+            if (result.body?.data.ValueKind == JsonValueKind.Object &&
+                result.body.data.TryGetProperty("deletedCount", out var deletedCountProp))
+            {
+                deleted = deletedCountProp.GetInt32();
+            }
+
+            _message = deleted == 0
+                ? (string)L["Settings_CleanupNone"]
+                : (string)L["Settings_CleanupSuccess", deleted];
+        }
+        finally
+        {
+            _isCleaningUp = false;
+        }
     }
 
     /// <summary>切换暗色/亮色主题，立即应用并持久化到 localStorage。</summary>

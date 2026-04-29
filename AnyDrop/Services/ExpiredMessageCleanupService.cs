@@ -7,13 +7,17 @@ using Microsoft.EntityFrameworkCore;
 namespace AnyDrop.Services;
 
 /// <summary>
-/// 后台服务：每分钟检查并删除已到期的"阅后即焚"消息。
+/// 后台服务：每分钟检查并删除已到期的"阅后即焚"消息；
+/// 同时每天（UTC 日期变更后）检查是否需要执行自动清理旧消息任务。
 /// 删除时同步清理对应的文件（Image/Video/File 类型）。
 /// </summary>
 public sealed class ExpiredMessageCleanupService(
     IServiceProvider serviceProvider,
     ILogger<ExpiredMessageCleanupService> logger) : BackgroundService
 {
+    // 记录上次执行自动清理的日期（UTC），避免一天内重复执行
+    private DateOnly _lastAutoCleanupDate = DateOnly.MinValue;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
@@ -27,6 +31,22 @@ public sealed class ExpiredMessageCleanupService(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Expired message cleanup cycle failed.");
+            }
+
+            // 每天 UTC 日期变更后执行一次自动清理检查
+            var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+            if (todayUtc > _lastAutoCleanupDate)
+            {
+                try
+                {
+                    await RunAutoCleanupIfEnabledAsync(stoppingToken);
+                    // 仅在成功后更新日期，确保失败时下个周期可以重试
+                    _lastAutoCleanupDate = todayUtc;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Auto cleanup cycle failed.");
+                }
             }
         }
     }
@@ -105,6 +125,29 @@ public sealed class ExpiredMessageCleanupService(
             var allTopics = await topicService.GetAllTopicsAsync(ct);
 
             await hubContext.Clients.All.SendAsync("TopicsUpdated", allTopics, ct);
+        }
+    }
+
+    /// <summary>
+    /// 读取系统设置，若自动清理已启用，则调用 ShareService 清理超龄消息。
+    /// </summary>
+    private async Task RunAutoCleanupIfEnabledAsync(CancellationToken ct)
+    {
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ISystemSettingsService>();
+        var (enabled, months) = await settingsService.GetAutoCleanupSettingsAsync(ct);
+
+        if (!enabled)
+        {
+            return;
+        }
+
+        var shareService = scope.ServiceProvider.GetRequiredService<IShareService>();
+        var deleted = await shareService.CleanupOldMessagesAsync(months, null, ct);
+
+        if (deleted > 0)
+        {
+            logger.LogInformation("Auto cleanup deleted {Count} message(s) older than {Months} month(s).", deleted, months);
         }
     }
 }

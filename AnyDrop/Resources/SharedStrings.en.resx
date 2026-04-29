@@ -69,6 +69,26 @@
   <data name="Settings_UpdatePasswordFailed"><value>Failed to update password.</value></data>
   <data name="Settings_SaveSecurityFailed"><value>Failed to save settings.</value></data>
 
+  <!-- Message Cleanup -->
+  <data name="Settings_MessageManagement"><value>Message Management</value></data>
+  <data name="Settings_ManualCleanup"><value>Manual Cleanup</value></data>
+  <data name="Settings_ManualCleanupHint"><value>Clean up all messages and associated files before the specified date</value></data>
+  <data name="Settings_Cleanup1Month"><value>Clean up 1 month ago</value></data>
+  <data name="Settings_Cleanup3Months"><value>Clean up 3 months ago</value></data>
+  <data name="Settings_Cleanup6Months"><value>Clean up 6 months ago</value></data>
+  <data name="Settings_AutoCleanup"><value>Auto Cleanup</value></data>
+  <data name="Settings_AutoCleanupHint"><value>Automatically clean up messages older than the threshold each day</value></data>
+  <data name="Settings_AutoCleanupMonths"><value>Auto cleanup threshold</value></data>
+  <data name="Settings_AutoCleanupMonths1"><value>Older than 1 month</value></data>
+  <data name="Settings_AutoCleanupMonths3"><value>Older than 3 months</value></data>
+  <data name="Settings_AutoCleanupMonths6"><value>Older than 6 months</value></data>
+  <data name="Settings_CleanupSuccess"><value>Successfully cleaned up {0} message(s).</value></data>
+  <data name="Settings_CleanupNone"><value>No messages to clean up.</value></data>
+  <data name="Settings_CleanupFailed"><value>Cleanup failed. Please try again.</value></data>
+  <data name="Settings_CleanupConfirmTitle"><value>Confirm Cleanup</value></data>
+  <data name="Settings_CleanupConfirmMessage"><value>This will permanently delete all messages and files older than {0} month(s). This cannot be undone. Continue?</value></data>
+  <data name="Settings_CleanupConfirmAction"><value>Confirm Cleanup</value></data>
+
   <!-- Login Page -->
   <data name="Login_Title"><value>AnyDrop</value></data>
   <data name="Login_Subtitle"><value>Private cross-device content sharing</value></data>
@@ -206,6 +226,16 @@
   <data name="Home_DeleteAfterSeconds"><value>Delete in {0} sec</value></data>
   <data name="Home_Uploading"><value>Uploading…</value></data>
   <data name="Home_UploadFailed"><value>Upload failed</value></data>
+
+  <!-- Selection Mode -->
+  <data name="Home_SelectMessages"><value>Select</value></data>
+  <data name="Home_ExitSelect"><value>Cancel</value></data>
+  <data name="Home_SelectedCount"><value>{0} selected</value></data>
+  <data name="Home_BatchDelete"><value>Delete</value></data>
+  <data name="Home_BatchDeleteConfirmTitle"><value>Confirm Delete</value></data>
+  <data name="Home_BatchDeleteConfirmMessage"><value>Delete the selected {0} message(s)? This cannot be undone and associated files will also be deleted.</value></data>
+  <data name="Home_BatchDeleteConfirmAction"><value>Confirm Delete</value></data>
+  <data name="Home_BatchDeleteFailed"><value>Batch delete failed. Please try again.</value></data>
 
   <!-- Search -->
   <data name="Search_PageTitle"><value>Search · {0}</value></data>

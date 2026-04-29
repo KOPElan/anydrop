@@ -69,6 +69,26 @@
   <data name="Settings_UpdatePasswordFailed"><value>更新密码失败。</value></data>
   <data name="Settings_SaveSecurityFailed"><value>保存设置失败。</value></data>
 
+  <!-- 消息管理 / Message Cleanup -->
+  <data name="Settings_MessageManagement"><value>消息管理</value></data>
+  <data name="Settings_ManualCleanup"><value>手动清理</value></data>
+  <data name="Settings_ManualCleanupHint"><value>清理指定时间之前的所有消息及相关文件资源</value></data>
+  <data name="Settings_Cleanup1Month"><value>清理 1 个月前</value></data>
+  <data name="Settings_Cleanup3Months"><value>清理 3 个月前</value></data>
+  <data name="Settings_Cleanup6Months"><value>清理 6 个月前</value></data>
+  <data name="Settings_AutoCleanup"><value>自动清理</value></data>
+  <data name="Settings_AutoCleanupHint"><value>启用后每天自动清理超过指定时长的消息</value></data>
+  <data name="Settings_AutoCleanupMonths"><value>自动清理时间阈值</value></data>
+  <data name="Settings_AutoCleanupMonths1"><value>1 个月前</value></data>
+  <data name="Settings_AutoCleanupMonths3"><value>3 个月前</value></data>
+  <data name="Settings_AutoCleanupMonths6"><value>6 个月前</value></data>
+  <data name="Settings_CleanupSuccess"><value>已成功清理 {0} 条消息。</value></data>
+  <data name="Settings_CleanupNone"><value>没有需要清理的消息。</value></data>
+  <data name="Settings_CleanupFailed"><value>清理失败，请重试。</value></data>
+  <data name="Settings_CleanupConfirmTitle"><value>确认清理</value></data>
+  <data name="Settings_CleanupConfirmMessage"><value>将删除 {0} 个月前的所有消息及相关文件，此操作不可撤销，确认继续？</value></data>
+  <data name="Settings_CleanupConfirmAction"><value>确认清理</value></data>
+
   <!-- 登录页 / Login Page -->
   <data name="Login_Title"><value>AnyDrop</value></data>
   <data name="Login_Subtitle"><value>私有跨设备内容共享平台</value></data>
@@ -208,6 +228,16 @@
   <data name="Home_DeleteAfterSeconds"><value>{0}秒后删除</value></data>
   <data name="Home_Uploading"><value>上传中…</value></data>
   <data name="Home_UploadFailed"><value>上传失败</value></data>
+
+  <!-- 批量选择 / Selection Mode -->
+  <data name="Home_SelectMessages"><value>选择</value></data>
+  <data name="Home_ExitSelect"><value>取消选择</value></data>
+  <data name="Home_SelectedCount"><value>已选 {0} 条</value></data>
+  <data name="Home_BatchDelete"><value>删除</value></data>
+  <data name="Home_BatchDeleteConfirmTitle"><value>确认批量删除</value></data>
+  <data name="Home_BatchDeleteConfirmMessage"><value>确定要删除所选的 {0} 条消息？此操作不可撤销，相关文件也会被删除。</value></data>
+  <data name="Home_BatchDeleteConfirmAction"><value>确认删除</value></data>
+  <data name="Home_BatchDeleteFailed"><value>批量删除失败，请重试。</value></data>
 
   <!-- 搜索页 / Search -->
   <data name="Search_PageTitle"><value>搜索 · {0}</value></data>

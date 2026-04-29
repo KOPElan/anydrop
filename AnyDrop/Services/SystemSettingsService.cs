@@ -29,10 +29,18 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return AuthResult<SecuritySettingsDto>.Failure("不支持的语言代码。", StatusCodes.Status400BadRequest);
         }
 
+        // 仅在启用自动清理时才校验月数（未启用时月数无实际影响，避免破坏旧客户端请求）
+        if (request.AutoCleanupEnabled && request.AutoCleanupMonths is not (1 or 3 or 6))
+        {
+            return AuthResult<SecuritySettingsDto>.Failure("自动清理月数必须为 1、3 或 6。", StatusCodes.Status400BadRequest);
+        }
+
         var settings = await EnsureSettingsAsync(ct);
         settings.AutoFetchLinkPreview = request.AutoFetchLinkPreview;
         settings.BurnAfterReadingMinutes = request.BurnAfterReadingMinutes;
         settings.Language = request.Language;
+        settings.AutoCleanupEnabled = request.AutoCleanupEnabled;
+        settings.AutoCleanupMonths = request.AutoCleanupMonths;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(ct);
         return AuthResult<SecuritySettingsDto>.Success(MapToDto(settings));
@@ -68,8 +76,23 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         return settings.BurnAfterReadingMinutes;
     }
 
+    public async Task<(bool Enabled, int Months)> GetAutoCleanupSettingsAsync(CancellationToken ct = default)
+    {
+        var projection = await dbContext.SystemSettings
+            .AsNoTracking()
+            .Select(x => new { x.AutoCleanupEnabled, x.AutoCleanupMonths })
+            .FirstOrDefaultAsync(ct);
+        if (projection is not null)
+        {
+            return (projection.AutoCleanupEnabled, projection.AutoCleanupMonths);
+        }
+
+        var settings = await EnsureSettingsAsync(ct);
+        return (settings.AutoCleanupEnabled, settings.AutoCleanupMonths);
+    }
+
     private static SecuritySettingsDto MapToDto(SystemSettings s)
-        => new(s.AutoFetchLinkPreview, s.BurnAfterReadingMinutes, s.Language);
+        => new(s.AutoFetchLinkPreview, s.BurnAfterReadingMinutes, s.Language, s.AutoCleanupEnabled, s.AutoCleanupMonths);
 
     private async Task<SystemSettings> EnsureSettingsAsync(CancellationToken ct)
     {
