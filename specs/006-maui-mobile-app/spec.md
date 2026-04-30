@@ -194,7 +194,7 @@
 
 #### 设置
 
-- **FR-028**: App MUST 提供设置页，包含以下子功能：昵称修改（`PUT /api/v1/settings/nickname`）、密码修改（`PUT /api/v1/settings/password`）、安全设置查看与更新（`GET/PUT /api/v1/settings/security`）。
+- **FR-028**: App MUST 提供设置页，包含以下子功能：昵称修改（`PUT /api/v1/settings/profile`）、密码修改（`PUT /api/v1/settings/password`）、安全设置查看与更新（`GET/PUT /api/v1/settings/security`）。
 - **FR-029**: App MUST 支持手动触发旧消息清理（`DELETE /api/v1/share-items/cleanup`），用户指定保留月数并在操作前二次确认。
 - **FR-030**: App MUST 支持语言切换（中文 / 英文），切换后 UI 立即生效，选择持久化。
 - **FR-031**: App MUST 支持深色 / 浅色主题切换，选择持久化至本地。

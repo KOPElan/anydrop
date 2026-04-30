@@ -217,7 +217,7 @@
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `before` | `string` (ISO 8601) | 游标（返回此时间之前的消息） |
-| `limit` | `int` | 每页数量，默认 30 |
+| `limit` | `int` | 每页数量，默认 50 |
 
 **Response** `200 OK`:
 ```json
@@ -240,7 +240,17 @@
 关键词搜索消息（需认证）。
 
 **Query Params**: `q=关键词&limit=20&before=游标`  
-**Response**: `IReadOnlyList<ShareItemDto>`（与分页消息结构一致）
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [ /* ShareItemDto[] */ ],
+    "hasMore": false,
+    "nextCursor": null
+  }
+}
+```
 
 ---
 
@@ -257,8 +267,8 @@
 
 按内容类型筛选消息（需认证）。
 
-**Query Params**: `type=Image&limit=20&before=游标`  
-**ContentType 值**: `Text` | `Image` | `Video` | `File` | `Link`
+**Query Params**: `contentType=Image&limit=20&before=游标`  
+**ContentType 值**: 可传枚举名；枚举名为 `Text` | `Image` | `Video` | `File` | `Link`
 
 ---
 
@@ -266,12 +276,12 @@
 
 获取该主题有消息的日期列表（用于日历高亮，需认证）。
 
-**Query Params**: `year=2026&month=4`  
-**Response**:
+**Query Params**: `start=2026-04-01&end=2026-04-30`  
+**Response** `200 OK`:
 ```json
 {
   "success": true,
-  "data": { "dates": ["2026-04-01", "2026-04-15", "2026-04-28"] }
+  "data": ["2026-04-01", "2026-04-15", "2026-04-28"]
 }
 ```
 
@@ -291,7 +301,7 @@
 }
 ```
 
-**Response** `201 Created`: 返回新 `ShareItemDto`。
+**Response** `200 OK`: 返回新 `ShareItemDto`。
 
 ---
 
@@ -319,7 +329,7 @@
 | `file` | `binary` | 文件内容 |
 | `topicId` | `string (guid)` | 目标主题 ID |
 
-**Response** `201 Created`: 返回新 `ShareItemDto`。
+**Response** `200 OK`: 返回新 `ShareItemDto`。
 
 **Constraints**:
 - 最大文件大小：由服务端配置（默认通常 100MB）

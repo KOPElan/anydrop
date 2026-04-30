@@ -13,22 +13,12 @@ public static class TopicEndpoints
         group.MapGet("/archived", GetArchivedTopicsAsync);
         group.MapPost("/", CreateTopicAsync);
         group.MapPut("/reorder", ReorderTopicsAsync);
-        group.MapGet("/{id:guid}", GetTopicByIdAsync)
-            .WithName("GetTopicById")
-            .WithSummary("Get a single topic by ID");
+        group.MapGet("/{id:guid}", GetTopicByIdAsync);
         group.MapGet("/{id:guid}/messages", GetTopicMessagesAsync);
-        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync)
-            .WithName("SearchTopicMessages")
-            .WithSummary("Search messages in a topic by text content");
-        group.MapGet("/{id:guid}/messages/by-date", GetTopicMessagesByDateAsync)
-            .WithName("GetTopicMessagesByDate")
-            .WithSummary("Get all messages in a topic for a specific date");
-        group.MapGet("/{id:guid}/active-dates", GetTopicActiveDatesAsync)
-            .WithName("GetTopicActiveDates")
-            .WithSummary("Get dates that have messages within a date range");
-        group.MapGet("/{id:guid}/messages/by-type", GetTopicMessagesByTypeAsync)
-            .WithName("GetTopicMessagesByType")
-            .WithSummary("Get messages in a topic filtered by content type");
+        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync);
+        group.MapGet("/{id:guid}/messages/by-date", GetTopicMessagesByDateAsync);
+        group.MapGet("/{id:guid}/active-dates", GetTopicActiveDatesAsync);
+        group.MapGet("/{id:guid}/messages/by-type", GetTopicMessagesByTypeAsync);
         group.MapPut("/{id:guid}", UpdateTopicAsync);
         group.MapPut("/{id:guid}/pin", PinTopicAsync);
         group.MapPut("/{id:guid}/archive", ArchiveTopicAsync);
