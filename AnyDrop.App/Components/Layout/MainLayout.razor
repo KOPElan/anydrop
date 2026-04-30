@@ -2,6 +2,7 @@
 @inject AppEventBus EventBus
 @inject NavigationManager Nav
 @inject IConnectivityService Connectivity
+@inject ISignalRService SignalR
 @implements IDisposable
 
 <div class="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -53,7 +54,9 @@
     {
         EventBus.AuthExpired += OnAuthExpired;
         EventBus.ConnectivityChanged += OnConnectivityChanged;
+        SignalR.StateChanged += OnSignalRStateChanged;
         _showOfflineBanner = !Connectivity.IsOnline;
+        _signalRDisconnected = SignalR.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected;
     }
 
     private void OnAuthExpired()
@@ -73,10 +76,20 @@
         });
     }
 
+    private void OnSignalRStateChanged(Microsoft.AspNetCore.SignalR.Client.HubConnectionState state)
+    {
+        InvokeAsync(() =>
+        {
+            _signalRDisconnected = state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected;
+            StateHasChanged();
+        });
+    }
+
     public void Dispose()
     {
         EventBus.AuthExpired -= OnAuthExpired;
         EventBus.ConnectivityChanged -= OnConnectivityChanged;
+        SignalR.StateChanged -= OnSignalRStateChanged;
     }
 }
 

@@ -91,6 +91,8 @@
     private string? _cursor;
     private System.Threading.Timer? _debounceTimer;
 
+    private const int PageSize = 20;
+
     private static readonly Dictionary<string, string> _modes = new()
     {
         ["keyword"] = "关键词",
@@ -128,8 +130,10 @@
                 {
                     _loading = true;
                     StateHasChanged();
-                    var items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword);
+                    var items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, limit: PageSize);
                     _results.AddRange(items);
+                    _cursor = items.Count > 0 ? items[^1].Id.ToString() : null;
+                    _hasMore = items.Count >= PageSize;
                     _loading = false;
                     StateHasChanged();
                 }
@@ -150,10 +154,14 @@
         _contentType = type;
         _results.Clear();
         _cursor = null;
+        _hasMore = false;
         if (!AppState.CurrentTopicId.HasValue) return;
         _loading = true;
-        var items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, type);
+        const int limit = PageSize;
+        var items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, type, limit: limit);
         _results.AddRange(items);
+        _cursor = items.Count > 0 ? items[^1].Id.ToString() : null;
+        _hasMore = items.Count >= limit;
         _loading = false;
     }
 
@@ -163,10 +171,12 @@
         _loading = true;
         IReadOnlyList<ShareItemDto> items;
         if (_mode == "keyword")
-            items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, before: _cursor);
+            items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, limit: PageSize, before: _cursor);
         else
-            items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, _contentType, before: _cursor);
+            items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, _contentType, limit: PageSize, before: _cursor);
         _results.AddRange(items);
+        _cursor = items.Count > 0 ? items[^1].Id.ToString() : _cursor;
+        _hasMore = items.Count >= PageSize;
         _loading = false;
     }
 }

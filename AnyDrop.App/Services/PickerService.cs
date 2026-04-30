@@ -22,7 +22,8 @@ public sealed class PickerService : IPickerService
     public async Task<(Stream Stream, string FileName, string MimeType)?> PickPhotoAsync()
     {
 #if ANDROID || IOS || MACCATALYST || WINDOWS
-        var result = await MediaPicker.PickPhotoAsync().ConfigureAwait(false);
+        var results = await MediaPicker.Default.PickPhotosAsync().ConfigureAwait(false);
+        var result = results?.FirstOrDefault();
         if (result is null) return null;
         var stream = await result.OpenReadAsync().ConfigureAwait(false);
         return (stream, result.FileName, "image/jpeg");
@@ -35,7 +36,8 @@ public sealed class PickerService : IPickerService
     public async Task<(Stream Stream, string FileName, string MimeType)?> PickVideoAsync()
     {
 #if ANDROID || IOS || MACCATALYST || WINDOWS
-        var result = await MediaPicker.PickVideoAsync().ConfigureAwait(false);
+        var results = await MediaPicker.Default.PickVideosAsync().ConfigureAwait(false);
+        var result = results?.FirstOrDefault();
         if (result is null) return null;
         var stream = await result.OpenReadAsync().ConfigureAwait(false);
         return (stream, result.FileName, "video/mp4");

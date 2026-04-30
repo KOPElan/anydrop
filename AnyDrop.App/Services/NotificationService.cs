@@ -33,6 +33,7 @@ public sealed class NotificationService : INotificationService
             {
                 var context = Android.App.Application.Context;
                 const string channelId = "anydrop_messages";
+                if (context is null) return;
                 var manager = (Android.App.NotificationManager?)context.GetSystemService(Android.Content.Context.NotificationService);
                 if (manager is null) return;
 
@@ -42,13 +43,15 @@ public sealed class NotificationService : INotificationService
                     manager.CreateNotificationChannel(channel);
                 }
 
-                var builder = new AndroidX.Core.App.NotificationCompat.Builder(context, channelId)
+#pragma warning disable CS8602 // AndroidX Builder 方法链从不返回 null
+                var builder = new AndroidX.Core.App.NotificationCompat.Builder(context!, channelId)
                     .SetSmallIcon(Android.Resource.Drawable.IcDialogInfo)
                     .SetContentTitle(topicName)
                     .SetContentText(preview)
                     .SetAutoCancel(true);
 
-                manager.Notify(Math.Abs(topicId.GetHashCode()), builder.Build());
+                manager.Notify(Math.Abs(topicId.GetHashCode()), builder.Build()!);
+#pragma warning restore CS8602
             }).ConfigureAwait(false);
         }
         catch { /* 权限被拒绝时静默失败 */ }

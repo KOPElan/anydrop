@@ -29,8 +29,8 @@ public sealed class AuthService : IAuthService
         var httpResponse = await client.PostAsJsonAsync("api/v1/auth/setup", request).ConfigureAwait(false);
         var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>().ConfigureAwait(false);
 
-        if (response?.Data is { Success: true, Token: not null, ExpiresAt: not null })
-            await _tokenStorage.SaveTokenAsync(response.Data.Token, response.Data.ExpiresAt.Value).ConfigureAwait(false);
+        if (response?.Data is { Success: true, Token: { } token, ExpiresAt: { } expiresAt })
+            await _tokenStorage.SaveTokenAsync(token, expiresAt).ConfigureAwait(false);
 
         return response?.Data ?? new LoginResponse(false, null, null, "Unknown error");
     }
@@ -41,8 +41,8 @@ public sealed class AuthService : IAuthService
         var httpResponse = await client.PostAsJsonAsync("api/v1/auth/login", request).ConfigureAwait(false);
         var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>().ConfigureAwait(false);
 
-        if (response?.Data is { Success: true, Token: not null, ExpiresAt: not null })
-            await _tokenStorage.SaveTokenAsync(response.Data.Token, response.Data.ExpiresAt.Value).ConfigureAwait(false);
+        if (response?.Data is { Success: true, Token: { } token, ExpiresAt: { } expiresAt })
+            await _tokenStorage.SaveTokenAsync(token, expiresAt).ConfigureAwait(false);
 
         return response?.Data ?? new LoginResponse(false, null, null, "Unknown error");
     }
