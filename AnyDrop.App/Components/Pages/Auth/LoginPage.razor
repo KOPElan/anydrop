@@ -37,9 +37,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var status = await AuthService.GetSetupStatusAsync();
-        if (status.RequiresSetup)
-            Nav.NavigateTo("/setup-account");
+        try
+        {
+            var status = await AuthService.GetSetupStatusAsync();
+            if (status.RequiresSetup)
+                Nav.NavigateTo("/setup-account");
+        }
+        catch { /* BaseUrl 暂不可用时静默忽略，保持在登录页让用户手动操作 */ }
     }
 
     private async Task LoginAsync()

@@ -60,7 +60,7 @@
     protected override async Task OnInitializedAsync()
     {
         AppState.OnChange += StateHasChanged;
-        await LoadTopicsAsync();
+        try { await LoadTopicsAsync(); } catch { /* BaseUrl 未配置或网络不可达时静默失败 */ }
 
         if (TopicId is not null && Guid.TryParse(TopicId, out var id))
             AppState.CurrentTopicId = id;
