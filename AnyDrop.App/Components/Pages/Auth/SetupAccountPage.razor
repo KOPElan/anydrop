@@ -1,0 +1,71 @@
+@page "/setup-account"
+@layout AuthLayout
+@inject IAuthService AuthService
+@inject ISignalRService SignalR
+@inject INotificationService Notifications
+@inject NavigationManager Nav
+
+<div class="space-y-4">
+    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">创建账号</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">首次使用，请设置您的昵称和密码</p>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">昵称</label>
+        <input @bind="_nickname" type="text" placeholder="请输入昵称"
+               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">密码</label>
+        <input @bind="_password" type="password" placeholder="请输入密码"
+               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">确认密码</label>
+        <input @bind="_confirmPassword" type="password" placeholder="再次输入密码"
+               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    </div>
+
+    @if (_error is not null)
+    {
+        <p class="text-red-500 text-sm">@_error</p>
+    }
+
+    <button @onclick="SetupAsync"
+            disabled="@(_loading)"
+            class="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+        @(_loading ? "创建中..." : "创建账号")
+    </button>
+</div>
+
+@code {
+    private string _nickname = string.Empty;
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private string? _error;
+    private bool _loading;
+
+    private async Task SetupAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_nickname)) { _error = "请输入昵称"; return; }
+        if (string.IsNullOrWhiteSpace(_password)) { _error = "请输入密码"; return; }
+        if (_password != _confirmPassword) { _error = "两次密码不一致"; return; }
+
+        _loading = true;
+        _error = null;
+
+        var result = await AuthService.SetupAsync(new SetupRequest(_nickname, _password, _confirmPassword));
+        if (result.Success)
+        {
+            await Notifications.RequestPermissionAsync();
+            await SignalR.StartAsync();
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            _error = result.Error ?? "创建失败，请重试。";
+            _loading = false;
+        }
+    }
+}

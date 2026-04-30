@@ -1,0 +1,172 @@
+@page "/search"
+@layout MainLayout
+@inject ISearchService SearchService
+@inject IAppStateService AppState
+
+<div class="flex flex-col h-full overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 pt-3 pb-2 space-y-2">
+        <div class="flex gap-2 rounded-xl bg-gray-100 dark:bg-gray-700 p-1">
+            @foreach (var mode in _modes)
+            {
+                <button @onclick="() => SetMode(mode.Key)"
+                        class="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors @(_mode == mode.Key ? "bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-gray-500 dark:text-gray-400")">
+                    @mode.Value
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+        @if (_mode == "keyword")
+        {
+            <div class="px-4 pt-3 pb-2">
+                <input value="@_keyword" @oninput="OnKeywordInput"
+                       type="search" placeholder="输入关键词搜索..."
+                       class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            @if (_results.Count == 0 && !string.IsNullOrWhiteSpace(_keyword) && !_loading)
+            {
+                <div class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">未找到相关内容</div>
+            }
+            @foreach (var item in _results)
+            {
+                <SearchResultItem Item="item" />
+            }
+            @if (_hasMore)
+            {
+                <div class="text-center py-3">
+                    <button @onclick="LoadMoreAsync" disabled="@_loading"
+                            class="text-xs text-indigo-600 dark:text-indigo-400 disabled:opacity-50">加载更多</button>
+                </div>
+            }
+        }
+        else if (_mode == "date")
+        {
+            @if (AppState.CurrentTopicId.HasValue)
+            {
+                <ActiveDateCalendar TopicId="AppState.CurrentTopicId.Value" OnDateSelected="OnDateSelected" />
+                @foreach (var item in _results)
+                {
+                    <SearchResultItem Item="item" />
+                }
+            }
+            else
+            {
+                <div class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">请先在主页选择主题</div>
+            }
+        }
+        else
+        {
+            <div class="flex gap-1 px-4 py-2 flex-wrap">
+                @foreach (var type in _contentTypes)
+                {
+                    <button @onclick="() => SetContentType(type.Key)"
+                            class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors @(_contentType == type.Key ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300")">
+                        @type.Value
+                    </button>
+                }
+            </div>
+            @foreach (var item in _results)
+            {
+                <SearchResultItem Item="item" />
+            }
+            @if (_hasMore)
+            {
+                <div class="text-center py-3">
+                    <button @onclick="LoadMoreAsync" disabled="@_loading"
+                            class="text-xs text-indigo-600 dark:text-indigo-400 disabled:opacity-50">加载更多</button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private string _mode = "keyword";
+    private string _keyword = string.Empty;
+    private ShareContentType _contentType = ShareContentType.Text;
+    private List<ShareItemDto> _results = [];
+    private bool _loading;
+    private bool _hasMore;
+    private string? _cursor;
+    private System.Threading.Timer? _debounceTimer;
+
+    private static readonly Dictionary<string, string> _modes = new()
+    {
+        ["keyword"] = "关键词",
+        ["date"] = "日期",
+        ["type"] = "类型"
+    };
+
+    private static readonly Dictionary<ShareContentType, string> _contentTypes = new()
+    {
+        [ShareContentType.Text] = "文本",
+        [ShareContentType.Image] = "图片",
+        [ShareContentType.Video] = "视频",
+        [ShareContentType.File] = "文件",
+        [ShareContentType.Link] = "链接"
+    };
+
+    private void SetMode(string mode)
+    {
+        _mode = mode;
+        _results.Clear();
+        _cursor = null;
+    }
+
+    private void OnKeywordInput(ChangeEventArgs e)
+    {
+        _keyword = e.Value?.ToString() ?? string.Empty;
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                _results.Clear();
+                _cursor = null;
+                if (!string.IsNullOrWhiteSpace(_keyword) && AppState.CurrentTopicId.HasValue)
+                {
+                    _loading = true;
+                    StateHasChanged();
+                    var items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword);
+                    _results.AddRange(items);
+                    _loading = false;
+                    StateHasChanged();
+                }
+            });
+        }, null, 300, System.Threading.Timeout.Infinite);
+    }
+
+    private async Task OnDateSelected(DateOnly date)
+    {
+        if (!AppState.CurrentTopicId.HasValue) return;
+        _results.Clear();
+        var items = await SearchService.GetByDateAsync(AppState.CurrentTopicId.Value, date);
+        _results.AddRange(items);
+    }
+
+    private async Task SetContentType(ShareContentType type)
+    {
+        _contentType = type;
+        _results.Clear();
+        _cursor = null;
+        if (!AppState.CurrentTopicId.HasValue) return;
+        _loading = true;
+        var items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, type);
+        _results.AddRange(items);
+        _loading = false;
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (!AppState.CurrentTopicId.HasValue) return;
+        _loading = true;
+        IReadOnlyList<ShareItemDto> items;
+        if (_mode == "keyword")
+            items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, before: _cursor);
+        else
+            items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, _contentType, before: _cursor);
+        _results.AddRange(items);
+        _loading = false;
+    }
+}

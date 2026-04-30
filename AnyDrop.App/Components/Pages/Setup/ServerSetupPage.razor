@@ -1,0 +1,61 @@
+@page "/setup"
+@layout AuthLayout
+@inject IServerConfigService ServerConfig
+@inject NavigationManager Nav
+
+<div class="space-y-4">
+    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">配置服务端</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">输入您的 AnyDrop 服务端地址以开始使用</p>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">服务端地址</label>
+        <input @bind="_url"
+               @bind:event="oninput"
+               type="url"
+               placeholder="http://192.168.1.100:5002"
+               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    </div>
+
+    @if (_error is not null)
+    {
+        <p class="text-red-500 text-sm">@_error</p>
+    }
+
+    <button @onclick="ConnectAsync"
+            disabled="@(_loading || string.IsNullOrWhiteSpace(_url))"
+            class="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+        @if (_loading)
+        {
+            <span>连接中...</span>
+        }
+        else
+        {
+            <span>连接</span>
+        }
+    </button>
+</div>
+
+@code {
+    private string _url = string.Empty;
+    private string? _error;
+    private bool _loading;
+
+    private async Task ConnectAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_url)) return;
+        _loading = true;
+        _error = null;
+
+        var valid = await ServerConfig.ValidateUrlAsync(_url);
+        if (!valid)
+        {
+            _error = "无法连接到服务端，请检查地址是否正确。";
+            _loading = false;
+            return;
+        }
+
+        await ServerConfig.SetBaseUrlAsync(_url);
+        _loading = false;
+        Nav.NavigateTo("/login");
+    }
+}

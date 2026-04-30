@@ -1,0 +1,27 @@
+@page "/image-preview/{Id}"
+@layout AuthLayout
+@inject IServerConfigService ServerConfig
+@inject NavigationManager Nav
+
+<div class="fixed inset-0 bg-black z-50 flex items-center justify-center touch-action-pinch-zoom">
+    <button @onclick="GoBack"
+            class="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+    </button>
+    <img src="@_imageUrl" alt="preview" class="max-w-full max-h-full object-contain" />
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    private string _imageUrl = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _imageUrl = $"{ServerConfig.GetBaseUrl()}/api/v1/share-items/{Id}/file";
+    }
+
+    private void GoBack() => Nav.NavigateTo("/");
+}

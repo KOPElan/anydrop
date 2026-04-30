@@ -28,5 +28,36 @@
     </array>
     <key>XSAppIconAssets</key>
     <string>Assets.xcassets/appicon.appiconset</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>AnyDrop 需要访问相册以分享图片</string>
+    <key>NSCameraUsageDescription</key>
+    <string>AnyDrop 需要访问相机以拍摄并分享照片</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>AnyDrop 需要访问麦克风以录制视频</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>All Files</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.data</string>
+                <string>public.content</string>
+            </array>
+        </dict>
+    </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>AnyDrop Deep Link</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>anydrop</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

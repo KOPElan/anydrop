@@ -1,6 +1,49 @@
-﻿<Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+@inject ISecureTokenStorage TokenStorage
+@inject IServerConfigService ServerConfig
+@inject NavigationManager Nav
+
+<Router AppAssembly="typeof(Routes).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // 检测外部分享内容
+        if (PendingShareStore.HasContent)
+        {
+            if (await TokenStorage.IsAuthenticatedAsync())
+                Nav.NavigateTo("/share");
+            else
+                Nav.NavigateTo("/login?returnTo=/share");
+            return;
+        }
+
+        // 检测通知深链接
+        if (PendingShareStore.NotificationTopicId.HasValue)
+        {
+            var topicId = PendingShareStore.NotificationTopicId.Value;
+            PendingShareStore.NotificationTopicId = null;
+            if (await TokenStorage.IsAuthenticatedAsync())
+            {
+                Nav.NavigateTo($"/?topicId={topicId}");
+                return;
+            }
+        }
+
+        // 正常启动路由决策
+        if (!ServerConfig.HasBaseUrl())
+        {
+            Nav.NavigateTo("/setup");
+            return;
+        }
+        if (!await TokenStorage.IsAuthenticatedAsync())
+        {
+            Nav.NavigateTo("/login");
+        }
+    }
+}
+
