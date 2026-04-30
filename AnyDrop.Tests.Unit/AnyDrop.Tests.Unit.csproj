@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AnyDrop\AnyDrop.csproj" />
+    <ProjectReference Include="..\AnyDrop.App\AnyDrop.App.csproj" />
   </ItemGroup>
 
 </Project>

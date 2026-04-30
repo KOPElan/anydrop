@@ -1,0 +1,140 @@
+@page "/settings"
+@layout MainLayout
+@inject IAuthService AuthService
+@inject ISettingsService SettingsService
+@inject IServerConfigService ServerConfig
+@inject ISignalRService SignalR
+@inject ISecureTokenStorage TokenStorage
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="flex-1 overflow-y-auto">
+    <div class="px-4 py-6 space-y-6 max-w-lg mx-auto">
+        <h1 class="text-xl font-semibold text-gray-800 dark:text-gray-100">设置</h1>
+
+        <!-- 个人资料 -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl p-4 space-y-4">
+            <h2 class="font-medium text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider">个人资料</h2>
+            <div class="flex items-center gap-3">
+                @if (_editNickname)
+                {
+                    <input @bind="_nicknameInput" type="text"
+                           class="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <button @onclick="SaveNicknameAsync" class="text-indigo-600 text-sm font-medium">保存</button>
+                    <button @onclick="() => _editNickname = false" class="text-gray-400 text-sm">取消</button>
+                }
+                else
+                {
+                    <span class="flex-1 text-gray-800 dark:text-gray-100">@_nickname</span>
+                    <button @onclick="() => { _editNickname = true; _nicknameInput = _nickname; }"
+                            class="text-indigo-600 text-sm font-medium">编辑</button>
+                }
+            </div>
+
+            <div class="border-t border-gray-100 dark:border-gray-700 pt-4 space-y-3">
+                <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">修改密码</h3>
+                <input @bind="_currentPassword" type="password" placeholder="当前密码"
+                       class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input @bind="_newPassword" type="password" placeholder="新密码"
+                       class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                @if (_passwordError is not null)
+                {
+                    <p class="text-red-500 text-xs">@_passwordError</p>
+                }
+                <button @onclick="ChangePasswordAsync"
+                        class="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">修改密码</button>
+            </div>
+        </section>
+
+        <!-- 外观与语言 -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl p-4 space-y-4">
+            <h2 class="font-medium text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider">外观与语言</h2>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-800 dark:text-gray-100">深色模式</span>
+                <button @onclick="ToggleThemeAsync"
+                        class="w-12 h-6 rounded-full transition-colors @(_isDark ? "bg-indigo-600" : "bg-gray-300") relative">
+                    <span class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform @(_isDark ? "translate-x-6" : "translate-x-0.5")"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 危险区域 -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl p-4 space-y-3">
+            <h2 class="font-medium text-red-600 text-sm uppercase tracking-wider">危险区域</h2>
+            <div class="space-y-2">
+                <label class="block text-sm text-gray-700 dark:text-gray-300">修改服务端地址</label>
+                <input @bind="_newBaseUrl" type="url" placeholder="@(ServerConfig.GetBaseUrl() ?? "")"
+                       class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <button @onclick="ChangeServerUrlAsync"
+                        class="w-full py-2 border border-red-500 text-red-500 rounded-lg text-sm font-medium">更换服务端地址</button>
+            </div>
+            <button @onclick="LogoutAsync"
+                    class="w-full py-2.5 border border-red-500 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium">退出登录</button>
+        </section>
+    </div>
+</div>
+
+@code {
+    private string _nickname = string.Empty;
+    private bool _editNickname;
+    private string _nicknameInput = string.Empty;
+    private string _currentPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private string? _passwordError;
+    private bool _isDark;
+    private string _newBaseUrl = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var profile = await AuthService.GetCurrentUserAsync();
+        _nickname = profile.Nickname;
+    }
+
+    private async Task SaveNicknameAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_nicknameInput)) return;
+        await SettingsService.UpdateNicknameAsync(new UpdateNicknameRequest(_nicknameInput));
+        _nickname = _nicknameInput;
+        _editNickname = false;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_currentPassword) || string.IsNullOrWhiteSpace(_newPassword)) return;
+        try
+        {
+            await SettingsService.UpdatePasswordAsync(new UpdatePasswordRequest(_currentPassword, _newPassword));
+            _currentPassword = _newPassword = string.Empty;
+            _passwordError = null;
+        }
+        catch (HttpRequestException ex)
+        {
+            _passwordError = ex.StatusCode == System.Net.HttpStatusCode.BadRequest ? "当前密码错误" : "修改失败，请重试";
+        }
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        _isDark = !_isDark;
+        var mode = _isDark ? "dark" : "light";
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+        Preferences.Set("anydrop_theme", mode);
+#endif
+        await JS.InvokeVoidAsync("ThemeManager.setTheme", mode);
+    }
+
+    private async Task ChangeServerUrlAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newBaseUrl)) return;
+        await SignalR.StopAsync();
+        await TokenStorage.ClearTokenAsync();
+        await ServerConfig.SetBaseUrlAsync(_newBaseUrl);
+        Nav.NavigateTo("/setup");
+    }
+
+    private async Task LogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}

@@ -1,0 +1,83 @@
+@inject ISearchService SearchService
+
+<div class="p-4 space-y-3">
+    <div class="flex items-center justify-between">
+        <button @onclick="PrevMonth" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">◀</button>
+        <span class="font-medium text-gray-800 dark:text-gray-100">@_current.Year 年 @_current.Month 月</span>
+        <button @onclick="NextMonth" class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">▶</button>
+    </div>
+
+    <div class="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 dark:text-gray-400">
+        @foreach (var d in new[] { "日", "一", "二", "三", "四", "五", "六" })
+        {
+            <div class="py-1 font-medium">@d</div>
+        }
+        @foreach (var day in _calendarDays)
+        {
+            @if (day == 0)
+            {
+                <div></div>
+            }
+            else
+            {
+                var date = new DateOnly(_current.Year, _current.Month, day);
+                var isActive = _activeDates.Contains(date);
+                <button @onclick="() => SelectDate(date)"
+                        class="w-8 h-8 rounded-full mx-auto flex items-center justify-center text-sm transition-colors
+                               @(isActive ? "bg-indigo-600 text-white font-semibold" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700")">
+                    @day
+                </button>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid TopicId { get; set; }
+    [Parameter] public EventCallback<DateOnly> OnDateSelected { get; set; }
+
+    private DateOnly _current = DateOnly.FromDateTime(DateTime.Today);
+    private HashSet<DateOnly> _activeDates = [];
+    private List<int> _calendarDays = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadActiveDatesAsync();
+        BuildCalendar();
+    }
+
+    private async Task LoadActiveDatesAsync()
+    {
+        var dates = await SearchService.GetActiveDatesAsync(TopicId, _current.Year, _current.Month);
+        _activeDates = [.. dates];
+    }
+
+    private void BuildCalendar()
+    {
+        _calendarDays.Clear();
+        var firstDay = new DateOnly(_current.Year, _current.Month, 1);
+        var dayOfWeek = (int)firstDay.DayOfWeek;
+        for (int i = 0; i < dayOfWeek; i++) _calendarDays.Add(0);
+        var daysInMonth = DateTime.DaysInMonth(_current.Year, _current.Month);
+        for (int d = 1; d <= daysInMonth; d++) _calendarDays.Add(d);
+    }
+
+    private async Task PrevMonth()
+    {
+        _current = _current.AddMonths(-1);
+        await LoadActiveDatesAsync();
+        BuildCalendar();
+    }
+
+    private async Task NextMonth()
+    {
+        _current = _current.AddMonths(1);
+        await LoadActiveDatesAsync();
+        BuildCalendar();
+    }
+
+    private async Task SelectDate(DateOnly date)
+    {
+        await OnDateSelected.InvokeAsync(date);
+    }
+}

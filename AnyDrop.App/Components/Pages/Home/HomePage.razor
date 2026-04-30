@@ -1,0 +1,95 @@
+@page "/"
+@layout MainLayout
+@inject ITopicService TopicService
+@inject ISignalRService SignalR
+@inject IAppStateService AppState
+@implements IDisposable
+
+<div class="flex h-full overflow-hidden">
+    @if (_showSidebar || _isWide)
+    {
+        <div class="@(_isWide ? "w-64 border-r border-gray-200 dark:border-gray-700" : "fixed inset-0 z-40 flex") bg-white dark:bg-gray-800">
+            @if (!_isWide)
+            {
+                <div class="fixed inset-0 bg-black opacity-40" @onclick="() => _showSidebar = false"></div>
+            }
+            <div class="@(_isWide ? "w-full" : "w-64 relative z-50 bg-white dark:bg-gray-800 h-full") overflow-y-auto">
+                <TopicSidebar OnTopicSelected="OnTopicSelected" />
+            </div>
+        </div>
+    }
+
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            @if (!_isWide)
+            {
+                <button @onclick="() => _showSidebar = true" class="text-gray-500 dark:text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            }
+            <span class="font-medium text-gray-800 dark:text-gray-100">
+                @(AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId)?.Name ?? "选择主题")
+            </span>
+        </div>
+
+        @if (AppState.CurrentTopicId.HasValue)
+        {
+            <MessageList TopicId="AppState.CurrentTopicId.Value" />
+            <MessageInput TopicId="AppState.CurrentTopicId.Value" />
+        }
+        else
+        {
+            <div class="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+                <div class="text-center">
+                    <div class="text-4xl mb-2">📁</div>
+                    <p class="text-sm">请从左侧选择或创建一个主题</p>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? TopicId { get; set; }
+
+    private bool _showSidebar;
+    private bool _isWide = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += StateHasChanged;
+        try { await LoadTopicsAsync(); } catch { /* BaseUrl 未配置或网络不可达时静默失败 */ }
+
+        if (TopicId is not null && Guid.TryParse(TopicId, out var id))
+            AppState.CurrentTopicId = id;
+
+        if (SignalR.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected)
+        {
+            try { await SignalR.StartAsync(); } catch { /* ignore */ }
+        }
+    }
+
+    private async Task LoadTopicsAsync()
+    {
+        var topics = await TopicService.GetTopicsAsync();
+        AppState.Topics.Clear();
+        foreach (var t in topics) AppState.Topics.Add(t);
+        if (AppState.CurrentTopicId is null && AppState.Topics.Count > 0)
+            AppState.CurrentTopicId = AppState.Topics[0].Id;
+        AppState.NotifyStateChanged();
+    }
+
+    private void OnTopicSelected(Guid topicId)
+    {
+        AppState.CurrentTopicId = topicId;
+        _showSidebar = false;
+        AppState.NotifyStateChanged();
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+    }
+}

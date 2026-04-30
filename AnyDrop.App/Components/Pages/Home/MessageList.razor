@@ -1,0 +1,124 @@
+@inject IShareService ShareService
+@inject ISignalRService SignalR
+@inject IAppStateService AppState
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div id="message-list-container"
+     class="flex-1 overflow-y-auto px-4 py-2 space-y-2"
+     style="-webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
+    @if (AppState.HasMoreMessages)
+    {
+        <div class="text-center py-2">
+            <button @onclick="LoadMoreAsync"
+                    disabled="@_loadingMore"
+                    class="text-xs text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+                @(_loadingMore ? "加载中..." : "加载更多")
+            </button>
+        </div>
+    }
+
+    @if (AppState.Messages.Count == 0 && !_loading)
+    {
+        <div class="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500 text-sm">
+            暂无消息，发送第一条吧 👋
+        </div>
+    }
+
+    @if (AppState.Messages.Count <= 200)
+    {
+        @foreach (var msg in AppState.Messages)
+        {
+            <MessageItem Item="msg" />
+        }
+    }
+    else
+    {
+        <Virtualize Items="@(AppState.Messages as ICollection<ShareItemDto> ?? AppState.Messages.ToList())" Context="msg">
+            <MessageItem Item="msg" />
+        </Virtualize>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid TopicId { get; set; }
+
+    private bool _loading;
+    private bool _loadingMore;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TopicId != _lastTopicId)
+        {
+            _lastTopicId = TopicId;
+            await LoadMessagesAsync();
+        }
+    }
+
+    private Guid _lastTopicId;
+
+    protected override void OnInitialized()
+    {
+        SignalR.TopicsUpdated += OnTopicsUpdated;
+        AppState.OnChange += StateHasChanged;
+    }
+
+    private async Task LoadMessagesAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        var result = await ShareService.GetMessagesAsync(TopicId);
+        AppState.Messages.Clear();
+        foreach (var m in result.Items) AppState.Messages.Add(m);
+        AppState.HasMoreMessages = result.HasMore;
+        AppState.MessageCursor = result.NextCursor;
+        AppState.NotifyStateChanged();
+        _loading = false;
+        await ScrollToBottomAsync();
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        _loadingMore = true;
+        var result = await ShareService.GetMessagesAsync(TopicId, before: AppState.MessageCursor);
+        var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
+        var newItems = result.Items.Where(m => !existingIds.Contains(m.Id)).ToList();
+        for (int i = 0; i < newItems.Count; i++)
+            AppState.Messages.Insert(i, newItems[i]);
+        AppState.HasMoreMessages = result.HasMore;
+        AppState.MessageCursor = result.NextCursor;
+        AppState.NotifyStateChanged();
+        _loadingMore = false;
+    }
+
+    private void OnTopicsUpdated(IReadOnlyList<TopicDto> topics)
+    {
+        var current = topics.FirstOrDefault(t => t.Id == TopicId);
+        if (current is not null && current.MessageCount > AppState.Messages.Count)
+            InvokeAsync(async () =>
+            {
+                var result = await ShareService.GetMessagesAsync(TopicId);
+                var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
+                var newItems = result.Items.Where(m => !existingIds.Contains(m.Id)).ToList();
+                foreach (var item in newItems) AppState.Messages.Add(item);
+                AppState.NotifyStateChanged();
+                await ScrollToBottomAsync();
+            });
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("scrollUtils.scrollToBottom", "message-list-container");
+        }
+        catch { /* ignore */ }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        SignalR.TopicsUpdated -= OnTopicsUpdated;
+        AppState.OnChange -= StateHasChanged;
+        return ValueTask.CompletedTask;
+    }
+}

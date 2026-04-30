@@ -1,0 +1,110 @@
+@inject IShareService ShareService
+@inject IServerConfigService ServerConfig
+@inject NavigationManager Nav
+
+<div class="rounded-xl @GetContainerClass() p-3 max-w-xs break-words">
+    @switch (Item.ContentType)
+    {
+        case ShareContentType.Text:
+            <pre class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap font-sans">@Item.TextContent</pre>
+            break;
+
+        case ShareContentType.Image:
+            <img src="@GetFileUrl()" alt="image"
+                 class="rounded-lg max-w-full cursor-pointer"
+                 @onclick="NavigateToImagePreview" />
+            break;
+
+        case ShareContentType.Video:
+            <div class="relative cursor-pointer" @onclick="OpenVideoAsync">
+                <div class="bg-gray-200 dark:bg-gray-700 rounded-lg h-32 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-500" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                    </svg>
+                </div>
+                <p class="text-xs text-gray-500 mt-1 truncate">@Item.FileName</p>
+            </div>
+            break;
+
+        case ShareContentType.File:
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate text-gray-800 dark:text-gray-100">@Item.FileName</p>
+                    <p class="text-xs text-gray-500">@FormatSize(Item.FileSize)</p>
+                </div>
+                <button @onclick="DownloadAsync" class="text-indigo-600 dark:text-indigo-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                </button>
+            </div>
+            break;
+
+        case ShareContentType.Link:
+            <div class="space-y-1 cursor-pointer" @onclick="OpenLinkAsync">
+                @if (Item.LinkTitle is not null)
+                {
+                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">@Item.LinkTitle</p>
+                }
+                @if (Item.LinkDescription is not null)
+                {
+                    <p class="text-xs text-gray-500 line-clamp-2">@Item.LinkDescription</p>
+                }
+                <p class="text-xs text-indigo-500 truncate">@Item.LinkUrl</p>
+            </div>
+            break;
+    }
+    <p class="text-xs text-gray-400 mt-1 text-right">@Item.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ShareItemDto Item { get; set; } = null!;
+
+    private void NavigateToImagePreview() => Nav.NavigateTo($"/image-preview/{Item.Id}");
+
+    private string GetContainerClass() => Item.ContentType switch
+    {
+        ShareContentType.Text => "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700",
+        ShareContentType.Link => "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
+        _ => "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+    };
+
+    private string GetFileUrl() => $"{ServerConfig.GetBaseUrl()}/api/v1/share-items/{Item.Id}/file";
+
+    private async Task DownloadAsync()
+    {
+        try { await ShareService.DownloadFileAsync(Item.Id); } catch { /* ignore */ }
+    }
+
+    private async Task OpenVideoAsync()
+    {
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+        await Launcher.OpenAsync(new Uri(GetFileUrl()));
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
+    private async Task OpenLinkAsync()
+    {
+        if (Item.LinkUrl is null) return;
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+        await Browser.OpenAsync(Item.LinkUrl, BrowserLaunchMode.SystemPreferred);
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
+    private static string FormatSize(long? bytes) => bytes switch
+    {
+        null => "",
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        _ => $"{bytes / (1024.0 * 1024):F1} MB"
+    };
+}

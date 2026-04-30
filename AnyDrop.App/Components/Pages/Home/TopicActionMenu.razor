@@ -1,0 +1,97 @@
+@inject ITopicService TopicService
+@inject IAppStateService AppState
+
+@if (_showMenu && Topic is not null)
+{
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50" @onclick="() => OnClose.InvokeAsync()">
+        <div class="bg-white dark:bg-gray-800 rounded-t-2xl w-full max-w-lg p-4 space-y-1" @onclick:stopPropagation="true">
+            <div class="text-center font-medium text-gray-800 dark:text-gray-100 py-2">@Topic.Icon @Topic.Name</div>
+            <hr class="border-gray-200 dark:border-gray-700" />
+
+            @if (_editMode)
+            {
+                <div class="py-2 space-y-2">
+                    <input @bind="_editName" type="text"
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <div class="flex gap-2">
+                        <button @onclick="() => _editMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
+                        <button @onclick="RenameAsync" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">保存</button>
+                    </div>
+                </div>
+            }
+            else if (_confirmDelete)
+            {
+                <div class="py-2 space-y-2">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 text-center">确认删除主题「@Topic.Name」？此操作不可撤销。</p>
+                    <div class="flex gap-2">
+                        <button @onclick="() => _confirmDelete = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
+                        <button @onclick="DeleteAsync" class="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium">删除</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <ActionItem Icon="✏️" Label="重命名" OnClick="() => { _editMode = true; _editName = Topic.Name; }" />
+                <ActionItem Icon="@(Topic.IsPinned ? "📌 取消置顶" : "📌 置顶")" Label="@(Topic.IsPinned ? "取消置顶" : "置顶")" OnClick="TogglePinAsync" />
+                <ActionItem Icon="@(Topic.IsArchived ? "📂 取消归档" : "📂 归档")" Label="@(Topic.IsArchived ? "取消归档" : "归档")" OnClick="ToggleArchiveAsync" />
+                <ActionItem Icon="🗑️" Label="删除" OnClick="() => _confirmDelete = true" Danger="true" />
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public TopicDto? Topic { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnTopicChanged { get; set; }
+
+    private bool _showMenu = true;
+    private bool _editMode;
+    private bool _confirmDelete;
+    private string _editName = string.Empty;
+
+    private async Task RenameAsync()
+    {
+        if (Topic is null || string.IsNullOrWhiteSpace(_editName)) return;
+        await TopicService.UpdateTopicAsync(Topic.Id, new UpdateTopicRequest(_editName));
+        _editMode = false;
+        await OnTopicChanged.InvokeAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task TogglePinAsync()
+    {
+        if (Topic is null) return;
+        await TopicService.PinTopicAsync(Topic.Id, new PinTopicRequest(!Topic.IsPinned));
+        await OnTopicChanged.InvokeAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task ToggleArchiveAsync()
+    {
+        if (Topic is null) return;
+        await TopicService.ArchiveTopicAsync(Topic.Id, new ArchiveTopicRequest(!Topic.IsArchived));
+        await OnTopicChanged.InvokeAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (Topic is null) return;
+        await TopicService.DeleteTopicAsync(Topic.Id);
+        var existing = AppState.Topics.FirstOrDefault(t => t.Id == Topic.Id);
+        if (existing is not null) AppState.Topics.Remove(existing);
+        AppState.NotifyStateChanged();
+        _confirmDelete = false;
+        await OnTopicChanged.InvokeAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private sealed class ActionItemParams
+    {
+        public string Icon { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public EventCallback OnClick { get; set; }
+        public bool Danger { get; set; }
+    }
+}

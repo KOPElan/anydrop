@@ -1,0 +1,21 @@
+@inject IAppStateService AppState
+@inject NavigationManager Nav
+
+<div @onclick="NavigateToTopic"
+     class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+    <div class="text-xs text-indigo-500 mb-1">
+        @(AppState.Topics.FirstOrDefault(t => t.Id == Item.TopicId)?.Name ?? "未知主题")
+    </div>
+    <MessageItem Item="Item" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ShareItemDto Item { get; set; } = null!;
+
+    private void NavigateToTopic()
+    {
+        AppState.CurrentTopicId = Item.TopicId;
+        AppState.NotifyStateChanged();
+        Nav.NavigateTo("/");
+    }
+}

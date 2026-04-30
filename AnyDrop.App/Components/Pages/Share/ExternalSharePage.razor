@@ -1,0 +1,113 @@
+@page "/share"
+@layout AuthLayout
+@inject IShareService ShareService
+@inject IFileUploadService FileUploadService
+@inject ITopicService TopicService
+@inject IConnectivityService Connectivity
+@inject NavigationManager Nav
+
+<div class="flex flex-col h-full">
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <button @onclick="GoBack" class="text-gray-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </button>
+        <h1 class="font-semibold text-gray-800 dark:text-gray-100">分享至 AnyDrop</h1>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        @if (!Connectivity.IsOnline)
+        {
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-3 text-sm text-yellow-700 dark:text-yellow-300">
+                📡 无网络连接，内容已暂存。
+                <button @onclick="SendAsync" class="underline ml-1">重试</button>
+            </div>
+        }
+
+        @if (_content is not null)
+        {
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+                @if (_content.Text is not null)
+                {
+                    <pre class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans">@_content.Text</pre>
+                }
+                @foreach (var path in _content.FilePaths)
+                {
+                    <p class="text-sm text-gray-600 dark:text-gray-400 truncate">📎 @System.IO.Path.GetFileName(path)</p>
+                }
+            </div>
+        }
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">选择目标主题</label>
+            <select @bind="_selectedTopicId"
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">-- 请选择主题 --</option>
+                @foreach (var topic in _topics)
+                {
+                    <option value="@topic.Id">@topic.Icon @topic.Name</option>
+                }
+            </select>
+        </div>
+
+        @if (_error is not null)
+        {
+            <p class="text-red-500 text-sm">@_error</p>
+        }
+    </div>
+
+    <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+        <button @onclick="SendAsync"
+                disabled="@(_sending || string.IsNullOrEmpty(_selectedTopicId))"
+                class="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            @(_sending ? "发送中..." : "发送")
+        </button>
+    </div>
+</div>
+
+@code {
+    private SharedContent? _content;
+    private List<TopicDto> _topics = [];
+    private string _selectedTopicId = string.Empty;
+    private bool _sending;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _content = PendingShareStore.Content;
+        _topics = (await TopicService.GetTopicsAsync()).ToList();
+        if (_topics.Count > 0) _selectedTopicId = _topics[0].Id.ToString();
+    }
+
+    private void GoBack() => Nav.NavigateTo("/");
+
+    private async Task SendAsync()
+    {
+        if (!Guid.TryParse(_selectedTopicId, out var topicId)) return;
+        _sending = true;
+        _error = null;
+
+        try
+        {
+            if (_content?.Text is not null)
+                await ShareService.SendTextAsync(new CreateTextShareItemRequest(topicId, _content.Text));
+
+            foreach (var path in _content?.FilePaths ?? [])
+            {
+                using var stream = File.OpenRead(path);
+                var fileName = System.IO.Path.GetFileName(path);
+                var mime = _content?.MimeType ?? "application/octet-stream";
+                await FileUploadService.UploadFileAsync(stream, fileName, mime, topicId);
+            }
+
+            PendingShareStore.Clear();
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            _error = $"发送失败：{ex.Message}";
+            _sending = false;
+        }
+    }
+}
