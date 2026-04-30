@@ -6,7 +6,7 @@
     @switch (Item.ContentType)
     {
         case ShareContentType.Text:
-            <pre class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap font-sans">@Item.TextContent</pre>
+            <pre class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap font-sans">@Item.Content</pre>
             break;
 
         case ShareContentType.Image:
@@ -55,7 +55,7 @@
                 {
                     <p class="text-xs text-gray-500 line-clamp-2">@Item.LinkDescription</p>
                 }
-                <p class="text-xs text-indigo-500 truncate">@Item.LinkUrl</p>
+                <p class="text-xs text-indigo-500 truncate">@Item.Content</p>
             </div>
             break;
     }
@@ -92,9 +92,9 @@
 
     private async Task OpenLinkAsync()
     {
-        if (Item.LinkUrl is null) return;
+        if (string.IsNullOrWhiteSpace(Item.Content)) return;
 #if ANDROID || IOS || MACCATALYST || WINDOWS
-        await Browser.OpenAsync(Item.LinkUrl, BrowserLaunchMode.SystemPreferred);
+        await Browser.OpenAsync(Item.Content, BrowserLaunchMode.SystemPreferred);
 #else
         await Task.CompletedTask;
 #endif

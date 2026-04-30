@@ -22,8 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AnyDrop.Shared\AnyDrop.Shared.csproj" />
     <ProjectReference Include="..\AnyDrop\AnyDrop.csproj" />
-    <ProjectReference Include="..\AnyDrop.App\AnyDrop.App.csproj" />
+    <ProjectReference Include="..\AnyDrop.App\AnyDrop.App.csproj">
+      <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

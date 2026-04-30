@@ -52,10 +52,10 @@ public sealed class ServerConfigService : IServerConfigService
             var normalized = NormalizeUrl(url);
             var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(5);
-            var response = await client.SendAsync(
-                new HttpRequestMessage(HttpMethod.Head, $"{normalized}/api/v1/auth/setup-status"))
+            // 服务端 /api/v1/auth/setup-status 只支持 GET，不支持 HEAD
+            var response = await client.GetAsync($"{normalized}/api/v1/auth/setup-status")
                 .ConfigureAwait(false);
-            return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed;
+            return response.IsSuccessStatusCode;
         }
         catch
         {

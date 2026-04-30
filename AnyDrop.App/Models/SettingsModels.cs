@@ -1,17 +1,8 @@
+using AnyDrop.Shared;
+
 namespace AnyDrop.App.Models;
 
-public sealed record SecuritySettingsDto(
-    bool AutoFetchLinkPreview,
-    int BurnAfterReadMinutes,
-    bool AutoCleanup,
-    int AutoCleanupMonths);
+// SecuritySettingsDto, UpdateSecuritySettingsRequest,
+// UpdateNicknameRequest, UpdatePasswordRequest
+// 均已迁移到 AnyDrop.Shared，可直接使用。
 
-public sealed record UpdateSecuritySettingsRequest(
-    bool AutoFetchLinkPreview,
-    int BurnAfterReadMinutes,
-    bool AutoCleanup,
-    int AutoCleanupMonths);
-
-public sealed record UpdateNicknameRequest(string Nickname);
-
-public sealed record UpdatePasswordRequest(string CurrentPassword, string NewPassword);

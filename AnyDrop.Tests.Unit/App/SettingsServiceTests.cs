@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
 using AnyDrop.App.Services;
+using AnyDrop.Shared;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
@@ -29,7 +30,8 @@ public class SettingsServiceTests
     [Fact]
     public async Task GetSecuritySettingsAsync_ReturnsData()
     {
-        var settings = new SecuritySettingsDto(true, 5, true, 24);
+        // 与服务端 SecuritySettingsDto 一致：(AutoFetchLinkPreview, BurnAfterReadingMinutes, Language, AutoCleanupEnabled, AutoCleanupMonths)
+        var settings = new SecuritySettingsDto(true, 5, "zh-CN", true, 24);
         var apiResponse = new ApiResponse<SecuritySettingsDto>(true, settings, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
@@ -37,8 +39,8 @@ public class SettingsServiceTests
         var result = await sut.GetSecuritySettingsAsync();
 
         result.AutoFetchLinkPreview.Should().BeTrue();
-        result.BurnAfterReadMinutes.Should().Be(5);
-        result.AutoCleanup.Should().BeTrue();
+        result.BurnAfterReadingMinutes.Should().Be(5);
+        result.AutoCleanupEnabled.Should().BeTrue();
         result.AutoCleanupMonths.Should().Be(24);
     }
 
@@ -54,7 +56,7 @@ public class SettingsServiceTests
         var result = await sut.GetSecuritySettingsAsync();
 
         result.Should().NotBeNull();
-        result.BurnAfterReadMinutes.Should().Be(0);
+        result.BurnAfterReadingMinutes.Should().Be(0);
     }
 
     [Fact]
@@ -86,7 +88,7 @@ public class SettingsServiceTests
         var http = new HttpResponseMessage(HttpStatusCode.BadRequest);
         var sut = CreateSut(http);
 
-        var act = () => sut.UpdatePasswordAsync(new UpdatePasswordRequest("wrong", "newpass"));
+        var act = () => sut.UpdatePasswordAsync(new UpdatePasswordRequest("wrong", "newpass", "newpass"));
 
         await act.Should().ThrowAsync<HttpRequestException>();
     }
@@ -94,7 +96,9 @@ public class SettingsServiceTests
     [Fact]
     public async Task CleanupOldMessagesAsync_ReturnsDeletedCount()
     {
-        var apiResponse = new ApiResponse<int>(true, 42, null);
+        // 服务端返回 CleanupResult { DeletedCount: 42 }，不是直接的 int
+        var cleanupResult = new CleanupResult(42);
+        var apiResponse = new ApiResponse<CleanupResult>(true, cleanupResult, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -103,3 +107,4 @@ public class SettingsServiceTests
         result.Should().Be(42);
     }
 }
+

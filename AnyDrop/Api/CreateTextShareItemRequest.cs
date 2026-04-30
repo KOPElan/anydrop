@@ -1,3 +1,6 @@
+using AnyDrop.Shared;
+
 namespace AnyDrop.Api;
 
-public sealed record CreateTextShareItemRequest(string Content, Guid? TopicId);
+// CreateTextShareItemRequest 已迁移到 AnyDrop.Shared。
+

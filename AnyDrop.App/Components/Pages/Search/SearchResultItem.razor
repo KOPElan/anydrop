@@ -14,7 +14,7 @@
 
     private void NavigateToTopic()
     {
-        AppState.CurrentTopicId = Item.TopicId;
+        AppState.CurrentTopicId = Item.TopicId ?? Guid.Empty;
         AppState.NotifyStateChanged();
         Nav.NavigateTo("/");
     }

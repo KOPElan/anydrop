@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -43,20 +44,23 @@ public sealed class TopicService : ITopicService
 
     public async Task UpdateTopicIconAsync(Guid id, UpdateTopicIconRequest request)
     {
+        // 服务端使用 PUT /api/v1/topics/{id}/icon
         var client = _httpClientFactory.CreateClient("api");
-        (await client.PatchAsJsonAsync($"api/v1/topics/{id}/icon", request).ConfigureAwait(false)).EnsureSuccessStatusCode();
+        (await client.PutAsJsonAsync($"api/v1/topics/{id}/icon", request).ConfigureAwait(false)).EnsureSuccessStatusCode();
     }
 
     public async Task PinTopicAsync(Guid id, PinTopicRequest request)
     {
+        // 服务端使用 PUT /api/v1/topics/{id}/pin
         var client = _httpClientFactory.CreateClient("api");
-        (await client.PatchAsJsonAsync($"api/v1/topics/{id}/pin", request).ConfigureAwait(false)).EnsureSuccessStatusCode();
+        (await client.PutAsJsonAsync($"api/v1/topics/{id}/pin", request).ConfigureAwait(false)).EnsureSuccessStatusCode();
     }
 
     public async Task ArchiveTopicAsync(Guid id, ArchiveTopicRequest request)
     {
+        // 服务端使用 PUT /api/v1/topics/{id}/archive
         var client = _httpClientFactory.CreateClient("api");
-        (await client.PatchAsJsonAsync($"api/v1/topics/{id}/archive", request).ConfigureAwait(false)).EnsureSuccessStatusCode();
+        (await client.PutAsJsonAsync($"api/v1/topics/{id}/archive", request).ConfigureAwait(false)).EnsureSuccessStatusCode();
     }
 
     public async Task ReorderTopicsAsync(ReorderTopicsRequest request)
@@ -71,3 +75,4 @@ public sealed class TopicService : ITopicService
         (await client.DeleteAsync($"api/v1/topics/{id}").ConfigureAwait(false)).EnsureSuccessStatusCode();
     }
 }
+

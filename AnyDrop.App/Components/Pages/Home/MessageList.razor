@@ -69,7 +69,7 @@
         StateHasChanged();
         var result = await ShareService.GetMessagesAsync(TopicId);
         AppState.Messages.Clear();
-        foreach (var m in result.Items) AppState.Messages.Add(m);
+        foreach (var m in result.Messages) AppState.Messages.Add(m);
         AppState.HasMoreMessages = result.HasMore;
         AppState.MessageCursor = result.NextCursor;
         AppState.NotifyStateChanged();
@@ -82,7 +82,7 @@
         _loadingMore = true;
         var result = await ShareService.GetMessagesAsync(TopicId, before: AppState.MessageCursor);
         var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
-        var newItems = result.Items.Where(m => !existingIds.Contains(m.Id)).ToList();
+        var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
         for (int i = 0; i < newItems.Count; i++)
             AppState.Messages.Insert(i, newItems[i]);
         AppState.HasMoreMessages = result.HasMore;
@@ -99,7 +99,7 @@
             {
                 var result = await ShareService.GetMessagesAsync(TopicId);
                 var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
-                var newItems = result.Items.Where(m => !existingIds.Contains(m.Id)).ToList();
+                var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
                 foreach (var item in newItems) AppState.Messages.Add(item);
                 AppState.NotifyStateChanged();
                 await ScrollToBottomAsync();

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -18,11 +19,11 @@ public sealed class SettingsService : ISettingsService
         {
             var client = _httpClientFactory.CreateClient("api");
             var response = await client.GetFromJsonAsync<ApiResponse<SecuritySettingsDto>>("api/v1/settings/security").ConfigureAwait(false);
-            return response?.Data ?? new SecuritySettingsDto(false, 0, false, 12);
+            return response?.Data ?? new SecuritySettingsDto(false, 0, "zh-CN", false, 12);
         }
         catch
         {
-            return new SecuritySettingsDto(false, 0, false, 12);
+            return new SecuritySettingsDto(false, 0, "zh-CN", false, 12);
         }
     }
 
@@ -49,7 +50,9 @@ public sealed class SettingsService : ISettingsService
         var client = _httpClientFactory.CreateClient("api");
         var response = await client.DeleteAsync($"api/v1/share-items/cleanup?months={months}").ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<ApiResponse<int>>().ConfigureAwait(false);
-        return result?.Data ?? 0;
+        // 服务端返回 { success, data: { deletedCount }, error }
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<CleanupResult>>().ConfigureAwait(false);
+        return result?.Data?.DeletedCount ?? 0;
     }
 }
+

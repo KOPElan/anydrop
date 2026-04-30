@@ -1,4 +1,5 @@
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -9,3 +10,4 @@ public interface IShareService
     Task<ShareItemDto> SendTextAsync(CreateTextShareItemRequest request);
     Task<Stream> DownloadFileAsync(Guid id);
 }
+

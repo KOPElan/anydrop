@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -25,6 +26,7 @@ public sealed class ShareService : IShareService
 
     public async Task<ShareItemDto> SendTextAsync(CreateTextShareItemRequest request)
     {
+        // 服务端接口：POST /api/v1/share-items/text，请求体 { content, topicId }
         var client = _httpClientFactory.CreateClient("api");
         var httpResponse = await client.PostAsJsonAsync("api/v1/share-items/text", request).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
@@ -38,3 +40,4 @@ public sealed class ShareService : IShareService
         return await client.GetStreamAsync($"api/v1/share-items/{id}/file?download=true").ConfigureAwait(false);
     }
 }
+

@@ -1,4 +1,5 @@
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -11,3 +12,4 @@ public interface ISettingsService
     Task UpdatePasswordAsync(UpdatePasswordRequest request);
     Task<int> CleanupOldMessagesAsync(int months);
 }
+

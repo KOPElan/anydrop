@@ -91,7 +91,7 @@
         try
         {
             if (_content?.Text is not null)
-                await ShareService.SendTextAsync(new CreateTextShareItemRequest(topicId, _content.Text));
+                await ShareService.SendTextAsync(new CreateTextShareItemRequest(_content.Text!, topicId));
 
             foreach (var path in _content?.FilePaths ?? [])
             {

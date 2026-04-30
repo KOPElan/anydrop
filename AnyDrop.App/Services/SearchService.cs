@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -17,8 +18,8 @@ public sealed class SearchService : ISearchService
         var client = _httpClientFactory.CreateClient("api");
         var url = $"api/v1/topics/{topicId}/messages/search?q={Uri.EscapeDataString(q)}&limit={limit}";
         if (before is not null) url += $"&before={Uri.EscapeDataString(before)}";
-        var response = await client.GetFromJsonAsync<ApiResponse<IReadOnlyList<ShareItemDto>>>(url).ConfigureAwait(false);
-        return response?.Data ?? [];
+        var response = await client.GetFromJsonAsync<ApiResponse<TopicMessagesResponse>>(url).ConfigureAwait(false);
+        return response?.Data?.Messages ?? [];
     }
 
     public async Task<IReadOnlyList<ShareItemDto>> GetByDateAsync(Guid topicId, DateOnly date)
@@ -31,18 +32,23 @@ public sealed class SearchService : ISearchService
 
     public async Task<IReadOnlyList<DateOnly>> GetActiveDatesAsync(Guid topicId, int year, int month)
     {
+        // 服务端接口：GET /api/v1/topics/{id}/active-dates?start=yyyy-MM-dd&end=yyyy-MM-dd
         var client = _httpClientFactory.CreateClient("api");
-        var url = $"api/v1/topics/{topicId}/messages/active-dates?year={year}&month={month}";
-        var response = await client.GetFromJsonAsync<ApiResponse<ActiveDatesResponse>>(url).ConfigureAwait(false);
-        return response?.Data?.Dates ?? [];
+        var start = new DateOnly(year, month, 1);
+        var end = start.AddMonths(1).AddDays(-1);
+        var url = $"api/v1/topics/{topicId}/active-dates?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}";
+        var response = await client.GetFromJsonAsync<ApiResponse<IReadOnlyList<DateOnly>>>(url).ConfigureAwait(false);
+        return response?.Data ?? [];
     }
 
     public async Task<IReadOnlyList<ShareItemDto>> GetByTypeAsync(Guid topicId, ShareContentType type, int limit = 20, string? before = null)
     {
+        // 服务端接口：GET /api/v1/topics/{id}/messages/by-type?contentType=<int>&limit=<int>[&before=<DateTimeOffset>]
         var client = _httpClientFactory.CreateClient("api");
-        var url = $"api/v1/topics/{topicId}/messages?type={(int)type}&limit={limit}";
+        var url = $"api/v1/topics/{topicId}/messages/by-type?contentType={(int)type}&limit={limit}";
         if (before is not null) url += $"&before={Uri.EscapeDataString(before)}";
-        var response = await client.GetFromJsonAsync<ApiResponse<IReadOnlyList<ShareItemDto>>>(url).ConfigureAwait(false);
-        return response?.Data ?? [];
+        var response = await client.GetFromJsonAsync<ApiResponse<TopicMessagesResponse>>(url).ConfigureAwait(false);
+        return response?.Data?.Messages ?? [];
     }
 }
+

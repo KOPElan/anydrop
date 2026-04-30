@@ -103,7 +103,7 @@
         if (string.IsNullOrWhiteSpace(_currentPassword) || string.IsNullOrWhiteSpace(_newPassword)) return;
         try
         {
-            await SettingsService.UpdatePasswordAsync(new UpdatePasswordRequest(_currentPassword, _newPassword));
+            await SettingsService.UpdatePasswordAsync(new UpdatePasswordRequest(_currentPassword, _newPassword, _newPassword));
             _currentPassword = _newPassword = string.Empty;
             _passwordError = null;
         }

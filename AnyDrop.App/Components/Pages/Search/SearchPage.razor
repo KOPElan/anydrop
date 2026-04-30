@@ -132,7 +132,7 @@
                     StateHasChanged();
                     var items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, limit: PageSize);
                     _results.AddRange(items);
-                    _cursor = items.Count > 0 ? items[^1].Id.ToString() : null;
+                    _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : null;
                     _hasMore = items.Count >= PageSize;
                     _loading = false;
                     StateHasChanged();
@@ -160,7 +160,7 @@
         const int limit = PageSize;
         var items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, type, limit: limit);
         _results.AddRange(items);
-        _cursor = items.Count > 0 ? items[^1].Id.ToString() : null;
+        _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : null;
         _hasMore = items.Count >= limit;
         _loading = false;
     }
@@ -175,7 +175,7 @@
         else
             items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, _contentType, limit: PageSize, before: _cursor);
         _results.AddRange(items);
-        _cursor = items.Count > 0 ? items[^1].Id.ToString() : _cursor;
+        _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : _cursor;
         _hasMore = items.Count >= PageSize;
         _loading = false;
     }

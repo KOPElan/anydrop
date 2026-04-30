@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
 using AnyDrop.App.Services;
+using AnyDrop.Shared;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
@@ -26,28 +27,33 @@ public class SearchServiceTests
         return new SearchService(factoryMock.Object);
     }
 
+    // ShareItemDto: (Guid Id, ShareContentType ContentType, string Content, string? FileName,
+    //   long? FileSize, string? MimeType, string? LinkTitle, string? LinkDescription,
+    //   DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt, Guid? TopicId)
     private static ShareItemDto MakeTextItem(Guid topicId, string text) =>
-        new(Guid.NewGuid(), topicId, ShareContentType.Text, text, null, null, null, null, null, null, null, DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), ShareContentType.Text, text, null, null, null, null, null, DateTimeOffset.UtcNow, null, topicId);
 
     [Fact]
     public async Task SearchAsync_ReturnsMatchingItems()
     {
         var topicId = Guid.NewGuid();
         var items = new List<ShareItemDto> { MakeTextItem(topicId, "hello world") };
-        var apiResponse = new ApiResponse<IReadOnlyList<ShareItemDto>>(true, items, null);
+        var messagesResponse = new TopicMessagesResponse(items, false, null);
+        var apiResponse = new ApiResponse<TopicMessagesResponse>(true, messagesResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
         var result = await sut.SearchAsync(topicId, "hello");
 
         result.Should().HaveCount(1);
-        result[0].TextContent.Should().Be("hello world");
+        result[0].Content.Should().Be("hello world");
     }
 
     [Fact]
     public async Task SearchAsync_WhenEmptyResult_ReturnsEmptyList()
     {
-        var apiResponse = new ApiResponse<IReadOnlyList<ShareItemDto>>(true, [], null);
+        var messagesResponse = new TopicMessagesResponse([], false, null);
+        var apiResponse = new ApiResponse<TopicMessagesResponse>(true, messagesResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -75,7 +81,8 @@ public class SearchServiceTests
     {
         var topicId = Guid.NewGuid();
         var dates = new List<DateOnly> { DateOnly.FromDateTime(DateTime.Today) };
-        var apiResponse = new ApiResponse<ActiveDatesResponse>(true, new ActiveDatesResponse(dates), null);
+        // 服务端直接返回 IReadOnlyList<DateOnly>，不包装在对象中
+        var apiResponse = new ApiResponse<IReadOnlyList<DateOnly>>(true, dates, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -84,3 +91,4 @@ public class SearchServiceTests
         result.Should().HaveCount(1);
     }
 }
+

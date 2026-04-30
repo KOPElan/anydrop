@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
 using AnyDrop.App.Services;
+using AnyDrop.Shared;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
@@ -26,8 +27,11 @@ public class ShareServiceTests
         return (new ShareService(factoryMock.Object), handlerMock);
     }
 
+    // ShareItemDto: (Guid Id, ShareContentType ContentType, string Content, string? FileName,
+    //   long? FileSize, string? MimeType, string? LinkTitle, string? LinkDescription,
+    //   DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt, Guid? TopicId)
     private static ShareItemDto MakeTextItem(Guid topicId, string text) =>
-        new(Guid.NewGuid(), topicId, ShareContentType.Text, text, null, null, null, null, null, null, null, DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), ShareContentType.Text, text, null, null, null, null, null, DateTimeOffset.UtcNow, null, topicId);
 
     [Fact]
     public async Task GetMessagesAsync_ReturnsItems()
@@ -42,8 +46,8 @@ public class ShareServiceTests
 
         var result = await sut.GetMessagesAsync(topicId);
 
-        result.Items.Should().HaveCount(1);
-        result.Items[0].TextContent.Should().Be("hello");
+        result.Messages.Should().HaveCount(1);
+        result.Messages[0].Content.Should().Be("hello");
     }
 
     [Fact]
@@ -56,9 +60,10 @@ public class ShareServiceTests
         var http = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(apiResponse) };
         var (sut, _) = CreateSut(http);
 
-        var result = await sut.SendTextAsync(new CreateTextShareItemRequest(topicId, "new text"));
+        // 服务端 CreateTextShareItemRequest: (string Content, Guid? TopicId)
+        var result = await sut.SendTextAsync(new CreateTextShareItemRequest("new text", topicId));
 
-        result.TextContent.Should().Be("new text");
+        result.Content.Should().Be("new text");
         result.TopicId.Should().Be(topicId);
     }
 
@@ -88,3 +93,4 @@ public class ShareServiceTests
         capturedRequest!.RequestUri!.Query.Should().Contain("before=cursor-123");
     }
 }
+

@@ -1,10 +1,6 @@
+using AnyDrop.Shared;
+
 namespace AnyDrop.Models;
 
-public enum ShareContentType
-{
-    Text = 0,
-    File = 1,
-    Image = 2,
-    Video = 3,
-    Link = 4
-}
+// ShareContentType 已迁移到 AnyDrop.Shared。
+

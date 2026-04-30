@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using AnyDrop.App.Infrastructure;
 using AnyDrop.App.Models;
 using AnyDrop.App.Services;
+using AnyDrop.Shared;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
@@ -32,7 +33,8 @@ public class AuthServiceTests
     [Fact]
     public async Task LoginAsync_SuccessResponse_SavesToken()
     {
-        var loginResponse = new LoginResponse(true, "jwt-token", DateTimeOffset.UtcNow.AddHours(1), null);
+        var userProfile = new UserProfileDto("TestUser");
+        var loginResponse = new LoginResponse(userProfile, "jwt-token", DateTimeOffset.UtcNow.AddHours(1));
         var apiResponse = new ApiResponse<LoginResponse>(true, loginResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -49,8 +51,7 @@ public class AuthServiceTests
     [Fact]
     public async Task LoginAsync_FailureResponse_DoesNotSaveToken()
     {
-        var loginResponse = new LoginResponse(false, null, null, "Invalid");
-        var apiResponse = new ApiResponse<LoginResponse>(false, loginResponse, "Invalid");
+        var apiResponse = new ApiResponse<LoginResponse>(false, null, "Invalid");
         var http = new HttpResponseMessage(HttpStatusCode.Unauthorized)
         {
             Content = JsonContent.Create(apiResponse)
@@ -98,7 +99,8 @@ public class AuthServiceTests
     [Fact]
     public async Task SetupAsync_SuccessResponse_SavesToken()
     {
-        var loginResponse = new LoginResponse(true, "jwt-token", DateTimeOffset.UtcNow.AddHours(1), null);
+        var userProfile = new UserProfileDto("Admin");
+        var loginResponse = new LoginResponse(userProfile, "jwt-token", DateTimeOffset.UtcNow.AddHours(1));
         var apiResponse = new ApiResponse<LoginResponse>(true, loginResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.Created)
         {
@@ -112,3 +114,4 @@ public class AuthServiceTests
         _tokenStorageMock.Verify(t => t.SaveTokenAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>()), Times.Once);
     }
 }
+

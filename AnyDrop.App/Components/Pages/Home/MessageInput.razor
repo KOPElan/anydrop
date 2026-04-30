@@ -57,7 +57,7 @@
         if (string.IsNullOrWhiteSpace(_text)) return;
         var textToSend = _text;
         _text = string.Empty;
-        var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(TopicId, textToSend));
+        var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId));
         AppState.Messages.Add(item);
         AppState.NotifyStateChanged();
     }

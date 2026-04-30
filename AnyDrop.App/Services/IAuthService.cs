@@ -1,4 +1,5 @@
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -6,8 +7,9 @@ namespace AnyDrop.App.Services;
 public interface IAuthService
 {
     Task<SetupStatusDto> GetSetupStatusAsync();
-    Task<LoginResponse> SetupAsync(SetupRequest request);
-    Task<LoginResponse> LoginAsync(LoginRequest request);
+    Task<AppAuthResult> SetupAsync(SetupRequest request);
+    Task<AppAuthResult> LoginAsync(LoginRequest request);
     Task LogoutAsync();
     Task<UserProfileDto> GetCurrentUserAsync();
 }
+

@@ -1,11 +1,16 @@
+using AnyDrop.Shared;
+
 namespace AnyDrop.App.Models;
 
-public sealed record SetupStatusDto(bool RequiresSetup);
+// SetupStatusDto, SetupRequest, LoginRequest, LoginResponse, UserProfileDto,
+// LogoutResultDto, UpdateNicknameRequest, UpdatePasswordRequest
+// 均已迁移到 AnyDrop.Shared，可直接使用。
 
-public sealed record SetupRequest(string Nickname, string Password, string ConfirmPassword);
+/// <summary>App 端认证服务操作结果。封装服务端 LoginResponse 的成功/失败状态。</summary>
+public sealed record AppAuthResult(
+    bool Success,
+    string? Error = null,
+    string? AccessToken = null,
+    DateTimeOffset ExpiresAt = default,
+    UserProfileDto? User = null);
 
-public sealed record LoginRequest(string Password);
-
-public sealed record LoginResponse(bool Success, string? Token, DateTimeOffset? ExpiresAt, string? Error);
-
-public sealed record UserProfileDto(string Nickname);

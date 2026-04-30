@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -23,28 +24,14 @@ public sealed class AuthService : IAuthService
         return response?.Data ?? new SetupStatusDto(false);
     }
 
-    public async Task<LoginResponse> SetupAsync(SetupRequest request)
+    public async Task<AppAuthResult> SetupAsync(SetupRequest request)
     {
-        var client = _httpClientFactory.CreateClient("api");
-        var httpResponse = await client.PostAsJsonAsync("api/v1/auth/setup", request).ConfigureAwait(false);
-        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>().ConfigureAwait(false);
-
-        if (response?.Data is { Success: true, Token: { } token, ExpiresAt: { } expiresAt })
-            await _tokenStorage.SaveTokenAsync(token, expiresAt).ConfigureAwait(false);
-
-        return response?.Data ?? new LoginResponse(false, null, null, "Unknown error");
+        return await PostAuthAsync("api/v1/auth/setup", request).ConfigureAwait(false);
     }
 
-    public async Task<LoginResponse> LoginAsync(LoginRequest request)
+    public async Task<AppAuthResult> LoginAsync(LoginRequest request)
     {
-        var client = _httpClientFactory.CreateClient("api");
-        var httpResponse = await client.PostAsJsonAsync("api/v1/auth/login", request).ConfigureAwait(false);
-        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>().ConfigureAwait(false);
-
-        if (response?.Data is { Success: true, Token: { } token, ExpiresAt: { } expiresAt })
-            await _tokenStorage.SaveTokenAsync(token, expiresAt).ConfigureAwait(false);
-
-        return response?.Data ?? new LoginResponse(false, null, null, "Unknown error");
+        return await PostAuthAsync("api/v1/auth/login", request).ConfigureAwait(false);
     }
 
     public async Task LogoutAsync()
@@ -54,7 +41,7 @@ public sealed class AuthService : IAuthService
             var client = _httpClientFactory.CreateClient("api");
             await client.PostAsync("api/v1/auth/logout", null).ConfigureAwait(false);
         }
-        catch { /* ignore logout API failures */ }
+        catch { /* 忽略注销 API 失败 */ }
         finally
         {
             await _tokenStorage.ClearTokenAsync().ConfigureAwait(false);
@@ -68,4 +55,38 @@ public sealed class AuthService : IAuthService
             .ConfigureAwait(false);
         return response?.Data ?? new UserProfileDto("Unknown");
     }
+
+    private async Task<AppAuthResult> PostAuthAsync<TRequest>(string url, TRequest request)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("api");
+            var httpResponse = await client.PostAsJsonAsync(url, request).ConfigureAwait(false);
+
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                var errorEnvelope = await httpResponse.Content
+                    .ReadFromJsonAsync<ApiResponse<LoginResponse>>()
+                    .ConfigureAwait(false);
+                return new AppAuthResult(false, errorEnvelope?.Error ?? "请求失败");
+            }
+
+            var envelope = await httpResponse.Content
+                .ReadFromJsonAsync<ApiResponse<LoginResponse>>()
+                .ConfigureAwait(false);
+
+            if (envelope?.Data is { } data)
+            {
+                await _tokenStorage.SaveTokenAsync(data.AccessToken, data.ExpiresAt).ConfigureAwait(false);
+                return new AppAuthResult(true, null, data.AccessToken, data.ExpiresAt, data.User);
+            }
+
+            return new AppAuthResult(false, "响应数据为空");
+        }
+        catch (Exception ex)
+        {
+            return new AppAuthResult(false, ex.Message);
+        }
+    }
 }
+

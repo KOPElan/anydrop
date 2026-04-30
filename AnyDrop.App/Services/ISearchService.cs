@@ -1,4 +1,5 @@
 using AnyDrop.App.Models;
+using AnyDrop.Shared;
 
 namespace AnyDrop.App.Services;
 
@@ -10,3 +11,4 @@ public interface ISearchService
     Task<IReadOnlyList<DateOnly>> GetActiveDatesAsync(Guid topicId, int year, int month);
     Task<IReadOnlyList<ShareItemDto>> GetByTypeAsync(Guid topicId, ShareContentType type, int limit = 20, string? before = null);
 }
+
