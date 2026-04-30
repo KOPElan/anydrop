@@ -33,7 +33,7 @@ public sealed class FileUploadService : IFileUploadService
 
         var httpResponse = await client.PostAsync("api/v1/files", content).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
-        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<ShareItemDto>>().ConfigureAwait(false);
+        var response = await httpResponse.Content.ReadFromJsonAsync<ApiEnvelope<ShareItemDto>>().ConfigureAwait(false);
         progress?.Report(1.0);
         return response!.Data!;
     }

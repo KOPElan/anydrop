@@ -1,5 +1,17 @@
 namespace AnyDrop.Shared;
 
+// ── 公共 API 响应 Envelope ──────────────────────────────────────────────────────
+
+/// <summary>统一的 API 响应信封。所有 API 响应均返回此结构。</summary>
+public sealed record ApiEnvelope<T>(bool Success, T? Data, string? Error)
+{
+    /// <summary>返回成功响应。</summary>
+    public static ApiEnvelope<T> Ok(T? data = default) => new(true, data, null);
+
+    /// <summary>返回失败响应。</summary>
+    public static ApiEnvelope<T> Fail(string error) => new(false, default, error);
+}
+
 // ── 认证相关 DTO ──────────────────────────────────────────────────────────────
 
 /// <summary>获取初始化状态的响应。</summary>

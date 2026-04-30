@@ -20,7 +20,7 @@ public sealed class ShareService : IShareService
         if (before is not null)
             url += $"&before={Uri.EscapeDataString(before)}";
 
-        var response = await client.GetFromJsonAsync<ApiResponse<TopicMessagesResponse>>(url).ConfigureAwait(false);
+        var response = await client.GetFromJsonAsync<ApiEnvelope<TopicMessagesResponse>>(url).ConfigureAwait(false);
         return response?.Data ?? new TopicMessagesResponse([], false, null);
     }
 
@@ -30,7 +30,7 @@ public sealed class ShareService : IShareService
         var client = _httpClientFactory.CreateClient("api");
         var httpResponse = await client.PostAsJsonAsync("api/v1/share-items/text", request).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
-        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<ShareItemDto>>().ConfigureAwait(false);
+        var response = await httpResponse.Content.ReadFromJsonAsync<ApiEnvelope<ShareItemDto>>().ConfigureAwait(false);
         return response!.Data!;
     }
 

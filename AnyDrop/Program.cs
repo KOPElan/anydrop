@@ -199,7 +199,12 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 }
-else
+
+// 根据配置决定是否启用 Swagger UI（开发环境默认启用，生产环境默认禁用）
+var enableSwaggerUI = builder.Configuration.GetValue<bool?>("OpenApi:EnableSwaggerUI")
+                      ?? app.Environment.IsDevelopment();
+
+if (enableSwaggerUI)
 {
     app.UseSwagger(options => { options.RouteTemplate = "openapi/{documentName}.json"; });
     app.UseSwaggerUI(options =>

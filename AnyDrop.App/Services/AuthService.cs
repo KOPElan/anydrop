@@ -19,7 +19,7 @@ public sealed class AuthService : IAuthService
     public async Task<SetupStatusDto> GetSetupStatusAsync()
     {
         var client = _httpClientFactory.CreateClient("api");
-        var response = await client.GetFromJsonAsync<ApiResponse<SetupStatusDto>>("api/v1/auth/setup-status")
+        var response = await client.GetFromJsonAsync<ApiEnvelope<SetupStatusDto>>("api/v1/auth/setup-status")
             .ConfigureAwait(false);
         return response?.Data ?? new SetupStatusDto(false);
     }
@@ -51,7 +51,7 @@ public sealed class AuthService : IAuthService
     public async Task<UserProfileDto> GetCurrentUserAsync()
     {
         var client = _httpClientFactory.CreateClient("api");
-        var response = await client.GetFromJsonAsync<ApiResponse<UserProfileDto>>("api/v1/auth/me")
+        var response = await client.GetFromJsonAsync<ApiEnvelope<UserProfileDto>>("api/v1/auth/me")
             .ConfigureAwait(false);
         return response?.Data ?? new UserProfileDto("Unknown");
     }
@@ -66,13 +66,13 @@ public sealed class AuthService : IAuthService
             if (!httpResponse.IsSuccessStatusCode)
             {
                 var errorEnvelope = await httpResponse.Content
-                    .ReadFromJsonAsync<ApiResponse<LoginResponse>>()
+                    .ReadFromJsonAsync<ApiEnvelope<LoginResponse>>()
                     .ConfigureAwait(false);
                 return new AppAuthResult(false, errorEnvelope?.Error ?? "请求失败");
             }
 
             var envelope = await httpResponse.Content
-                .ReadFromJsonAsync<ApiResponse<LoginResponse>>()
+                .ReadFromJsonAsync<ApiEnvelope<LoginResponse>>()
                 .ConfigureAwait(false);
 
             if (envelope?.Data is { } data)

@@ -18,7 +18,7 @@ public sealed class SettingsService : ISettingsService
         try
         {
             var client = _httpClientFactory.CreateClient("api");
-            var response = await client.GetFromJsonAsync<ApiResponse<SecuritySettingsDto>>("api/v1/settings/security").ConfigureAwait(false);
+            var response = await client.GetFromJsonAsync<ApiEnvelope<SecuritySettingsDto>>("api/v1/settings/security").ConfigureAwait(false);
             return response?.Data ?? new SecuritySettingsDto(false, 0, "zh-CN", false, 12);
         }
         catch
@@ -51,7 +51,7 @@ public sealed class SettingsService : ISettingsService
         var response = await client.DeleteAsync($"api/v1/share-items/cleanup?months={months}").ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         // 服务端返回 { success, data: { deletedCount }, error }
-        var result = await response.Content.ReadFromJsonAsync<ApiResponse<CleanupResult>>().ConfigureAwait(false);
+        var result = await response.Content.ReadFromJsonAsync<ApiEnvelope<CleanupResult>>().ConfigureAwait(false);
         return result?.Data?.DeletedCount ?? 0;
     }
 }

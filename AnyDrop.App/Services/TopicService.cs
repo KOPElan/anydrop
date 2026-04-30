@@ -16,14 +16,14 @@ public sealed class TopicService : ITopicService
     public async Task<IReadOnlyList<TopicDto>> GetTopicsAsync()
     {
         var client = _httpClientFactory.CreateClient("api");
-        var response = await client.GetFromJsonAsync<ApiResponse<IReadOnlyList<TopicDto>>>("api/v1/topics").ConfigureAwait(false);
+        var response = await client.GetFromJsonAsync<ApiEnvelope<IReadOnlyList<TopicDto>>>("api/v1/topics").ConfigureAwait(false);
         return response?.Data ?? [];
     }
 
     public async Task<IReadOnlyList<TopicDto>> GetArchivedTopicsAsync()
     {
         var client = _httpClientFactory.CreateClient("api");
-        var response = await client.GetFromJsonAsync<ApiResponse<IReadOnlyList<TopicDto>>>("api/v1/topics/archived").ConfigureAwait(false);
+        var response = await client.GetFromJsonAsync<ApiEnvelope<IReadOnlyList<TopicDto>>>("api/v1/topics/archived").ConfigureAwait(false);
         return response?.Data ?? [];
     }
 
@@ -32,7 +32,7 @@ public sealed class TopicService : ITopicService
         var client = _httpClientFactory.CreateClient("api");
         var httpResponse = await client.PostAsJsonAsync("api/v1/topics", request).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
-        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<TopicDto>>().ConfigureAwait(false);
+        var response = await httpResponse.Content.ReadFromJsonAsync<ApiEnvelope<TopicDto>>().ConfigureAwait(false);
         return response!.Data!;
     }
 
