@@ -8,6 +8,35 @@
 
 ---
 
+## 统一 API 响应格式
+
+所有 API 响应使用以下 **ApiEnvelope** 统一结构：
+
+```json
+{
+  "success": boolean,           // true 表示请求成功，false 表示失败
+  "data": T | null,             // 成功时返回业务数据；失败时为 null
+  "error": string | null        // 失败时返回错误信息；成功时为 null
+}
+```
+
+### 示例
+
+**成功响应**:
+```json
+{ "success": true, "data": { "id": "uuid", "name": "..." }, "error": null }
+```
+
+**失败响应**:
+```json
+{ "success": false, "data": null, "error": "密码错误或用户不存在" }
+```
+
+> **注意**: 以下示例中，为了简洁性，成功响应可能省略 `"error": null`，但实际 API 响应中**始终包含**此字段（值为 `null`）。
+> 失败响应（非 2xx 状态码）中，`"success"` 为 `false`，`"data"` 为 `null`，`"error"` 包含错误信息。
+
+---
+
 ## 认证（Auth）
 
 ### GET `/auth/setup-status`
@@ -16,7 +45,7 @@
 
 **Response** `200 OK`:
 ```json
-{ "success": true, "data": { "requiresSetup": false } }
+{ "success": true, "data": { "requiresSetup": false }, "error": null }
 ```
 
 **Client Usage**: App 启动时 → `LoginPage.OnInitializedAsync` 调用，决定路由至 `/login` 或 `/setup-account`。
@@ -44,7 +73,8 @@
     "user": { "nickname": "admin", "lastLoginAt": null },
     "accessToken": "eyJ...",
     "expiresAt": "2026-05-29T00:00:00Z"
-  }
+  },
+  "error": null
 }
 ```
 
