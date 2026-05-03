@@ -1,6 +1,7 @@
 @page "/image-preview/{Id}"
 @layout AuthLayout
 @inject IServerConfigService ServerConfig
+@inject ISecureTokenStorage TokenStorage
 @inject NavigationManager Nav
 
 <div class="fixed inset-0 bg-black z-50 flex items-center justify-center touch-action-pinch-zoom">
@@ -18,9 +19,21 @@
 
     private string _imageUrl = string.Empty;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        _imageUrl = $"{ServerConfig.GetBaseUrl()}/api/v1/share-items/{Id}/file";
+        var baseUrl = ServerConfig.GetBaseUrl();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            _imageUrl = string.Empty;
+            return;
+        }
+
+        var token = await TokenStorage.GetTokenAsync().ConfigureAwait(false);
+        var query = string.IsNullOrWhiteSpace(token)
+            ? string.Empty
+            : $"?access_token={Uri.EscapeDataString(token)}";
+
+        _imageUrl = $"{baseUrl}/api/v1/share-items/{Id}/file{query}";
     }
 
     private void GoBack() => Nav.NavigateTo("/");

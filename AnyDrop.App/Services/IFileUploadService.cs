@@ -10,5 +10,6 @@ public interface IFileUploadService
         string fileName,
         string mimeType,
         Guid topicId,
+        bool burnAfterReading = false,
         IProgress<double>? progress = null);
 }

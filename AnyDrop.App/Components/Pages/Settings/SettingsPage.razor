@@ -81,6 +81,16 @@
     {
         var profile = await AuthService.GetCurrentUserAsync();
         _nickname = profile.Nickname;
+
+        try
+        {
+            var savedTheme = await JS.InvokeAsync<string?>("ThemeManager.getTheme");
+            _isDark = string.Equals(savedTheme, "dark", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            _isDark = false;
+        }
     }
 
     private async Task SaveNicknameAsync()

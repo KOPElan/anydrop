@@ -136,5 +136,5 @@ public sealed record ShareItemDto(
     Guid? TopicId
 );
 
-/// <summary>发送文本消息请求。</summary>
-public sealed record CreateTextShareItemRequest(string Content, Guid? TopicId = null);
+/// <summary>发送文本消息请求。BurnAfterReading=true 时按系统配置时长自动过期。</summary>
+public sealed record CreateTextShareItemRequest(string Content, Guid? TopicId = null, bool BurnAfterReading = false);

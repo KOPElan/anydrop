@@ -39,7 +39,7 @@ public class SearchServiceTests
         var topicId = Guid.NewGuid();
         var items = new List<ShareItemDto> { MakeTextItem(topicId, "hello world") };
         var messagesResponse = new TopicMessagesResponse(items, false, null);
-        var apiResponse = new ApiResponse<TopicMessagesResponse>(true, messagesResponse, null);
+        var apiResponse = new ApiEnvelope<TopicMessagesResponse>(true, messagesResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -53,7 +53,7 @@ public class SearchServiceTests
     public async Task SearchAsync_WhenEmptyResult_ReturnsEmptyList()
     {
         var messagesResponse = new TopicMessagesResponse([], false, null);
-        var apiResponse = new ApiResponse<TopicMessagesResponse>(true, messagesResponse, null);
+        var apiResponse = new ApiEnvelope<TopicMessagesResponse>(true, messagesResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -67,7 +67,7 @@ public class SearchServiceTests
     {
         var topicId = Guid.NewGuid();
         var items = new List<ShareItemDto> { MakeTextItem(topicId, "today msg") };
-        var apiResponse = new ApiResponse<IReadOnlyList<ShareItemDto>>(true, items, null);
+        var apiResponse = new ApiEnvelope<IReadOnlyList<ShareItemDto>>(true, items, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -82,7 +82,7 @@ public class SearchServiceTests
         var topicId = Guid.NewGuid();
         var dates = new List<DateOnly> { DateOnly.FromDateTime(DateTime.Today) };
         // 服务端直接返回 IReadOnlyList<DateOnly>，不包装在对象中
-        var apiResponse = new ApiResponse<IReadOnlyList<DateOnly>>(true, dates, null);
+        var apiResponse = new ApiEnvelope<IReadOnlyList<DateOnly>>(true, dates, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 

@@ -28,6 +28,23 @@ html, body {
     -webkit-tap-highlight-color: transparent;
 }
 
+.material-symbols-outlined {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+}
+
 h1:focus, h2:focus, h3:focus { outline: none; }
 
 /* ── 工具类 (Tailwind 无法处理的) ── */
@@ -46,6 +63,18 @@ h1:focus, h2:focus, h3:focus { outline: none; }
 
 .touch-action-pinch-zoom {
     touch-action: pinch-zoom;
+}
+
+.glass {
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+}
+
+.dark .glass {
+    background: rgba(17, 24, 39, 0.8);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
 }
 
 /* ── iOS 安全区域适配 ── */

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using AnyDrop.App.Models;
 using AnyDrop.App.Services;
+using AnyDrop.Shared;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
@@ -27,14 +28,14 @@ public class FileUploadServiceTests
     }
 
     private static ShareItemDto MakeFileItem(Guid topicId, string fileName, string mimeType) =>
-        new(Guid.NewGuid(), topicId, ShareContentType.File, null, fileName, null, mimeType, null, null, null, null, DateTimeOffset.UtcNow);
+        new(Guid.NewGuid(), ShareContentType.File, fileName, fileName, null, mimeType, null, null, DateTimeOffset.UtcNow, null, topicId);
 
     [Fact]
     public async Task UploadFileAsync_Success_ReturnsShareItem()
     {
         var topicId = Guid.NewGuid();
         var item = MakeFileItem(topicId, "test.txt", "text/plain");
-        var apiResponse = new ApiResponse<ShareItemDto>(true, item, null);
+        var apiResponse = new ApiEnvelope<ShareItemDto>(true, item, null);
         var http = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -50,7 +51,7 @@ public class FileUploadServiceTests
     {
         var topicId = Guid.NewGuid();
         var item = MakeFileItem(topicId, "file.bin", "application/octet-stream");
-        var apiResponse = new ApiResponse<ShareItemDto>(true, item, null);
+        var apiResponse = new ApiEnvelope<ShareItemDto>(true, item, null);
         var http = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -58,7 +59,7 @@ public class FileUploadServiceTests
         var progress = new Progress<double>(p => reportedProgress = p);
 
         using var stream = new MemoryStream([1, 2, 3]);
-        await sut.UploadFileAsync(stream, "file.bin", "application/octet-stream", topicId, progress);
+        await sut.UploadFileAsync(stream, "file.bin", "application/octet-stream", topicId, false, progress);
 
         await Task.Delay(50); // let Progress<T> fire on captured context
         reportedProgress.Should().Be(1.0);

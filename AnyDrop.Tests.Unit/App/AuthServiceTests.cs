@@ -35,7 +35,7 @@ public class AuthServiceTests
     {
         var userProfile = new UserProfileDto("TestUser");
         var loginResponse = new LoginResponse(userProfile, "jwt-token", DateTimeOffset.UtcNow.AddHours(1));
-        var apiResponse = new ApiResponse<LoginResponse>(true, loginResponse, null);
+        var apiResponse = new ApiEnvelope<LoginResponse>(true, loginResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = JsonContent.Create(apiResponse)
@@ -51,7 +51,7 @@ public class AuthServiceTests
     [Fact]
     public async Task LoginAsync_FailureResponse_DoesNotSaveToken()
     {
-        var apiResponse = new ApiResponse<LoginResponse>(false, null, "Invalid");
+        var apiResponse = new ApiEnvelope<LoginResponse>(false, null, "Invalid");
         var http = new HttpResponseMessage(HttpStatusCode.Unauthorized)
         {
             Content = JsonContent.Create(apiResponse)
@@ -101,7 +101,7 @@ public class AuthServiceTests
     {
         var userProfile = new UserProfileDto("Admin");
         var loginResponse = new LoginResponse(userProfile, "jwt-token", DateTimeOffset.UtcNow.AddHours(1));
-        var apiResponse = new ApiResponse<LoginResponse>(true, loginResponse, null);
+        var apiResponse = new ApiEnvelope<LoginResponse>(true, loginResponse, null);
         var http = new HttpResponseMessage(HttpStatusCode.Created)
         {
             Content = JsonContent.Create(apiResponse)

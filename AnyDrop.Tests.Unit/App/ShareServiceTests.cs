@@ -39,7 +39,7 @@ public class ShareServiceTests
         var topicId = Guid.NewGuid();
         var items = new List<ShareItemDto> { MakeTextItem(topicId, "hello") };
         var data = new TopicMessagesResponse(items, false, null);
-        var apiResponse = new ApiResponse<TopicMessagesResponse>(true, data, null);
+        var apiResponse = new ApiEnvelope<TopicMessagesResponse>(true, data, null);
 
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var (sut, _) = CreateSut(http);
@@ -55,7 +55,7 @@ public class ShareServiceTests
     {
         var topicId = Guid.NewGuid();
         var item = MakeTextItem(topicId, "new text");
-        var apiResponse = new ApiResponse<ShareItemDto>(true, item, null);
+        var apiResponse = new ApiEnvelope<ShareItemDto>(true, item, null);
 
         var http = new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(apiResponse) };
         var (sut, _) = CreateSut(http);
@@ -72,7 +72,7 @@ public class ShareServiceTests
     {
         var topicId = Guid.NewGuid();
         var data = new TopicMessagesResponse([], false, null);
-        var apiResponse = new ApiResponse<TopicMessagesResponse>(true, data, null);
+        var apiResponse = new ApiEnvelope<TopicMessagesResponse>(true, data, null);
 
         HttpRequestMessage? capturedRequest = null;
         var handlerMock = new Mock<HttpMessageHandler>();

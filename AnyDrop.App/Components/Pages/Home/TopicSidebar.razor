@@ -15,7 +15,7 @@
              @ondragover:preventDefault="true"
              @ondrop="() => OnDrop(topic.Id)"
              class="topic-item @(AppState.CurrentTopicId == topic.Id ? "topic-item-active" : "topic-item-inactive")">
-            <span class="text-xl">@topic.Icon</span>
+            <span class="material-symbols-outlined text-xl">@topic.Icon</span>
             <div class="flex-1 min-w-0">
                 <div class="font-medium text-sm text-gray-800 dark:text-gray-100 truncate">@topic.Name</div>
                 @if (topic.IsPinned)
@@ -43,7 +43,7 @@
             {
                 <div @onclick="() => SelectTopic(topic.Id)"
                      class="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer opacity-60 hover:opacity-80 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all">
-                    <span class="text-lg">@topic.Icon</span>
+                    <span class="material-symbols-outlined text-lg">@topic.Icon</span>
                     <span class="flex-1 text-sm text-gray-600 dark:text-gray-400 truncate">@topic.Name</span>
                 </div>
             }

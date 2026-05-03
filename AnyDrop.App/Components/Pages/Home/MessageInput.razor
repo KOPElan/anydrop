@@ -28,6 +28,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                 </svg>
             </button>
+            <button @onclick="ToggleBurnAfterReading"
+                    disabled="@_uploading"
+                    title="阅后即焚"
+                    class="w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40 transition-colors @(_burnAfterReading ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/25" : "text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700")">
+                <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' @( _burnAfterReading ? 1 : 0 );">local_fire_department</span>
+            </button>
         </div>
 
         <textarea @bind="_text" @onkeydown="OnKeyDown"
@@ -52,13 +58,14 @@
     private string _text = string.Empty;
     private bool _uploading;
     private double _uploadProgress;
+    private bool _burnAfterReading;
 
     private async Task SendTextAsync()
     {
         if (string.IsNullOrWhiteSpace(_text)) return;
         var textToSend = _text;
         _text = string.Empty;
-        var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId));
+        var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
         AppState.Messages.Add(item);
         AppState.NotifyStateChanged();
     }
@@ -84,7 +91,7 @@
         var progress = new Progress<double>(p => { _uploadProgress = p; InvokeAsync(StateHasChanged); });
         try
         {
-            var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, progress);
+            var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
             AppState.Messages.Add(item);
             AppState.NotifyStateChanged();
         }
@@ -99,5 +106,10 @@
     {
         if (e.Key == "Enter" && !e.ShiftKey)
             await SendTextAsync();
+    }
+
+    private void ToggleBurnAfterReading()
+    {
+        _burnAfterReading = !_burnAfterReading;
     }
 }

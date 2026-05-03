@@ -5,7 +5,10 @@
 {
     <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50" @onclick="() => OnClose.InvokeAsync()">
         <div class="bg-white dark:bg-gray-800 rounded-t-2xl w-full max-w-lg p-4 space-y-1" @onclick:stopPropagation="true">
-            <div class="text-center font-medium text-gray-800 dark:text-gray-100 py-2">@Topic.Icon @Topic.Name</div>
+            <div class="text-center font-medium text-gray-800 dark:text-gray-100 py-2 flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">@Topic.Icon</span>
+                <span>@Topic.Name</span>
+            </div>
             <hr class="border-gray-200 dark:border-gray-700" />
 
             @if (_editMode)
@@ -16,6 +19,24 @@
                     <div class="flex gap-2">
                         <button @onclick="() => _editMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
                         <button @onclick="RenameAsync" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">保存</button>
+                    </div>
+                </div>
+            }
+            else if (_iconMode)
+            {
+                <div class="py-2 space-y-3">
+                    <div class="grid grid-cols-5 gap-2">
+                        @foreach (var icon in _availableIcons)
+                        {
+                            <button @onclick="() => _selectedIcon = icon"
+                                    class="h-10 rounded-lg border transition-colors @(icon == _selectedIcon ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30" : "border-gray-200 dark:border-gray-700")">
+                                <span class="material-symbols-outlined text-[20px] text-gray-700 dark:text-gray-200">@icon</span>
+                            </button>
+                        }
+                    </div>
+                    <div class="flex gap-2">
+                        <button @onclick="() => _iconMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
+                        <button @onclick="SaveIconAsync" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">保存图标</button>
                     </div>
                 </div>
             }
@@ -31,10 +52,11 @@
             }
             else
             {
-                <ActionItem Icon="✏️" Label="重命名" OnClick="() => { _editMode = true; _editName = Topic.Name; }" />
-                <ActionItem Icon="@(Topic.IsPinned ? "📌 取消置顶" : "📌 置顶")" Label="@(Topic.IsPinned ? "取消置顶" : "置顶")" OnClick="TogglePinAsync" />
-                <ActionItem Icon="@(Topic.IsArchived ? "📂 取消归档" : "📂 归档")" Label="@(Topic.IsArchived ? "取消归档" : "归档")" OnClick="ToggleArchiveAsync" />
-                <ActionItem Icon="🗑️" Label="删除" OnClick="() => _confirmDelete = true" Danger="true" />
+                <ActionItem Icon="edit" Label="重命名" OnClick="() => { _editMode = true; _editName = Topic.Name; }" />
+                <ActionItem Icon="image" Label="设置图标" OnClick="OpenIconMode" />
+                <ActionItem Icon="@(Topic.IsPinned ? "keep_off" : "keep")" Label="@(Topic.IsPinned ? "取消置顶" : "置顶")" OnClick="TogglePinAsync" />
+                <ActionItem Icon="@(Topic.IsArchived ? "unarchive" : "archive")" Label="@(Topic.IsArchived ? "取消归档" : "归档")" OnClick="ToggleArchiveAsync" />
+                <ActionItem Icon="delete" Label="删除" OnClick="() => _confirmDelete = true" Danger="true" />
             }
         </div>
     </div>
@@ -47,8 +69,30 @@
 
     private bool _showMenu = true;
     private bool _editMode;
+    private bool _iconMode;
     private bool _confirmDelete;
     private string _editName = string.Empty;
+    private string _selectedIcon = "chat_bubble";
+
+    private static readonly string[] _availableIcons =
+    [
+        "chat_bubble", "bookmark", "work", "home", "favorite",
+        "school", "sports_esports", "code", "music_note", "restaurant",
+        "flight", "local_cafe", "shopping_cart", "cake", "pets",
+        "directions_car", "movie", "explore", "star", "lightbulb",
+        "beach_access", "fitness_center", "palette", "public", "emoji_events"
+    ];
+
+    protected override void OnParametersSet()
+    {
+        _selectedIcon = Topic?.Icon ?? "chat_bubble";
+    }
+
+    private void OpenIconMode()
+    {
+        _iconMode = true;
+        _selectedIcon = Topic?.Icon ?? "chat_bubble";
+    }
 
     private async Task RenameAsync()
     {
@@ -71,6 +115,15 @@
     {
         if (Topic is null) return;
         await TopicService.ArchiveTopicAsync(Topic.Id, new ArchiveTopicRequest(!Topic.IsArchived));
+        await OnTopicChanged.InvokeAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task SaveIconAsync()
+    {
+        if (Topic is null || string.IsNullOrWhiteSpace(_selectedIcon)) return;
+        await TopicService.UpdateTopicIconAsync(Topic.Id, new UpdateTopicIconRequest(_selectedIcon));
+        _iconMode = false;
         await OnTopicChanged.InvokeAsync();
         await OnClose.InvokeAsync();
     }

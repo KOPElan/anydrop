@@ -17,6 +17,7 @@ public sealed class FileUploadService : IFileUploadService
         string fileName,
         string mimeType,
         Guid topicId,
+        bool burnAfterReading = false,
         IProgress<double>? progress = null)
     {
         if (fileStream is null) throw new ArgumentNullException(nameof(fileStream));
@@ -30,6 +31,7 @@ public sealed class FileUploadService : IFileUploadService
         streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mimeType);
         content.Add(streamContent, "file", fileName);
         content.Add(new StringContent(topicId.ToString()), "topicId");
+        content.Add(new StringContent(burnAfterReading ? "true" : "false"), "burnAfterReading");
 
         var httpResponse = await client.PostAsync("api/v1/files", content).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();

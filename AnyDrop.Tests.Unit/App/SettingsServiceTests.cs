@@ -32,7 +32,7 @@ public class SettingsServiceTests
     {
         // 与服务端 SecuritySettingsDto 一致：(AutoFetchLinkPreview, BurnAfterReadingMinutes, Language, AutoCleanupEnabled, AutoCleanupMonths)
         var settings = new SecuritySettingsDto(true, 5, "zh-CN", true, 24);
-        var apiResponse = new ApiResponse<SecuritySettingsDto>(true, settings, null);
+        var apiResponse = new ApiEnvelope<SecuritySettingsDto>(true, settings, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 
@@ -98,7 +98,7 @@ public class SettingsServiceTests
     {
         // 服务端返回 CleanupResult { DeletedCount: 42 }，不是直接的 int
         var cleanupResult = new CleanupResult(42);
-        var apiResponse = new ApiResponse<CleanupResult>(true, cleanupResult, null);
+        var apiResponse = new ApiEnvelope<CleanupResult>(true, cleanupResult, null);
         var http = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) };
         var sut = CreateSut(http);
 

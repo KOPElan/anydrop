@@ -58,7 +58,7 @@ public static class ShareItemEndpoints
 
         try
         {
-            var item = await shareService.SendTextAsync(request.Content, request.TopicId, burnAfterReading: false, cancellationToken);
+            var item = await shareService.SendTextAsync(request.Content, request.TopicId, burnAfterReading: request.BurnAfterReading, cancellationToken);
             return TypedResults.Ok(ApiEnvelope<ShareItemDto>.Ok(item));
         }
         catch (ArgumentException ex)

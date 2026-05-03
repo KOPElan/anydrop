@@ -105,9 +105,20 @@ builder.Services.AddAuthentication(options =>
         options.ForwardDefaultSelector = context =>
         {
             var authorization = context.Request.Headers.Authorization.ToString();
-            return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                ? JwtBearerDefaults.AuthenticationScheme
-                : CookieAuthenticationDefaults.AuthenticationScheme;
+            if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return JwtBearerDefaults.AuthenticationScheme;
+            }
+
+            var accessToken = context.Request.Query["access_token"];
+            if (!string.IsNullOrWhiteSpace(accessToken)
+                && (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                    || context.Request.Path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase)))
+            {
+                return JwtBearerDefaults.AuthenticationScheme;
+            }
+
+            return CookieAuthenticationDefaults.AuthenticationScheme;
         };
     })
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>

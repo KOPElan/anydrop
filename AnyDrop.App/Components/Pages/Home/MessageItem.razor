@@ -1,5 +1,5 @@
-@inject IShareService ShareService
 @inject IServerConfigService ServerConfig
+@inject ISecureTokenStorage TokenStorage
 @inject NavigationManager Nav
 
 <div class="@GetContainerClass() max-w-xs">
@@ -10,7 +10,7 @@
             break;
 
         case ShareContentType.Image:
-            <img src="@GetFileUrl()" alt="image"
+              <img src="@_fileUrl" alt="image"
                  class="rounded-xl max-w-full cursor-pointer active:opacity-80 transition-opacity"
                  @onclick="NavigateToImagePreview" />
             break;
@@ -68,6 +68,15 @@
 @code {
     [Parameter, EditorRequired] public ShareItemDto Item { get; set; } = null!;
 
+    private string _fileUrl = string.Empty;
+    private string _downloadUrl = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _fileUrl = await BuildFileUrlAsync(download: false).ConfigureAwait(false);
+        _downloadUrl = await BuildFileUrlAsync(download: true).ConfigureAwait(false);
+    }
+
     private void NavigateToImagePreview() => Nav.NavigateTo($"/image-preview/{Item.Id}");
 
     private string GetContainerClass() => Item.ContentType switch
@@ -77,17 +86,61 @@
         _ => "bubble-text"
     };
 
-    private string GetFileUrl() => $"{ServerConfig.GetBaseUrl()}/api/v1/share-items/{Item.Id}/file";
+    private async Task<string> BuildFileUrlAsync(bool download)
+    {
+        var baseUrl = ServerConfig.GetBaseUrl();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return string.Empty;
+        }
+
+        var token = await TokenStorage.GetTokenAsync().ConfigureAwait(false);
+        var queryParts = new List<string>();
+
+        if (download)
+        {
+            queryParts.Add("download=true");
+        }
+
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            queryParts.Add($"access_token={Uri.EscapeDataString(token)}");
+        }
+
+        var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : string.Empty;
+        return $"{baseUrl}/api/v1/share-items/{Item.Id}/file{query}";
+    }
 
     private async Task DownloadAsync()
     {
-        try { await ShareService.DownloadFileAsync(Item.Id); } catch { /* ignore */ }
+        if (string.IsNullOrWhiteSpace(_downloadUrl))
+        {
+            return;
+        }
+
+        try
+        {
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+            await Launcher.OpenAsync(new Uri(_downloadUrl));
+#else
+            await Task.CompletedTask;
+#endif
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     private async Task OpenVideoAsync()
     {
+        if (string.IsNullOrWhiteSpace(_fileUrl))
+        {
+            return;
+        }
+
 #if ANDROID || IOS || MACCATALYST || WINDOWS
-        await Launcher.OpenAsync(new Uri(GetFileUrl()));
+        await Launcher.OpenAsync(new Uri(_fileUrl));
 #else
         await Task.CompletedTask;
 #endif
