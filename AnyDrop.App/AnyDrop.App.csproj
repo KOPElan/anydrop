@@ -42,12 +42,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" Condition="$(TargetFramework) != 'net10.0'" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" Condition="$(TargetFramework) != 'net10.0'" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" Condition="$(TargetFramework) == 'net10.0'" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
-        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.5" />
-        <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" Condition="$(TargetFramework) != 'net10.0'" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.60" Condition="$(TargetFramework) != 'net10.0'" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.7" Condition="$(TargetFramework) == 'net10.0'" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.7" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.7" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
     </ItemGroup>
 
     <!-- net10.0 TFM 排除所有 MAUI 平台文件和 MAUI 代码 -->
