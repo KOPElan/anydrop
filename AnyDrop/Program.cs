@@ -4,6 +4,7 @@ using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -141,6 +142,7 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -154,6 +156,17 @@ builder.Services.AddAuthentication(options =>
         };
         options.Events = new JwtBearerEvents
         {
+            // 禁止 JWT Claim 映射（默认会将 "sub" → ClaimTypes.NameIdentifier），
+            // 否则 OnTokenValidated 中 FindFirstValue("sub") 返回 null 导致认证失败。
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var sub = context.Principal?.FindFirstValue("sub");
@@ -215,6 +228,7 @@ if (enableSwaggerUI)
 }
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseRequestLocalization();
+app.UseRouting();
 app.UseAntiforgery();
 app.UseAuthentication();
 
@@ -272,7 +286,8 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 
 app.MapStaticAssets().AllowAnonymous();
-app.MapHub<ShareHub>("/hubs/share");
+app.MapHub<ShareHub>("/hubs/share")
+   .DisableAntiforgery();
 app.MapShareItemEndpoints();
 app.MapFileEndpoints();
 app.MapTopicEndpoints();

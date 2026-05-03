@@ -56,7 +56,15 @@
         if (result.Success)
         {
             await Notifications.RequestPermissionAsync();
-            await SignalR.StartAsync();
+            try
+            {
+                await SignalR.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                // SignalR 连接失败不影响登录跳转，后续通过 MainLayout 的重连机制恢复
+                System.Diagnostics.Debug.WriteLine($"[SignalR] 首次连接失败: {ex.Message}");
+            }
             Nav.NavigateTo(ReturnTo ?? "/");
         }
         else
