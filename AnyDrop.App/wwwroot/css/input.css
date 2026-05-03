@@ -1,0 +1,140 @@
+/* ── Tailwind CSS v4 入口 ──────────────────────────────── */
+@import "tailwindcss" source(none);
+@source "../../**/*.razor";
+
+/* ── 暗色模式：基于 .dark class ── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── 自定义主题 ── */
+@theme {
+    --color-primary: #4f46e5;
+    --color-primary-light: #6366f1;
+}
+
+/* ── 组件样式 ── */
+@layer components {
+    .btn-primary {
+        @apply w-full py-3 rounded-xl font-medium text-white transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+    }
+
+    .btn-primary:active:not(:disabled) {
+        opacity: 0.9;
+    }
+
+    .btn-danger {
+        @apply w-full py-3 rounded-xl font-medium text-sm text-red-500 dark:text-red-400 border border-red-500/50 dark:border-red-400/50 active:bg-red-50 dark:active:bg-red-900/20 transition-colors duration-150;
+    }
+
+    .btn-secondary {
+        @apply w-full py-3 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors duration-150;
+    }
+
+    .input-base {
+        @apply w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 transition-shadow duration-150;
+    }
+
+    .input-base:focus {
+        @apply outline-none border-indigo-500/50;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
+    .bubble-text {
+        @apply rounded-2xl p-3.5 break-words;
+        background-color: #ffffff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .dark .bubble-text {
+        background-color: #1f2937;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .bubble-link {
+        @apply rounded-2xl p-3.5 break-words;
+        background-color: #eff6ff;
+        border: 1px solid rgba(59, 130, 246, 0.15);
+    }
+
+    .dark .bubble-link {
+        background-color: rgba(30, 58, 138, 0.2);
+        border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .status-banner {
+        @apply px-4 py-1.5 text-xs text-center font-medium transition-all duration-300;
+    }
+
+    .segmented-control {
+        @apply flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700/50 p-1;
+    }
+
+    .segmented-btn {
+        @apply flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150;
+    }
+
+    .segmented-btn-active {
+        @apply bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm;
+    }
+
+    .segmented-btn-inactive {
+        @apply text-gray-500 dark:text-gray-400;
+    }
+
+    .topic-item {
+        @apply flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors duration-150;
+    }
+
+    .topic-item-active {
+        @apply bg-indigo-50 dark:bg-indigo-900/30;
+    }
+
+    .topic-item-inactive {
+        @apply hover:bg-gray-50 dark:hover:bg-gray-800/50;
+    }
+
+    .nav-item-active svg {
+        @apply text-indigo-600 dark:text-indigo-400;
+    }
+
+    .nav-item-active span {
+        @apply text-indigo-600 dark:text-indigo-400;
+    }
+
+    .nav-item-inactive {
+        @apply text-gray-400 dark:text-gray-500;
+    }
+}
+
+/* ── 工具类 ── */
+@layer utilities {
+    .safe-area-bottom {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .safe-area-top {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+    .touch-scroll {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+    .touch-action-pinch-zoom {
+        touch-action: pinch-zoom;
+    }
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .glass {
+        background: rgba(255, 255, 255, 0.72);
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
+    }
+    .dark .glass {
+        background: rgba(17, 24, 39, 0.8);
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
+    }
+}

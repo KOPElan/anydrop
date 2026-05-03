@@ -1,15 +1,6 @@
+using AnyDrop.Shared;
+
 namespace AnyDrop.Models;
 
-public sealed record ShareItemDto(
-    Guid Id,
-    ShareContentType ContentType,
-    string Content,
-    string? FileName,
-    long? FileSize,
-    string? MimeType,
-    string? LinkTitle,
-    string? LinkDescription,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? ExpiresAt,
-    Guid? TopicId
-);
+// ShareItemDto 已迁移到 AnyDrop.Shared。
+

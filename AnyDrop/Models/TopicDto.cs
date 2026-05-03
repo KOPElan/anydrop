@@ -1,34 +1,8 @@
+using AnyDrop.Shared;
+
 namespace AnyDrop.Models;
 
-public sealed record TopicDto(
-    Guid Id,
-    string Name,
-    string Icon,
-    int SortOrder,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? LastMessageAt,
-    int MessageCount,
-    bool IsBuiltIn,
-    string? LastMessagePreview,
-    bool IsPinned,
-    DateTimeOffset? PinnedAt,
-    bool IsArchived,
-    DateTimeOffset? ArchivedAt
-);
+// TopicDto、CreateTopicRequest、UpdateTopicRequest、UpdateTopicIconRequest、
+// PinTopicRequest、ArchiveTopicRequest、ReorderTopicsRequest、TopicOrderItem、
+// TopicMessagesResponse 已迁移到 AnyDrop.Shared，此处保持 using 以供全局引用。
 
-public sealed record CreateTopicRequest(string Name);
-
-public sealed record UpdateTopicRequest(string Name);
-public sealed record UpdateTopicIconRequest(string Icon);
-public sealed record PinTopicRequest(bool IsPinned);
-public sealed record ArchiveTopicRequest(bool IsArchived);
-
-public sealed record ReorderTopicsRequest(IReadOnlyList<TopicOrderItem> Items);
-
-public sealed record TopicOrderItem(Guid TopicId, int SortOrder);
-
-public sealed record TopicMessagesResponse(
-    IReadOnlyList<ShareItemDto> Messages,
-    bool HasMore,
-    string? NextCursor
-);

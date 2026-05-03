@@ -4,6 +4,7 @@ using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -104,9 +105,20 @@ builder.Services.AddAuthentication(options =>
         options.ForwardDefaultSelector = context =>
         {
             var authorization = context.Request.Headers.Authorization.ToString();
-            return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                ? JwtBearerDefaults.AuthenticationScheme
-                : CookieAuthenticationDefaults.AuthenticationScheme;
+            if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return JwtBearerDefaults.AuthenticationScheme;
+            }
+
+            var accessToken = context.Request.Query["access_token"];
+            if (!string.IsNullOrWhiteSpace(accessToken)
+                && (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                    || context.Request.Path.StartsWithSegments("/hubs", StringComparison.OrdinalIgnoreCase)))
+            {
+                return JwtBearerDefaults.AuthenticationScheme;
+            }
+
+            return CookieAuthenticationDefaults.AuthenticationScheme;
         };
     })
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
@@ -141,6 +153,7 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -154,6 +167,17 @@ builder.Services.AddAuthentication(options =>
         };
         options.Events = new JwtBearerEvents
         {
+            // 禁止 JWT Claim 映射（默认会将 "sub" → ClaimTypes.NameIdentifier），
+            // 否则 OnTokenValidated 中 FindFirstValue("sub") 返回 null 导致认证失败。
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var sub = context.Principal?.FindFirstValue("sub");
@@ -199,7 +223,12 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 }
-else
+
+// 根据配置决定是否启用 Swagger UI（开发环境默认启用，生产环境默认禁用）
+var enableSwaggerUI = builder.Configuration.GetValue<bool?>("OpenApi:EnableSwaggerUI")
+                      ?? app.Environment.IsDevelopment();
+
+if (enableSwaggerUI)
 {
     app.UseSwagger(options => { options.RouteTemplate = "openapi/{documentName}.json"; });
     app.UseSwaggerUI(options =>
@@ -210,6 +239,7 @@ else
 }
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseRequestLocalization();
+app.UseRouting();
 app.UseAntiforgery();
 app.UseAuthentication();
 
@@ -267,7 +297,8 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 
 app.MapStaticAssets().AllowAnonymous();
-app.MapHub<ShareHub>("/hubs/share");
+app.MapHub<ShareHub>("/hubs/share")
+   .DisableAntiforgery();
 app.MapShareItemEndpoints();
 app.MapFileEndpoints();
 app.MapTopicEndpoints();

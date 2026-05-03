@@ -1,0 +1,70 @@
+@page "/setup-account"
+@layout AuthLayout
+@inject IAuthService AuthService
+@inject ISignalRService SignalR
+@inject INotificationService Notifications
+@inject NavigationManager Nav
+
+<div class="space-y-5">
+    <div class="text-center">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">创建账号</h2>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">首次使用，请设置您的昵称和密码</p>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">昵称</label>
+        <input @bind="_nickname" type="text" placeholder="请输入昵称" class="input-base" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">密码</label>
+        <input @bind="_password" type="password" placeholder="请输入密码" class="input-base" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">确认密码</label>
+        <input @bind="_confirmPassword" type="password" placeholder="再次输入密码" class="input-base" />
+    </div>
+
+    @if (_error is not null)
+    {
+        <p class="text-red-500 text-sm text-center">@_error</p>
+    }
+
+    <button @onclick="SetupAsync"
+            disabled="@(_loading)"
+            class="btn-primary">
+        @(_loading ? "创建中..." : "创建账号")
+    </button>
+</div>
+
+@code {
+    private string _nickname = string.Empty;
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private string? _error;
+    private bool _loading;
+
+    private async Task SetupAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_nickname)) { _error = "请输入昵称"; return; }
+        if (string.IsNullOrWhiteSpace(_password)) { _error = "请输入密码"; return; }
+        if (_password != _confirmPassword) { _error = "两次密码不一致"; return; }
+
+        _loading = true;
+        _error = null;
+
+        var result = await AuthService.SetupAsync(new SetupRequest(_nickname, _password, _confirmPassword));
+        if (result.Success)
+        {
+            await Notifications.RequestPermissionAsync();
+            await SignalR.StartAsync();
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            _error = result.Error ?? "创建失败，请重试。";
+            _loading = false;
+        }
+    }
+}

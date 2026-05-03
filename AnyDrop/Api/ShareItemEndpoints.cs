@@ -1,6 +1,7 @@
 using AnyDrop.Data;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,7 @@ public static class ShareItemEndpoints
 
         try
         {
-            var item = await shareService.SendTextAsync(request.Content, request.TopicId, burnAfterReading: false, cancellationToken);
+            var item = await shareService.SendTextAsync(request.Content, request.TopicId, burnAfterReading: request.BurnAfterReading, cancellationToken);
             return TypedResults.Ok(ApiEnvelope<ShareItemDto>.Ok(item));
         }
         catch (ArgumentException ex)
@@ -139,17 +140,11 @@ public static class ShareItemEndpoints
         return TypedResults.Ok(ApiEnvelope<object>.Ok(new { deleted = deletedCount }));
     }
 
-    private static bool ShouldForceAttachment(string mimeType)
-    {
-        return mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
-               || mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)
-               || mimeType.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-               || mimeType.Equals("text/javascript", StringComparison.OrdinalIgnoreCase);
-    }
+        private static bool ShouldForceAttachment(string mimeType)
+        {
+            return mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
+                   || mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)
+                   || mimeType.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
+                   || mimeType.Equals("text/javascript", StringComparison.OrdinalIgnoreCase);
+        }
 }
-
-/// <summary>清理操作结果 DTO。</summary>
-public sealed record CleanupResult(int DeletedCount);
-
-/// <summary>批量删除请求 DTO。</summary>
-public sealed record BatchDeleteRequest(List<Guid> Ids);

@@ -1,5 +1,6 @@
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AnyDrop.Api;
@@ -27,7 +28,7 @@ public static class FileEndpoints
     public static async Task<IResult> UploadFileAsync(
         IFormFile file,
         [FromForm] Guid? topicId,
-        [FromForm] bool burnAfterReading,
+        [FromForm] bool? burnAfterReading,
         IShareService shareService,
         IConfiguration configuration,
         CancellationToken cancellationToken)
@@ -69,7 +70,7 @@ public static class FileEndpoints
                 mimeType,
                 topicId.Value,
                 knownFileSize: file.Length,
-                burnAfterReading: burnAfterReading,
+                burnAfterReading: burnAfterReading ?? false,
                 ct: cancellationToken);
 
             return TypedResults.Ok(ApiEnvelope<ShareItemDto>.Ok(dto));

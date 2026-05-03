@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.HttpResults;
