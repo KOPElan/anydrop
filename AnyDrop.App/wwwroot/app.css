@@ -1,14 +1,14 @@
-/* AnyDrop 移动端 CSS */
+/* ── AnyDrop 移动端自定义样式 ──────────────────────────── */
+/* Tailwind 基础样式在 css/tailwind.css 中                  */
 
-h1:focus {
-    outline: none;
-}
-
+/* ── 基础重置 ── */
 html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
 }
 
@@ -17,16 +17,20 @@ html, body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background-color: #f5f7fa;
 }
 
-/* 移动端触控滚动优化 */
-.overflow-y-auto,
-.overflow-y-scroll {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
+.dark #app {
+    background-color: #111827;
 }
 
-/* iOS 安全区域 */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+h1:focus, h2:focus, h3:focus { outline: none; }
+
+/* ── 工具类 (Tailwind 无法处理的) ── */
 .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -35,37 +39,34 @@ html, body {
     padding-top: env(safe-area-inset-top, 0px);
 }
 
-.status-bar-safe-area {
-    display: none;
+.touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
-@supports (-webkit-touch-callout: none) {
-    .status-bar-safe-area {
-        display: flex;
-        position: sticky;
-        top: 0;
-        height: env(safe-area-inset-top);
-        background-color: #f7f7f7;
-        width: 100%;
-        z-index: 1;
-    }
-
-    .flex-column, .navbar-brand {
-        padding-left: env(safe-area-inset-left);
-    }
-}
-
-/* 触摸缩放 */
 .touch-action-pinch-zoom {
     touch-action: pinch-zoom;
 }
 
-/* Blazor 错误 UI */
+/* ── iOS 安全区域适配 ── */
+@supports (-webkit-touch-callout: none) {
+    .ios-safe-top {
+        display: flex;
+        position: sticky;
+        top: 0;
+        height: env(safe-area-inset-top);
+        background-color: inherit;
+        width: 100%;
+        z-index: 50;
+    }
+}
+
+/* ── Blazor 错误 UI ── */
 #blazor-error-ui {
     color-scheme: light only;
-    background: lightyellow;
+    background: #fef3c7;
     bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
     box-sizing: border-box;
     display: none;
     left: 0;
@@ -73,6 +74,8 @@ html, body {
     position: fixed;
     width: 100%;
     z-index: 1000;
+    font-size: 0.875rem;
+    color: #92400e;
 }
 
     #blazor-error-ui .dismiss {
@@ -80,6 +83,7 @@ html, body {
         position: absolute;
         right: 0.75rem;
         top: 0.5rem;
+        color: #92400e;
     }
 
 .blazor-error-boundary {
@@ -91,7 +95,6 @@ html, body {
     .blazor-error-boundary::after {
         content: "An error has occurred."
     }
-
 
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;

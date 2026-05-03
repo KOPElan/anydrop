@@ -58,6 +58,7 @@ yarn-error.log*
 wwwroot/dist/
 public/build/
 /dist/
+AnyDrop.App/wwwroot/css/tailwind.css
 
 # Playwright
 /playwright-report/

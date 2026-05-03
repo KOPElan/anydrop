@@ -5,14 +5,13 @@
 @implements IAsyncDisposable
 
 <div id="message-list-container"
-     class="flex-1 overflow-y-auto px-4 py-2 space-y-2"
-     style="-webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
+     class="flex-1 overflow-y-auto px-4 py-3 space-y-3 message-scroll">
     @if (AppState.HasMoreMessages)
     {
         <div class="text-center py-2">
             <button @onclick="LoadMoreAsync"
                     disabled="@_loadingMore"
-                    class="text-xs text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+                    class="text-xs text-indigo-600 dark:text-indigo-400 font-medium disabled:opacity-50 active:opacity-70">
                 @(_loadingMore ? "加载中..." : "加载更多")
             </button>
         </div>
@@ -20,7 +19,7 @@
 
     @if (AppState.Messages.Count == 0 && !_loading)
     {
-        <div class="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500 text-sm">
+        <div class="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">
             暂无消息，发送第一条吧 👋
         </div>
     }
