@@ -2,6 +2,7 @@
 @inject ISignalRService SignalR
 @inject IAppStateService AppState
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 @implements IAsyncDisposable
 
 @if (_selectionMode)
@@ -94,32 +95,54 @@
     {
         _loading = true;
         StateHasChanged();
-        var result = await ShareService.GetMessagesAsync(TopicId);
-        AppState.Messages.Clear();
-        // 服务端返回最新消息在前（降序），翻转后最新在底部
-        for (int i = result.Messages.Count - 1; i >= 0; i--)
-            AppState.Messages.Add(result.Messages[i]);
-        AppState.HasMoreMessages = result.HasMore;
-        AppState.MessageCursor = result.NextCursor;
-        AppState.NotifyStateChanged();
-        _loading = false;
-        await ScrollToBottomAsync();
+        try
+        {
+            var result = await ShareService.GetMessagesAsync(TopicId);
+            AppState.Messages.Clear();
+            // 服务端返回最新消息在前（降序），翻转后最新在底部
+            for (int i = result.Messages.Count - 1; i >= 0; i--)
+                AppState.Messages.Add(result.Messages[i]);
+            AppState.HasMoreMessages = result.HasMore;
+            AppState.MessageCursor = result.NextCursor;
+            AppState.NotifyStateChanged();
+            await ScrollToBottomAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageList] 加载消息失败: {ex.Message}");
+            await ShowConnectionFailedAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task LoadMoreAsync()
     {
         _loadingMore = true;
-        var result = await ShareService.GetMessagesAsync(TopicId, before: AppState.MessageCursor);
-        var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
-        var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
-        // 服务端返回较旧消息（降序），翻转后按时间升序插入到列表头部
-        newItems.Reverse(); // List<T>.Reverse() in-place，无额外分配
-        for (int i = 0; i < newItems.Count; i++)
-            AppState.Messages.Insert(i, newItems[i]);
-        AppState.HasMoreMessages = result.HasMore;
-        AppState.MessageCursor = result.NextCursor;
-        AppState.NotifyStateChanged();
-        _loadingMore = false;
+        try
+        {
+            var result = await ShareService.GetMessagesAsync(TopicId, before: AppState.MessageCursor);
+            var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
+            var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
+            // 服务端返回较旧消息（降序），翻转后按时间升序插入到列表头部
+            newItems.Reverse(); // List<T>.Reverse() in-place，无额外分配
+            for (int i = 0; i < newItems.Count; i++)
+                AppState.Messages.Insert(i, newItems[i]);
+            AppState.HasMoreMessages = result.HasMore;
+            AppState.MessageCursor = result.NextCursor;
+            AppState.NotifyStateChanged();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageList] 加载更多消息失败: {ex.Message}");
+            await ShowConnectionFailedAsync();
+        }
+        finally
+        {
+            _loadingMore = false;
+        }
     }
 
     private void OnTopicsUpdated(IReadOnlyList<TopicDto> topics)
@@ -163,6 +186,13 @@
     {
         _selectionMode = true;
         _selectedIds.Add(id);
+        StateHasChanged();
+    }
+
+    /// <summary>从外部（如页面头部按钮）进入批量选择模式。</summary>
+    public void EnterBatchSelectionMode()
+    {
+        _selectionMode = true;
         StateHasChanged();
     }
 
@@ -210,5 +240,20 @@
         AppState.OnChange -= StateHasChanged;
         AppState.MessageAdded -= OnMessageAdded;
         return ValueTask.CompletedTask;
+    }
+
+    private async Task ShowConnectionFailedAsync()
+    {
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+        if (Application.Current?.MainPage is not null)
+        {
+            await MainThread.InvokeOnMainThreadAsync(() =>
+                Application.Current.MainPage.DisplayAlert(
+                    "连接失败",
+                    "无法连接到服务器，请检查服务器地址设置后重试。",
+                    "确定"));
+        }
+#endif
+        Nav.NavigateTo("/login");
     }
 }

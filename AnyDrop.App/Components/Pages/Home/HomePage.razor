@@ -29,14 +29,22 @@
                     </svg>
                 </button>
             }
-            <span class="font-semibold text-sm text-gray-700 dark:text-gray-300">
+            <span class="flex-1 font-semibold text-sm text-gray-700 dark:text-gray-300">
                 @(AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId)?.Name ?? "选择主题")
             </span>
+            @if (AppState.CurrentTopicId.HasValue)
+            {
+                <button @onclick="() => _messageList?.EnterBatchSelectionMode()"
+                        aria-label="进入选择模式"
+                        class="text-sm text-indigo-600 dark:text-indigo-400 font-medium active:opacity-70 transition-opacity px-1 py-0.5">
+                    选择
+                </button>
+            }
         </div>
 
         @if (AppState.CurrentTopicId.HasValue)
         {
-            <MessageList TopicId="AppState.CurrentTopicId.Value" />
+            <MessageList @ref="_messageList" TopicId="AppState.CurrentTopicId.Value" />
             <MessageInput TopicId="AppState.CurrentTopicId.Value" />
         }
         else
@@ -56,6 +64,7 @@
 
     private bool _showSidebar;
     private bool _isWide = false;
+    private MessageList? _messageList;
 
     protected override async Task OnInitializedAsync()
     {
