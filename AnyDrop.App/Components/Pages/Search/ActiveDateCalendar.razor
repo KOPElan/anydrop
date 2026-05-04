@@ -48,10 +48,10 @@
         // 加载最近两个月的有效日期（覆盖7天范围）
         var dates = await SearchService.GetActiveDatesAsync(TopicId, today.Year, today.Month);
         _activeDates = [.. dates];
-        if (today.Month != _recentDays.Last().Month)
+        var oldest = _recentDays[_recentDays.Count - 1];
+        if (today.Month != oldest.Month)
         {
-            var prevMonth = today.AddMonths(-1);
-            var prevDates = await SearchService.GetActiveDatesAsync(TopicId, prevMonth.Year, prevMonth.Month);
+            var prevDates = await SearchService.GetActiveDatesAsync(TopicId, oldest.Year, oldest.Month);
             foreach (var d in prevDates) _activeDates.Add(d);
         }
     }

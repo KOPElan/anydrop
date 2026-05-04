@@ -7,7 +7,7 @@
 @if (_selectionMode)
 {
     <div class="flex items-center gap-3 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-100 dark:border-indigo-800">
-        <button @onclick="CancelSelectionAsync"
+        <button @onclick="CancelSelection"
                 class="text-sm text-gray-500 dark:text-gray-400 active:opacity-70">取消</button>
         <span class="flex-1 text-sm text-gray-700 dark:text-gray-300 text-center">已选 @_selectedIds.Count 条</span>
         <button @onclick="DeleteSelectedAsync"
@@ -97,7 +97,8 @@
         var result = await ShareService.GetMessagesAsync(TopicId);
         AppState.Messages.Clear();
         // 服务端返回最新消息在前（降序），翻转后最新在底部
-        foreach (var m in result.Messages.Reverse()) AppState.Messages.Add(m);
+        for (int i = result.Messages.Count - 1; i >= 0; i--)
+            AppState.Messages.Add(result.Messages[i]);
         AppState.HasMoreMessages = result.HasMore;
         AppState.MessageCursor = result.NextCursor;
         AppState.NotifyStateChanged();
@@ -112,9 +113,9 @@
         var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
         var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
         // 服务端返回较旧消息（降序），翻转后按时间升序插入到列表头部
-        var ordered = newItems.AsEnumerable().Reverse().ToList();
-        for (int i = 0; i < ordered.Count; i++)
-            AppState.Messages.Insert(i, ordered[i]);
+        newItems.Reverse(); // List<T>.Reverse() in-place，无额外分配
+        for (int i = 0; i < newItems.Count; i++)
+            AppState.Messages.Insert(i, newItems[i]);
         AppState.HasMoreMessages = result.HasMore;
         AppState.MessageCursor = result.NextCursor;
         AppState.NotifyStateChanged();
@@ -174,7 +175,7 @@
         StateHasChanged();
     }
 
-    private void CancelSelectionAsync()
+    private void CancelSelection()
     {
         _selectionMode = false;
         _selectedIds.Clear();

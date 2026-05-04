@@ -9,6 +9,6 @@ public interface IShareService
     Task<TopicMessagesResponse> GetMessagesAsync(Guid topicId, string? before = null, int limit = 30);
     Task<ShareItemDto> SendTextAsync(CreateTextShareItemRequest request);
     Task<Stream> DownloadFileAsync(Guid id);
-    Task DeleteMessagesAsync(List<Guid> ids);
+    Task DeleteMessagesAsync(IReadOnlyList<Guid> ids);
 }
 

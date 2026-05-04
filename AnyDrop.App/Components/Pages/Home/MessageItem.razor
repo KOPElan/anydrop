@@ -138,11 +138,7 @@
         }
     }
 
-    private void NavigateToImagePreview()
-    {
-        if (_selectionMode) return;
-        Nav.NavigateTo($"/image-preview/{Item.Id}");
-    }
+    private void NavigateToImagePreview() => Nav.NavigateTo($"/image-preview/{Item.Id}");
 
     private string GetContainerClass()
     {
@@ -217,10 +213,10 @@
 #endif
     }
 
-    private void HandleContainerClick()
+    private async Task HandleContainerClick()
     {
         if (_selectionMode)
-            OnToggleSelect.InvokeAsync(Item.Id);
+            await OnToggleSelect.InvokeAsync(Item.Id);
     }
 
     private static string FormatSize(long? bytes) => bytes switch
