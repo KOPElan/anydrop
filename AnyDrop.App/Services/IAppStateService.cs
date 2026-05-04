@@ -13,5 +13,8 @@ public interface IAppStateService
     string? MessageCursor { get; set; }
     HubConnectionState SignalRState { get; set; }
     event Action? OnChange;
+    /// <summary>新消息添加时触发，订阅方可据此滚动到底部。</summary>
+    event Action? MessageAdded;
     void NotifyStateChanged();
+    void NotifyMessageAdded();
 }

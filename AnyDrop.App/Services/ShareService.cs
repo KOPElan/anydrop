@@ -39,5 +39,16 @@ public sealed class ShareService : IShareService
         var client = _httpClientFactory.CreateClient("api");
         return await client.GetStreamAsync($"api/v1/share-items/{id}/file?download=true").ConfigureAwait(false);
     }
+
+    public async Task DeleteMessagesAsync(List<Guid> ids)
+    {
+        var client = _httpClientFactory.CreateClient("api");
+        var request = new HttpRequestMessage(HttpMethod.Delete, "api/v1/share-items/batch")
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new BatchDeleteRequest(ids))
+        };
+        var response = await client.SendAsync(request).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
 }
 

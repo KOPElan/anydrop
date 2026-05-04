@@ -39,6 +39,19 @@
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
     }
 
+    .bubble-burn {
+        @apply rounded-2xl p-3.5 break-words;
+        background: linear-gradient(135deg, rgba(255, 218, 214, 0.7), rgba(255, 200, 192, 0.6));
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08);
+    }
+
+    .dark .bubble-burn {
+        background: linear-gradient(135deg, rgba(127, 29, 29, 0.35), rgba(153, 27, 27, 0.25));
+        border-color: rgba(239, 68, 68, 0.25);
+        box-shadow: 0 1px 3px rgba(239, 68, 68, 0.15);
+    }
+
     .bubble-text {
         @apply rounded-2xl p-3.5 break-words;
         background-color: #ffffff;

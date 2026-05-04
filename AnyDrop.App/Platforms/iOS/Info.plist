@@ -28,6 +28,14 @@
     </array>
     <key>XSAppIconAssets</key>
     <string>Assets.xcassets/appicon.appiconset</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- 允许连接私有网络 HTTP 服务端（自托管场景通常使用 HTTP） -->
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+        <key>NSAllowsArbitraryLoadsInWebContent</key>
+        <true/>
+    </dict>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>AnyDrop 需要访问相册以分享图片</string>
     <key>NSCameraUsageDescription</key>

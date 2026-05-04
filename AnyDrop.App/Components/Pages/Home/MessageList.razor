@@ -4,8 +4,22 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
+@if (_selectionMode)
+{
+    <div class="flex items-center gap-3 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-100 dark:border-indigo-800">
+        <button @onclick="CancelSelectionAsync"
+                class="text-sm text-gray-500 dark:text-gray-400 active:opacity-70">取消</button>
+        <span class="flex-1 text-sm text-gray-700 dark:text-gray-300 text-center">已选 @_selectedIds.Count 条</span>
+        <button @onclick="DeleteSelectedAsync"
+                disabled="@(_selectedIds.Count == 0 || _deleting)"
+                class="text-sm text-red-500 dark:text-red-400 font-medium disabled:opacity-40 active:opacity-70">
+            @(_deleting ? "删除中..." : "删除")
+        </button>
+    </div>
+}
+
 <div id="message-list-container"
-     class="flex-1 overflow-y-auto px-4 py-3 space-y-3 message-scroll">
+     class="flex-1 overflow-y-auto px-4 py-3 space-y-3 message-scroll touch-scroll">
     @if (AppState.HasMoreMessages)
     {
         <div class="text-center py-2">
@@ -28,13 +42,21 @@
     {
         @foreach (var msg in AppState.Messages)
         {
-            <MessageItem Item="msg" />
+            <MessageItem Item="msg"
+                         SelectionMode="_selectionMode"
+                         IsSelected="_selectedIds.Contains(msg.Id)"
+                         OnToggleSelect="ToggleSelect"
+                         OnEnterSelectionMode="EnterSelectionMode" />
         }
     }
     else
     {
         <Virtualize Items="@(AppState.Messages as ICollection<ShareItemDto> ?? AppState.Messages.ToList())" Context="msg">
-            <MessageItem Item="msg" />
+            <MessageItem Item="msg"
+                         SelectionMode="_selectionMode"
+                         IsSelected="_selectedIds.Contains(msg.Id)"
+                         OnToggleSelect="ToggleSelect"
+                         OnEnterSelectionMode="EnterSelectionMode" />
         </Virtualize>
     }
 </div>
@@ -44,22 +66,28 @@
 
     private bool _loading;
     private bool _loadingMore;
+    private bool _selectionMode;
+    private bool _deleting;
+    private readonly HashSet<Guid> _selectedIds = [];
+
+    private Guid _lastTopicId;
 
     protected override async Task OnParametersSetAsync()
     {
         if (TopicId != _lastTopicId)
         {
             _lastTopicId = TopicId;
+            _selectionMode = false;
+            _selectedIds.Clear();
             await LoadMessagesAsync();
         }
     }
-
-    private Guid _lastTopicId;
 
     protected override void OnInitialized()
     {
         SignalR.TopicsUpdated += OnTopicsUpdated;
         AppState.OnChange += StateHasChanged;
+        AppState.MessageAdded += OnMessageAdded;
     }
 
     private async Task LoadMessagesAsync()
@@ -68,7 +96,8 @@
         StateHasChanged();
         var result = await ShareService.GetMessagesAsync(TopicId);
         AppState.Messages.Clear();
-        foreach (var m in result.Messages) AppState.Messages.Add(m);
+        // 服务端返回最新消息在前（降序），翻转后最新在底部
+        foreach (var m in result.Messages.Reverse()) AppState.Messages.Add(m);
         AppState.HasMoreMessages = result.HasMore;
         AppState.MessageCursor = result.NextCursor;
         AppState.NotifyStateChanged();
@@ -82,8 +111,10 @@
         var result = await ShareService.GetMessagesAsync(TopicId, before: AppState.MessageCursor);
         var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
         var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
-        for (int i = 0; i < newItems.Count; i++)
-            AppState.Messages.Insert(i, newItems[i]);
+        // 服务端返回较旧消息（降序），翻转后按时间升序插入到列表头部
+        var ordered = newItems.AsEnumerable().Reverse().ToList();
+        for (int i = 0; i < ordered.Count; i++)
+            AppState.Messages.Insert(i, ordered[i]);
         AppState.HasMoreMessages = result.HasMore;
         AppState.MessageCursor = result.NextCursor;
         AppState.NotifyStateChanged();
@@ -98,11 +129,24 @@
             {
                 var result = await ShareService.GetMessagesAsync(TopicId);
                 var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
-                var newItems = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
+                // 服务端返回最新在前，找出新消息后按时间升序追加到末尾
+                var newItems = result.Messages
+                    .Where(m => !existingIds.Contains(m.Id))
+                    .Reverse()
+                    .ToList();
                 foreach (var item in newItems) AppState.Messages.Add(item);
                 AppState.NotifyStateChanged();
                 await ScrollToBottomAsync();
             });
+    }
+
+    private void OnMessageAdded()
+    {
+        InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await ScrollToBottomAsync();
+        });
     }
 
     private async Task ScrollToBottomAsync()
@@ -114,10 +158,56 @@
         catch { /* ignore */ }
     }
 
+    private void EnterSelectionMode(Guid id)
+    {
+        _selectionMode = true;
+        _selectedIds.Add(id);
+        StateHasChanged();
+    }
+
+    private void ToggleSelect(Guid id)
+    {
+        if (_selectedIds.Contains(id))
+            _selectedIds.Remove(id);
+        else
+            _selectedIds.Add(id);
+        StateHasChanged();
+    }
+
+    private void CancelSelectionAsync()
+    {
+        _selectionMode = false;
+        _selectedIds.Clear();
+        StateHasChanged();
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (_selectedIds.Count == 0) return;
+        _deleting = true;
+        StateHasChanged();
+        try
+        {
+            await ShareService.DeleteMessagesAsync([.. _selectedIds]);
+            // 从本地列表移除已删除的消息
+            var removed = AppState.Messages.Where(m => _selectedIds.Contains(m.Id)).ToList();
+            foreach (var m in removed) AppState.Messages.Remove(m);
+            _selectedIds.Clear();
+            _selectionMode = false;
+            AppState.NotifyStateChanged();
+        }
+        catch { /* ignore */ }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
     public ValueTask DisposeAsync()
     {
         SignalR.TopicsUpdated -= OnTopicsUpdated;
         AppState.OnChange -= StateHasChanged;
+        AppState.MessageAdded -= OnMessageAdded;
         return ValueTask.CompletedTask;
     }
 }
