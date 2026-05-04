@@ -186,7 +186,7 @@
             {
                 await stream.CopyToAsync(fs);
             }
-            await Share.RequestAsync(new ShareFileRequest
+            await Microsoft.Maui.ApplicationModel.DataTransfer.Share.RequestAsync(new ShareFileRequest
             {
                 Title = fileName,
                 File = new ShareFile(filePath)
