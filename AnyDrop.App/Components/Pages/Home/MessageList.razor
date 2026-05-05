@@ -47,7 +47,8 @@
                          SelectionMode="_selectionMode"
                          IsSelected="_selectedIds.Contains(msg.Id)"
                          OnToggleSelect="ToggleSelect"
-                         OnEnterSelectionMode="EnterSelectionMode" />
+                         OnEnterSelectionMode="EnterSelectionMode"
+                         OnDelete="DeleteSingleAsync" />
         }
     }
     else
@@ -57,7 +58,8 @@
                          SelectionMode="_selectionMode"
                          IsSelected="_selectedIds.Contains(msg.Id)"
                          OnToggleSelect="ToggleSelect"
-                         OnEnterSelectionMode="EnterSelectionMode" />
+                         OnEnterSelectionMode="EnterSelectionMode"
+                         OnDelete="DeleteSingleAsync" />
         </Virtualize>
     }
 </div>
@@ -203,6 +205,24 @@
         else
             _selectedIds.Add(id);
         StateHasChanged();
+    }
+
+    private async Task DeleteSingleAsync(Guid id)
+    {
+        try
+        {
+            await ShareService.DeleteMessagesAsync([id]);
+            var msg = AppState.Messages.FirstOrDefault(m => m.Id == id);
+            if (msg is not null)
+            {
+                AppState.Messages.Remove(msg);
+                AppState.NotifyStateChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageList] 删除消息失败: {ex.Message}");
+        }
     }
 
     private void CancelSelection()

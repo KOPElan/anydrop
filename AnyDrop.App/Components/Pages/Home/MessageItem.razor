@@ -2,9 +2,48 @@
 @inject ISecureTokenStorage TokenStorage
 @inject IShareService ShareService
 @inject NavigationManager Nav
+@implements IDisposable
+
+<!-- 长按操作菜单遮罩 -->
+@if (_showContextMenu)
+{
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+         @onclick="CloseContextMenu">
+        <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-t-2xl pb-6 pt-3 shadow-2xl"
+             @onclick:stopPropagation="true">
+            <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4"></div>
+            @if (Item.ContentType == ShareContentType.Image)
+            {
+                <button @onclick="SaveImageAsync"
+                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    <span>保存图片</span>
+                </button>
+            }
+            <button @onclick="OnDeleteItem"
+                    class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-red-600 dark:text-red-400 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+                <span>删除</span>
+            </button>
+            <button @onclick="CloseContextMenu"
+                    class="flex items-center justify-center w-full px-5 py-3 mt-1 text-gray-500 dark:text-gray-400 font-medium active:bg-gray-50 dark:active:bg-gray-700 transition-colors border-t border-gray-100 dark:border-gray-700">
+                取消
+            </button>
+        </div>
+    </div>
+}
 
 <div class="flex items-start gap-2 @(_selectionMode ? "cursor-pointer" : "")"
-     @onclick="HandleContainerClick">
+     @onclick="HandleContainerClick"
+     @onpointerdown="OnPointerDown"
+     @onpointerup="OnPointerUp"
+     @onpointercancel="OnPointerCancel"
+     @oncontextmenu="OnContextMenu"
+     @oncontextmenu:preventDefault="true">
     @if (_selectionMode)
     {
         <div class="flex-shrink-0 mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
@@ -41,6 +80,26 @@
                         </div>
                     }
                 </div>
+                @if (!string.IsNullOrEmpty(_fileUrl))
+                {
+                    <button @onclick="SaveFileAsync" @onclick:stopPropagation="true"
+                            disabled="@_saving"
+                            class="flex items-center gap-1.5 mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium disabled:opacity-40 active:opacity-60 transition-opacity">
+                        @if (_saving)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                        }
+                        <span>@(_saving ? "保存中..." : "保存图片")</span>
+                    </button>
+                }
                 break;
 
             case ShareContentType.Video:
@@ -124,10 +183,20 @@
     [Parameter] public bool IsSelected { get; set; }
     [Parameter] public EventCallback<Guid> OnToggleSelect { get; set; }
     [Parameter] public EventCallback<Guid> OnEnterSelectionMode { get; set; }
+    [Parameter] public EventCallback<Guid> OnDelete { get; set; }
 
     private string _fileUrl = string.Empty;
     private bool _saving;
+    private bool _showContextMenu;
     private bool _selectionMode => SelectionMode;
+    private System.Threading.Timer? _longPressTimer;
+    private const int LongPressMs = 600;
+
+    private void CancelLongPress()
+    {
+        _longPressTimer?.Dispose();
+        _longPressTimer = null;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -217,6 +286,61 @@
     {
         if (_selectionMode)
             await OnToggleSelect.InvokeAsync(Item.Id);
+    }
+
+    private void OnPointerDown(PointerEventArgs e)
+    {
+        if (_selectionMode) return;
+        CancelLongPress();
+        _longPressTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(ShowContextMenuSafe);
+        }, null, LongPressMs, System.Threading.Timeout.Infinite);
+    }
+
+    private void OnPointerUp(PointerEventArgs e) => CancelLongPress();
+
+    private void OnPointerCancel(PointerEventArgs e) => CancelLongPress();
+
+    private async Task ShowContextMenuSafe()
+    {
+        try
+        {
+            _showContextMenu = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageItem] 显示上下文菜单失败: {ex.Message}");
+        }
+    }
+
+    private void OnContextMenu(MouseEventArgs e)
+    {
+        if (!_selectionMode)
+            _showContextMenu = true;
+    }
+
+    private void CloseContextMenu()
+    {
+        _showContextMenu = false;
+    }
+
+    private async Task OnDeleteItem()
+    {
+        _showContextMenu = false;
+        await OnDelete.InvokeAsync(Item.Id);
+    }
+
+    private async Task SaveImageAsync()
+    {
+        _showContextMenu = false;
+        await SaveFileAsync();
+    }
+
+    public void Dispose()
+    {
+        CancelLongPress();
     }
 
     private static string FormatSize(long? bytes) => bytes switch
