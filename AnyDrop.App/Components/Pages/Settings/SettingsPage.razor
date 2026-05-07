@@ -84,8 +84,16 @@
 
         try
         {
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+            // 从 Preferences 读取以确保 MAUI 端状态一致
+            var savedTheme = Preferences.Get("anydrop_theme", "light");
+            _isDark = string.Equals(savedTheme, "dark", StringComparison.OrdinalIgnoreCase);
+            // 同步 JS 端 CSS 类，确保 WebView 也应用正确主题
+            await JS.InvokeVoidAsync("ThemeManager.setTheme", _isDark ? "dark" : "light");
+#else
             var savedTheme = await JS.InvokeAsync<string?>("ThemeManager.getTheme");
             _isDark = string.Equals(savedTheme, "dark", StringComparison.OrdinalIgnoreCase);
+#endif
         }
         catch
         {

@@ -18,6 +18,16 @@ namespace AnyDrop.App
 
             builder.Services.AddMauiBlazorWebView();
 
+#if ANDROID
+            // 允许 BlazorWebView 加载 HTTP 资源（混合内容），自托管服务器通常使用 HTTP
+            Microsoft.AspNetCore.Components.WebView.Maui.BlazorWebViewHandler.BlazorWebViewMapper.AppendToMapping(
+                "AllowMixedContent",
+                (handler, view) =>
+                {
+                    handler.PlatformView.Settings.MixedContentMode = Android.Webkit.MixedContentHandling.AlwaysAllow;
+                });
+#endif
+
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
             builder.Logging.AddDebug();

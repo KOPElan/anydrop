@@ -14,6 +14,12 @@ public sealed class AppStateService : IAppStateService
     public HubConnectionState SignalRState { get; set; } = HubConnectionState.Disconnected;
 
     public event Action? OnChange;
+    public event Action? MessageAdded;
 
     public void NotifyStateChanged() => OnChange?.Invoke();
+    public void NotifyMessageAdded()
+    {
+        OnChange?.Invoke();
+        MessageAdded?.Invoke();
+    }
 }

@@ -1,149 +1,275 @@
 @inject IServerConfigService ServerConfig
 @inject ISecureTokenStorage TokenStorage
+@inject IShareService ShareService
 @inject NavigationManager Nav
+@implements IDisposable
 
-<div class="@GetContainerClass() max-w-xs">
-    @switch (Item.ContentType)
-    {
-        case ShareContentType.Text:
-            <pre class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap font-sans leading-relaxed">@Item.Content</pre>
-            break;
-
-        case ShareContentType.Image:
-              <img src="@_fileUrl" alt="image"
-                 class="rounded-xl max-w-full cursor-pointer active:opacity-80 transition-opacity"
-                 @onclick="NavigateToImagePreview" />
-            break;
-
-        case ShareContentType.Video:
-            <div class="relative cursor-pointer active:opacity-80 transition-opacity" @onclick="OpenVideoAsync">
-                <div class="bg-gray-100 dark:bg-gray-700 rounded-xl h-32 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 dark:text-gray-500" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M8 5v14l11-7z" />
-                    </svg>
-                </div>
-                @if (Item.FileName is not null)
-                {
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 truncate px-1">@Item.FileName</p>
-                }
-            </div>
-            break;
-
-        case ShareContentType.File:
-            <div class="flex items-center gap-3">
-                <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center">
+<!-- 长按操作菜单遮罩 -->
+@if (_showContextMenu)
+{
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+         @onclick="CloseContextMenu">
+        <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-t-2xl pb-6 pt-3 shadow-2xl"
+             @onclick:stopPropagation="true">
+            <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4"></div>
+            @if (Item.ContentType == ShareContentType.Image)
+            {
+                <button @onclick="SaveImageAsync"
+                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                    </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate text-gray-800 dark:text-gray-100">@Item.FileName</p>
-                    <p class="text-xs text-gray-400 dark:text-gray-500">@FormatSize(Item.FileSize)</p>
-                </div>
-                <button @onclick="DownloadAsync" class="w-8 h-8 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 active:bg-indigo-50 dark:active:bg-indigo-900/20 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
+                    <span>保存图片</span>
                 </button>
-            </div>
-            break;
+            }
+            <button @onclick="OnDeleteItem"
+                    class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-red-600 dark:text-red-400 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+                <span>删除</span>
+            </button>
+            <button @onclick="CloseContextMenu"
+                    class="flex items-center justify-center w-full px-5 py-3 mt-1 text-gray-500 dark:text-gray-400 font-medium active:bg-gray-50 dark:active:bg-gray-700 transition-colors border-t border-gray-100 dark:border-gray-700">
+                取消
+            </button>
+        </div>
+    </div>
+}
 
-        case ShareContentType.Link:
-            <div class="space-y-1.5 cursor-pointer active:opacity-70 transition-opacity" @onclick="OpenLinkAsync">
-                @if (Item.LinkTitle is not null)
-                {
-                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">@Item.LinkTitle</p>
-                }
-                @if (Item.LinkDescription is not null)
-                {
-                    <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">@Item.LinkDescription</p>
-                }
-                <p class="text-xs text-indigo-600 dark:text-indigo-400 truncate">@Item.Content</p>
-            </div>
-            break;
+<div class="flex items-start gap-2 @(_selectionMode ? "cursor-pointer" : "")"
+     @onclick="HandleContainerClick"
+     @onpointerdown="OnPointerDown"
+     @onpointerup="OnPointerUp"
+     @onpointercancel="OnPointerCancel"
+     @oncontextmenu="OnContextMenu"
+     @oncontextmenu:preventDefault="true">
+    @if (_selectionMode)
+    {
+        <div class="flex-shrink-0 mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
+                    @(IsSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 dark:border-gray-600")">
+            @if (IsSelected)
+            {
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            }
+        </div>
     }
-    <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-right">@Item.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
+
+    <div class="@GetContainerClass() max-w-xs flex-1">
+        @switch (Item.ContentType)
+        {
+            case ShareContentType.Text:
+                <pre class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap font-sans leading-relaxed">@Item.Content</pre>
+                break;
+
+            case ShareContentType.Image:
+                <div class="cursor-pointer active:opacity-80 transition-opacity" @onclick:stopPropagation="true" @onclick="NavigateToImagePreview">
+                    @if (!string.IsNullOrEmpty(_fileUrl))
+                    {
+                        <img src="@_fileUrl" alt="image"
+                             class="rounded-xl max-w-full min-h-16 bg-gray-100 dark:bg-gray-700" />
+                    }
+                    else
+                    {
+                        <div class="rounded-xl h-24 w-40 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                            </svg>
+                        </div>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(_fileUrl))
+                {
+                    <button @onclick="SaveFileAsync" @onclick:stopPropagation="true"
+                            disabled="@_saving"
+                            class="flex items-center gap-1.5 mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium disabled:opacity-40 active:opacity-60 transition-opacity">
+                        @if (_saving)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                        }
+                        <span>@(_saving ? "保存中..." : "保存图片")</span>
+                    </button>
+                }
+                break;
+
+            case ShareContentType.Video:
+                <div class="@(_selectionMode ? "" : "cursor-pointer")" @onclick:stopPropagation="true">
+                    @if (!string.IsNullOrEmpty(_fileUrl))
+                    {
+                        <video src="@_fileUrl"
+                               controls
+                               playsinline
+                               preload="metadata"
+                               class="rounded-xl max-w-full max-h-56"
+                               @onclick:stopPropagation="true">
+                        </video>
+                    }
+                    else
+                    {
+                        <div class="bg-gray-100 dark:bg-gray-700 rounded-xl h-32 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 dark:text-gray-500" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        </div>
+                    }
+                    @if (Item.FileName is not null)
+                    {
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 truncate px-1">@Item.FileName</p>
+                    }
+                </div>
+                break;
+
+            case ShareContentType.File:
+                <div class="flex items-center gap-3">
+                    <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate text-gray-800 dark:text-gray-100">@Item.FileName</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500">@FormatSize(Item.FileSize)</p>
+                    </div>
+                    <button @onclick="SaveFileAsync" @onclick:stopPropagation="true"
+                            disabled="@_saving"
+                            class="w-8 h-8 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 active:bg-indigo-50 dark:active:bg-indigo-900/20 transition-colors disabled:opacity-40">
+                        @if (_saving)
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                        }
+                    </button>
+                </div>
+                break;
+
+            case ShareContentType.Link:
+                <div class="space-y-1.5 cursor-pointer active:opacity-70 transition-opacity" @onclick:stopPropagation="true" @onclick="OpenLinkAsync">
+                    @if (Item.LinkTitle is not null)
+                    {
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">@Item.LinkTitle</p>
+                    }
+                    @if (Item.LinkDescription is not null)
+                    {
+                        <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">@Item.LinkDescription</p>
+                    }
+                    <p class="text-xs text-indigo-600 dark:text-indigo-400 truncate">@Item.Content</p>
+                </div>
+                break;
+        }
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-right">@Item.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public ShareItemDto Item { get; set; } = null!;
+    [Parameter] public bool SelectionMode { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public EventCallback<Guid> OnToggleSelect { get; set; }
+    [Parameter] public EventCallback<Guid> OnEnterSelectionMode { get; set; }
+    [Parameter] public EventCallback<Guid> OnDelete { get; set; }
 
     private string _fileUrl = string.Empty;
-    private string _downloadUrl = string.Empty;
+    private bool _saving;
+    private bool _showContextMenu;
+    private bool _selectionMode => SelectionMode;
+    private System.Threading.Timer? _longPressTimer;
+    private const int LongPressMs = 600;
+
+    private void CancelLongPress()
+    {
+        _longPressTimer?.Dispose();
+        _longPressTimer = null;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
-        _fileUrl = await BuildFileUrlAsync(download: false).ConfigureAwait(false);
-        _downloadUrl = await BuildFileUrlAsync(download: true).ConfigureAwait(false);
+        if (Item.ContentType is ShareContentType.Image or ShareContentType.Video)
+        {
+            _fileUrl = await BuildFileUrlAsync(download: false);
+            StateHasChanged();
+        }
     }
 
     private void NavigateToImagePreview() => Nav.NavigateTo($"/image-preview/{Item.Id}");
 
-    private string GetContainerClass() => Item.ContentType switch
+    private string GetContainerClass()
     {
-        ShareContentType.Text => "bubble-text",
-        ShareContentType.Link => "bubble-link",
-        _ => "bubble-text"
-    };
+        if (Item.ExpiresAt.HasValue)
+            return "bubble-burn";
+        return Item.ContentType switch
+        {
+            ShareContentType.Link => "bubble-link",
+            _ => "bubble-text"
+        };
+    }
 
     private async Task<string> BuildFileUrlAsync(bool download)
     {
         var baseUrl = ServerConfig.GetBaseUrl();
         if (string.IsNullOrWhiteSpace(baseUrl))
-        {
             return string.Empty;
-        }
 
         var token = await TokenStorage.GetTokenAsync().ConfigureAwait(false);
         var queryParts = new List<string>();
 
         if (download)
-        {
             queryParts.Add("download=true");
-        }
 
         if (!string.IsNullOrWhiteSpace(token))
-        {
             queryParts.Add($"access_token={Uri.EscapeDataString(token)}");
-        }
 
         var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : string.Empty;
         return $"{baseUrl}/api/v1/share-items/{Item.Id}/file{query}";
     }
 
-    private async Task DownloadAsync()
+    private async Task SaveFileAsync()
     {
-        if (string.IsNullOrWhiteSpace(_downloadUrl))
-        {
-            return;
-        }
-
+        if (_saving) return;
+        _saving = true;
+        StateHasChanged();
         try
         {
+            var stream = await ShareService.DownloadFileAsync(Item.Id);
+            var fileName = Item.FileName ?? "download.bin";
 #if ANDROID || IOS || MACCATALYST || WINDOWS
-            await Launcher.OpenAsync(new Uri(_downloadUrl));
+            var cacheDir = FileSystem.CacheDirectory;
+            var filePath = Path.Combine(cacheDir, fileName);
+            using (var fs = File.OpenWrite(filePath))
+            {
+                await stream.CopyToAsync(fs);
+            }
+            await Microsoft.Maui.ApplicationModel.DataTransfer.Share.RequestAsync(new ShareFileRequest
+            {
+                Title = fileName,
+                File = new ShareFile(filePath)
+            });
 #else
             await Task.CompletedTask;
 #endif
         }
-        catch
+        catch { /* ignore */ }
+        finally
         {
-            // ignore
+            _saving = false;
+            StateHasChanged();
         }
-    }
-
-    private async Task OpenVideoAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_fileUrl))
-        {
-            return;
-        }
-
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-        await Launcher.OpenAsync(new Uri(_fileUrl));
-#else
-        await Task.CompletedTask;
-#endif
     }
 
     private async Task OpenLinkAsync()
@@ -154,6 +280,67 @@
 #else
         await Task.CompletedTask;
 #endif
+    }
+
+    private async Task HandleContainerClick()
+    {
+        if (_selectionMode)
+            await OnToggleSelect.InvokeAsync(Item.Id);
+    }
+
+    private void OnPointerDown(PointerEventArgs e)
+    {
+        if (_selectionMode) return;
+        CancelLongPress();
+        _longPressTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(ShowContextMenuSafe);
+        }, null, LongPressMs, System.Threading.Timeout.Infinite);
+    }
+
+    private void OnPointerUp(PointerEventArgs e) => CancelLongPress();
+
+    private void OnPointerCancel(PointerEventArgs e) => CancelLongPress();
+
+    private async Task ShowContextMenuSafe()
+    {
+        try
+        {
+            _showContextMenu = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageItem] 显示上下文菜单失败: {ex.Message}");
+        }
+    }
+
+    private void OnContextMenu(MouseEventArgs e)
+    {
+        if (!_selectionMode)
+            _showContextMenu = true;
+    }
+
+    private void CloseContextMenu()
+    {
+        _showContextMenu = false;
+    }
+
+    private async Task OnDeleteItem()
+    {
+        _showContextMenu = false;
+        await OnDelete.InvokeAsync(Item.Id);
+    }
+
+    private async Task SaveImageAsync()
+    {
+        _showContextMenu = false;
+        await SaveFileAsync();
+    }
+
+    public void Dispose()
+    {
+        CancelLongPress();
     }
 
     private static string FormatSize(long? bytes) => bytes switch

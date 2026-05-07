@@ -49,6 +49,7 @@
 @code {
     private bool _showOfflineBanner;
     private bool _signalRDisconnected;
+    private bool _hasEverConnected;
 
     protected override void OnInitialized()
     {
@@ -56,7 +57,13 @@
         EventBus.ConnectivityChanged += OnConnectivityChanged;
         SignalR.StateChanged += OnSignalRStateChanged;
         _showOfflineBanner = !Connectivity.IsOnline;
-        _signalRDisconnected = SignalR.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected;
+        // 仅当已有过成功连接后才显示断开横幅，避免初始化时误报
+        var currentState = SignalR.State;
+        if (currentState == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        {
+            _hasEverConnected = true;
+        }
+        _signalRDisconnected = false;
     }
 
     private void OnAuthExpired()
@@ -80,7 +87,12 @@
     {
         InvokeAsync(() =>
         {
-            _signalRDisconnected = state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected;
+            if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+                _hasEverConnected = true;
+
+            // 只有首次连接成功后才显示断开/重连横幅，避免初始状态误报
+            _signalRDisconnected = _hasEverConnected &&
+                state != Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected;
             StateHasChanged();
         });
     }
