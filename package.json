@@ -21,5 +21,8 @@
   "homepage": "https://github.com/KOPElan/anydrop#readme",
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.2"
+  },
+  "dependencies": {
+    "tailwindcss": "^4.2.4"
   }
 }
