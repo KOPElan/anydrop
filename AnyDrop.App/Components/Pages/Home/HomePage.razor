@@ -32,7 +32,7 @@
             }
             <div class="flex-1 flex flex-col leading-tight">
                 <span class="font-bold text-lg text-white leading-tight">
-                    @(AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId)?.Name ?? "选择主题")
+                    @(_currentTopic?.Name ?? "选择主题")
                 </span>
                 <span class="text-xs text-white/60">存储会话</span>
             </div>
@@ -50,16 +50,12 @@
             </button>
         </div>
 
-        @if (_showTopicMenu && AppState.CurrentTopicId.HasValue)
+        @if (_showTopicMenu && _currentTopic is not null)
         {
-            var currentTopic = AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId.Value);
-            if (currentTopic is not null)
-            {
-                <TopicActionMenu Topic="currentTopic"
-                                 OnClose="() => _showTopicMenu = false"
-                                 OnTopicChanged="LoadTopicsAsync"
-                                 OnEnterSelectionMode="EnterSelectionModeFromMenu" />
-            }
+            <TopicActionMenu Topic="_currentTopic"
+                             OnClose="() => _showTopicMenu = false"
+                             OnTopicChanged="LoadTopicsAsync"
+                             OnEnterSelectionMode="EnterSelectionModeFromMenu" />
         }
 
         @if (AppState.CurrentTopicId.HasValue)
@@ -86,6 +82,9 @@
     private bool _isWide = false;
     private bool _showTopicMenu;
     private MessageList? _messageList;
+
+    private TopicDto? _currentTopic =>
+        AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId);
 
     protected override async Task OnInitializedAsync()
     {
