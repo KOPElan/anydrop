@@ -181,10 +181,6 @@
                     </div>
                     break;
             }
-            @if (Item.ContentType != ShareContentType.Image)
-            {
-                <p class="text-xs @GetTimestampColorClass() mt-2 text-right">@Item.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
-            }
         </div>
     </div>
     <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-1 flex items-center gap-1">

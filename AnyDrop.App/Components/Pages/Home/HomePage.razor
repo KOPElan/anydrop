@@ -14,14 +14,14 @@
             {
                 <div class="fixed inset-0 bg-black/50" @onclick="() => _showSidebar = false"></div>
             }
-            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full bg-white dark:bg-gray-800 shadow-xl") overflow-y-auto touch-scroll">
+            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full bg-white dark:bg-gray-800 shadow-xl") overflow-y-auto touch-scroll glass">
                 <TopicSidebar OnTopicSelected="OnTopicSelected" />
             </div>
         </div>
     }
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex items-center gap-3 px-4 py-3 header-blue-glass">
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+        <div class="flex items-center gap-3 px-4 py-3 glass absolute w-full">
             @if (!_isWide)
             {
                 <button @onclick="() => _showSidebar = true" class="w-9 h-9 rounded-full flex items-center justify-center text-white/80 active:bg-white/10 transition-colors">
@@ -33,8 +33,7 @@
             <div class="flex-1 flex flex-col leading-tight">
                 <span class="font-bold text-lg text-white leading-tight">
                     @(_currentTopic?.Name ?? "选择主题")
-                </span>
-                <span class="text-xs text-white/60">存储会话</span>
+                </span>                
             </div>
             <button aria-label="搜索" class="w-9 h-9 rounded-full flex items-center justify-center text-white/80 active:bg-white/10 transition-colors"
                     @onclick='() => Nav.NavigateTo("/search")'>

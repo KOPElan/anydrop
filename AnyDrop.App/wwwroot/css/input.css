@@ -170,7 +170,7 @@
         backdrop-filter: blur(20px);
     }
     .header-blue-glass {
-        background: rgba(43, 110, 245, 0.88);
+        background: rgb(255, 255, 255, 0.88);
         -webkit-backdrop-filter: blur(16px);
         backdrop-filter: blur(16px);
     }
