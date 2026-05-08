@@ -14,7 +14,7 @@
             {
                 <div class="fixed inset-0 bg-black/50" @onclick="() => _showSidebar = false"></div>
             }
-            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full bg-white dark:bg-gray-800 shadow-xl") overflow-y-auto touch-scroll glass">
+            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full bg-white dark:bg-gray-800 shadow-xl") overflow-y-auto touch-scroll">
                 <TopicSidebar OnTopicSelected="OnTopicSelected" />
             </div>
         </div>
@@ -48,6 +48,9 @@
                 </svg>
             </button>
         </div>
+
+        <!-- 标题栏占位：为 absolute 标题栏留出空间，防止内容（含选择工具栏）与之重叠 -->
+        <div class="flex-shrink-0 h-[60px]"></div>
 
         @if (_showTopicMenu && _currentTopic is not null)
         {
