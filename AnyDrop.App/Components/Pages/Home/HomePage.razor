@@ -14,8 +14,15 @@
             {
                 <div class="fixed inset-0 bg-black/50" @onclick="() => _showSidebar = false"></div>
             }
-            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full bg-white dark:bg-gray-800 shadow-xl")">
-                <TopicSidebar OnTopicSelected="OnTopicSelected" />
+            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full shadow-xl")">
+                @* 毛玻璃背景层：独立 div，不含固定定位（fixed）子元素；背景模糊（backdrop-filter）不会为兄弟节点中的 fixed 弹窗创建新的包含块（containing block） *@
+                @if (!_isWide)
+                {
+                    <div class="absolute inset-0 glass pointer-events-none" aria-hidden="true"></div>
+                }
+                <div class="relative h-full z-10">
+                    <TopicSidebar OnTopicSelected="OnTopicSelected" />
+                </div>
             </div>
         </div>
     }
