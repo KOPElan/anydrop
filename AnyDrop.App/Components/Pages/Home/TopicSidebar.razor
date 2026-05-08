@@ -51,25 +51,6 @@
             }
         }
     </div>
-
-    @if (_showCreateDialog)
-    {
-        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" @onclick="() => _showCreateDialog = false">
-            <div class="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-6 space-y-4 shadow-2xl" @onclick:stopPropagation="true">
-                <h3 class="font-semibold text-gray-800 dark:text-gray-100">新建主题</h3>
-                <input @bind="_newTopicName" type="text" placeholder="主题名称" class="input-base" />
-                <div class="flex gap-3">
-                    <button @onclick="() => _showCreateDialog = false" class="btn-secondary">取消</button>
-                    <button @onclick="CreateTopicAsync" class="btn-primary">创建</button>
-                </div>
-            </div>
-        </div>
-    }
-
-    @if (_actionMenuTopic is not null)
-    {
-        <TopicActionMenu Topic="_actionMenuTopic" OnClose="() => _actionMenuTopic = null" OnTopicChanged="LoadTopicsAsync" />
-    }
     </div>
 
     <!-- 底部设置入口 -->
@@ -84,6 +65,25 @@
         </button>
     </div>
 </div>
+
+@if (_showCreateDialog)
+{
+    <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" @onclick="() => _showCreateDialog = false">
+        <div class="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-6 space-y-4 shadow-2xl" @onclick:stopPropagation="true">
+            <h3 class="font-semibold text-gray-800 dark:text-gray-100">新建主题</h3>
+            <input @bind="_newTopicName" type="text" placeholder="主题名称" class="input-base" />
+            <div class="flex gap-3">
+                <button @onclick="() => _showCreateDialog = false" class="btn-secondary">取消</button>
+                <button @onclick="CreateTopicAsync" class="btn-primary">创建</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_actionMenuTopic is not null)
+{
+    <TopicActionMenu Topic="_actionMenuTopic" OnClose="() => _actionMenuTopic = null" OnTopicChanged="LoadTopicsAsync" />
+}
 
 @code {
     [Parameter] public EventCallback<Guid> OnTopicSelected { get; set; }
