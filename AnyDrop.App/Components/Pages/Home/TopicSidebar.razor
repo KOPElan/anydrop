@@ -82,7 +82,7 @@
 
 @if (_actionMenuTopic is not null)
 {
-    <TopicActionMenu Topic="_actionMenuTopic" OnClose="() => _actionMenuTopic = null" OnTopicChanged="LoadTopicsAsync" />
+    <TopicActionMenu Topic="@_actionMenuTopic" OnClose="() => _actionMenuTopic = null" OnTopicChanged="LoadTopicsAsync" />
 }
 
 @code {
