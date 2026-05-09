@@ -5,11 +5,13 @@
 @inject NavigationManager Nav
 @implements IAsyncDisposable
 
-<div class="flex-1 flex flex-col min-h-0">
+<div class="flex-1 flex flex-col min-h-0 relative">
 
 @if (_selectionMode)
 {
-    <div class="flex items-center gap-3 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-100 dark:border-indigo-800 flex-shrink-0">
+    <div class="absolute top-0 left-0 right-0 z-30 flex items-center gap-3 px-4 py-2.5
+                bg-indigo-50/90 dark:bg-indigo-900/80 backdrop-blur-sm
+                border-b border-indigo-100 dark:border-indigo-800">
         <button @onclick="CancelSelection"
                 class="text-sm text-gray-500 dark:text-gray-400 active:opacity-70">取消</button>
         <span class="flex-1 text-sm text-gray-700 dark:text-gray-300 text-center">已选 @_selectedIds.Count 条</span>
@@ -40,7 +42,7 @@
             暂无消息，发送第一条吧 👋
         </div>
     }
-    <div class="h-12"></div>
+    <div class="@(_selectionMode ? "h-24" : "h-12")"></div>
     @if (AppState.Messages.Count <= 200)
     {
         @foreach (var msg in AppState.Messages)
@@ -94,6 +96,8 @@
     protected override void OnInitialized()
     {
         SignalR.TopicsUpdated += OnTopicsUpdated;
+        SignalR.ShareItemReceived += OnShareItemReceived;
+        SignalR.ShareItemsDeleted += OnShareItemsDeleted;
         AppState.OnChange += StateHasChanged;
         AppState.MessageAdded += OnMessageAdded;
     }
@@ -154,21 +158,34 @@
 
     private void OnTopicsUpdated(IReadOnlyList<TopicDto> topics)
     {
-        var current = topics.FirstOrDefault(t => t.Id == TopicId);
-        if (current is not null && current.MessageCount > AppState.Messages.Count)
-            InvokeAsync(async () =>
-            {
-                var result = await ShareService.GetMessagesAsync(TopicId);
-                var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
-                // 服务端返回最新在前，找出新消息后按时间升序追加到末尾
-                var newItems = result.Messages
-                    .Where(m => !existingIds.Contains(m.Id))
-                    .Reverse()
-                    .ToList();
-                foreach (var item in newItems) AppState.Messages.Add(item);
-                AppState.NotifyStateChanged();
-                await ScrollToBottomAsync();
-            });
+        // Real-time messages arrive via ShareItemReceived; TopicsUpdated is kept subscribed
+        // so the sidebar topic list (managed elsewhere) stays up to date.
+    }
+
+    private void OnShareItemReceived(ShareItemDto item)
+    {
+        if (item.TopicId != TopicId) return;
+        InvokeAsync(async () =>
+        {
+            if (AppState.Messages.Any(m => m.Id == item.Id)) return;
+            AppState.Messages.Add(item);
+            AppState.NotifyStateChanged();
+            await ScrollToBottomAsync();
+        });
+    }
+
+    private void OnShareItemsDeleted(IReadOnlyList<Guid> ids)
+    {
+        InvokeAsync(() =>
+        {
+            var idSet = ids.ToHashSet();
+            var removed = AppState.Messages.Where(m => idSet.Contains(m.Id)).ToList();
+            if (removed.Count == 0) return;
+            foreach (var m in removed) AppState.Messages.Remove(m);
+            _selectedIds.ExceptWith(idSet);
+            if (_selectedIds.Count == 0 && _selectionMode) _selectionMode = false;
+            AppState.NotifyStateChanged();
+        });
     }
 
     private void OnMessageAdded()
@@ -262,6 +279,8 @@
     public ValueTask DisposeAsync()
     {
         SignalR.TopicsUpdated -= OnTopicsUpdated;
+        SignalR.ShareItemReceived -= OnShareItemReceived;
+        SignalR.ShareItemsDeleted -= OnShareItemsDeleted;
         AppState.OnChange -= StateHasChanged;
         AppState.MessageAdded -= OnMessageAdded;
         return ValueTask.CompletedTask;

@@ -12,6 +12,16 @@
         <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-t-2xl pb-6 pt-3 shadow-2xl"
              @onclick:stopPropagation="true">
             <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4"></div>
+            @if (Item.ContentType is ShareContentType.Text or ShareContentType.Link)
+            {
+                <button @onclick="ShowTextSelectModal"
+                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                    </svg>
+                    <span>选择文本</span>
+                </button>
+            }
             @if (Item.ContentType == ShareContentType.Image)
             {
                 <button @onclick="SaveImageAsync"
@@ -33,6 +43,29 @@
                     class="flex items-center justify-center w-full px-5 py-3 mt-1 text-gray-500 dark:text-gray-400 font-medium active:bg-gray-50 dark:active:bg-gray-700 transition-colors border-t border-gray-100 dark:border-gray-700">
                 取消
             </button>
+        </div>
+    </div>
+}
+
+<!-- 选择文本 Modal -->
+@if (_showTextModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+         @onclick="CloseTextModal">
+        <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden"
+             @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">选择文本</span>
+                <button @onclick="CloseTextModal"
+                        class="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 dark:active:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="px-4 py-4 max-h-64 overflow-y-auto">
+                <p class="text-sm text-gray-800 dark:text-gray-100 leading-relaxed select-text whitespace-pre-wrap break-words">@Item.Content</p>
+            </div>
         </div>
     </div>
 }
@@ -130,10 +163,33 @@
                                 </svg>
                             </div>
                         }
-                        @if (Item.FileName is not null)
-                        {
-                            <p class="text-xs @(IsBurnMessage ? "text-gray-500 dark:text-gray-400" : "text-white/70") mt-1.5 truncate px-1">@Item.FileName</p>
-                        }
+                    </div>
+                    <div class="flex items-center gap-3 px-3 py-2.5">
+                        <div class="flex-shrink-0 w-9 h-9 @(IsBurnMessage ? "bg-gray-400/20 dark:bg-gray-500/30" : "bg-white/20") rounded-xl flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 @GetTextColorClass()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium @GetTextColorClass() truncate">@(Item.FileName ?? "视频")</p>
+                            <p class="text-xs @(IsBurnMessage ? "text-gray-500 dark:text-gray-400" : "text-white/60")">@FormatSize(Item.FileSize)</p>
+                        </div>
+                        <button @onclick="SaveFileAsync" @onclick:stopPropagation="true"
+                                disabled="@_saving"
+                                class="w-8 h-8 rounded-full flex items-center justify-center @(IsBurnMessage ? "text-gray-600 dark:text-gray-300 active:bg-gray-200/30 dark:active:bg-gray-600/30" : "text-white active:bg-white/20") transition-colors disabled:opacity-40">
+                            @if (_saving)
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                </svg>
+                            }
+                            else
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                            }
+                        </button>
                     </div>
                     break;
 
@@ -200,6 +256,7 @@
     private string _fileUrl = string.Empty;
     private bool _saving;
     private bool _showContextMenu;
+    private bool _showTextModal;
     private bool _selectionMode => SelectionMode;
     private System.Threading.Timer? _longPressTimer;
     private const int LongPressMs = 600;
@@ -341,6 +398,17 @@
     private void CloseContextMenu()
     {
         _showContextMenu = false;
+    }
+
+    private void ShowTextSelectModal()
+    {
+        _showContextMenu = false;
+        _showTextModal = true;
+    }
+
+    private void CloseTextModal()
+    {
+        _showTextModal = false;
     }
 
     private async Task OnDeleteItem()
