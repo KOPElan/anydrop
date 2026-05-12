@@ -48,6 +48,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             entity.Property(e => e.Content).HasMaxLength(10_000).IsRequired();
             entity.Property(e => e.FileName).HasMaxLength(260);
             entity.Property(e => e.MimeType).HasMaxLength(127);
+            entity.Property(e => e.ThumbnailPath).HasMaxLength(500);
             entity.Property(e => e.CreatedAt)
                 .HasConversion(
                     value => value.UtcDateTime,
@@ -99,6 +100,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             entity.Property(e => e.Language).HasMaxLength(10).HasDefaultValue("zh-CN");
             entity.Property(e => e.AutoCleanupEnabled).HasDefaultValue(false);
             entity.Property(e => e.AutoCleanupMonths).HasDefaultValue(1);
+            entity.Property(e => e.ThumbnailGenerationHour).HasDefaultValue(2);
             entity.Property(e => e.UpdatedAt)
                 .HasConversion(
                     value => value.UtcDateTime,
@@ -112,6 +114,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 Language = "zh-CN",
                 AutoCleanupEnabled = false,
                 AutoCleanupMonths = 1,
+                ThumbnailGenerationHour = 2,
                 UpdatedAt = DateTimeOffset.Parse("2026-04-19T00:00:00Z")
             });
         });

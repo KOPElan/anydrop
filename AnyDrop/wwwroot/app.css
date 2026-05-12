@@ -964,6 +964,71 @@
     .search-msg-card:hover .search-msg-arrow {
         color: var(--color-primary);
     }
+
+    /* ─── 移动端 FAB 发送按钮 ─── */
+    .mobile-fab {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        /* 桌面输入框在移动端隐藏 */
+        .chat-footer-desktop {
+            display: none;
+        }
+
+        /* FAB 按钮固定在右下角 */
+        .mobile-fab {
+            display: flex;
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 45;
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 1rem;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+            transition: transform 200ms ease, box-shadow 200ms ease;
+        }
+
+        .mobile-fab:hover {
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.50);
+        }
+
+        .mobile-fab:active {
+            transform: scale(0.94);
+        }
+    }
+
+    /* ─── 骨架屏加载动画 ─── */
+    @keyframes skeleton-shimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position: 400px 0; }
+    }
+
+    .skeleton-bubble,
+    .skeleton-line {
+        background: linear-gradient(
+            90deg,
+            rgba(194, 198, 216, 0.30) 25%,
+            rgba(194, 198, 216, 0.55) 50%,
+            rgba(194, 198, 216, 0.30) 75%
+        );
+        background-size: 800px 100%;
+        animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    }
+
+    /* ─── 视频缩略图容器 ─── */
+    .video-thumb-container {
+        position: relative;
+        min-height: 80px;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 0.75rem;
+    }
 }
 
 /* ═══════════════════════════════════════
@@ -1200,4 +1265,29 @@ html.dark input[type="number"] {
 }
 html.dark textarea::placeholder {
     color: rgba(176, 181, 196, 0.45);
+}
+
+/* ── 主题切换平滑过渡效果 ── */
+html {
+    transition:
+        background-color 250ms ease,
+        color 250ms ease;
+}
+
+html body {
+    transition:
+        background 300ms ease,
+        color 250ms ease;
+}
+
+/* ── 暗色模式骨架屏颜色覆盖 ── */
+html.dark .skeleton-bubble,
+html.dark .skeleton-line {
+    background: linear-gradient(
+        90deg,
+        rgba(60, 68, 80, 0.35) 25%,
+        rgba(80, 90, 105, 0.55) 50%,
+        rgba(60, 68, 80, 0.35) 75%
+    );
+    background-size: 800px 100%;
 }

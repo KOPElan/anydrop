@@ -20,5 +20,8 @@ public sealed class SystemSettings
     /// <summary>自动清理的时间阈值（月数），支持 1 / 3 / 6，默认 1 个月。</summary>
     public int AutoCleanupMonths { get; set; } = 1;
 
+    /// <summary>每天自动生成缩略图的 UTC 小时（0–23），默认凌晨 2 点。</summary>
+    public int ThumbnailGenerationHour { get; set; } = 2;
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

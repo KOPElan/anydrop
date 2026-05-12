@@ -146,7 +146,24 @@
     <div @ref="_messageListRef"
          id="message-list"
          class="absolute inset-0 overflow-y-auto px-6 space-y-6 chat-message-list">
-        @if (!_selectedTopicId.HasValue)
+        @if (_isLoadingMessages)
+        {
+            @* 加载骨架屏 *@
+            <div class="max-w-4xl mx-auto w-full pt-4 space-y-4">
+                @for (var i = 0; i < 4; i++)
+                {
+                    <div class="flex flex-col items-start max-w-2xl m-2">
+                        <div class="skeleton-bubble w-64 h-16 rounded-2xl rounded-tl-sm"></div>
+                        <div class="skeleton-line w-24 h-3 mt-2 ml-2 rounded-full"></div>
+                    </div>
+                    <div class="flex flex-col items-start max-w-2xl m-2 ml-16">
+                        <div class="skeleton-bubble w-48 h-12 rounded-2xl rounded-tl-sm"></div>
+                        <div class="skeleton-line w-20 h-3 mt-2 ml-2 rounded-full"></div>
+                    </div>
+                }
+            </div>
+        }
+        else if (!_selectedTopicId.HasValue)
         {
             <div class="flex h-full flex-col items-center justify-center text-center">
                 <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">chat_bubble_outline</span>
@@ -218,11 +235,12 @@
 
                         case ShareContentType.Image:
                                 <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-lg transition-all duration-150">
-                                @* 点击图片在 Modal 中预览原图 *@
+                                @* 点击图片在 Modal 中预览原图（thumbnail-first：缩略图加载，点击查看原图）*@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
                                     <img class="max-h-72 w-full object-contain transition-transform duration-200 hover:scale-[1.02]"
-                                         src="@GetFileUrl(message.Id)"
+                                         src="@GetThumbnailUrl(message.Id)"
+                                         onerror="this.onerror=null;this.src='@GetFileUrl(message.Id)'"
                                          alt="@message.FileName" />
                                 </div>
                                 <div class="flex items-center justify-between px-1">
@@ -249,9 +267,30 @@
                         case ShareContentType.Video:
                                 <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
-                                    <video class="w-full max-h-64 rounded-xl"
-                                           controls
-                                           src="@GetFileUrl(message.Id)"></video>
+                                    @if (_expandedVideoIds.Contains(message.Id))
+                                    {
+                                        @* 展开后显示原始视频播放器 *@
+                                        <video class="w-full max-h-64 rounded-xl"
+                                               controls
+                                               autoplay
+                                               src="@GetFileUrl(message.Id)"></video>
+                                    }
+                                    else
+                                    {
+                                        @* 缩略图 + 播放按钮遮罩（点击后加载原视频）*@
+                                        <div class="relative cursor-pointer video-thumb-container"
+                                             @onclick="() => ExpandVideo(message.Id)">
+                                            <img class="w-full max-h-64 object-cover rounded-xl bg-black/20"
+                                                 src="@GetThumbnailUrl(message.Id)"
+                                                 onerror="this.onerror=null;this.style.minHeight='120px';this.style.background='rgba(0,0,0,0.3)'"
+                                                 alt="@message.FileName" />
+                                            <div class="absolute inset-0 flex items-center justify-center">
+                                                <div class="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform hover:scale-110">
+                                                    <span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
@@ -455,7 +494,8 @@
     }
     else
     {
-        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
+        @* 桌面端输入框（移动端隐藏，改用 FAB）*@
+        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass chat-footer-desktop" style="pointer-events: none;">
         <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
         <div class="input-wrapper chat-input-card px-4 py-3">
             @* 附件按钮（带右侧分割线）*@
@@ -536,6 +576,61 @@
                             style="background: var(--color-error);"
                             disabled="@_isBatchDeleting"
                             @onclick="ConfirmBatchDeleteAsync">@L["Home_BatchDeleteConfirmAction"]</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ─────────── 移动端 FAB 按钮（仅移动端显示，选择模式下隐藏）─────────── *@
+    @if (!_isSelectMode && _selectedTopicId.HasValue)
+    {
+        <button type="button"
+                class="mobile-fab"
+                aria-label="@L["Home_MobileSend"]"
+                @onclick="OpenMobileSendModal">
+            <span class="material-symbols-outlined"
+                  style="font-size: 26px; font-variation-settings: 'FILL' 1;">edit</span>
+        </button>
+    }
+
+    @* ─────────── 移动端发送 Modal ─────────── *@
+    @if (_showMobileSendModal)
+    {
+        <div class="modal-overlay" @onclick="CloseMobileSendModal">
+            <div class="modal-content w-full max-w-sm" role="dialog" aria-modal="true" aria-labelledby="mobile-send-modal-title" @onclick:stopPropagation>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 id="mobile-send-modal-title" class="modal-title mb-0">@L["Home_MobileSendTitle"]</h3>
+                    <button type="button"
+                            class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors"
+                            @onclick="CloseMobileSendModal">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+                    </button>
+                </div>
+                <textarea class="w-full resize-none rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
+                          style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface); min-height: 100px; max-height: 200px; field-sizing: content;"
+                          placeholder="@L["Home_MobileSendPlaceholder"]"
+                          maxlength="10000"
+                          @bind="_mobileInputText"
+                          @bind:event="oninput"></textarea>
+                @if (!string.IsNullOrWhiteSpace(_validationError))
+                {
+                    <p class="mt-1 text-xs" style="color: var(--color-error);">@_validationError</p>
+                }
+                <div class="modal-actions mt-4">
+                    <button type="button" class="btn-secondary" @onclick="CloseMobileSendModal">@L["Common_Cancel"]</button>
+                    <button type="button"
+                            class="btn-primary"
+                            disabled="@_isSending"
+                            @onclick="SendFromMobileModalAsync">
+                        @if (_isSending)
+                        {
+                            <span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span>
+                        }
+                        else
+                        {
+                            <span>@L["Common_Send"]</span>
+                        }
+                    </button>
                 </div>
             </div>
         </div>

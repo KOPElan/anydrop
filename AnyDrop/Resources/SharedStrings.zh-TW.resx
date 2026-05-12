@@ -105,6 +105,7 @@
   <!-- 通用 -->
   <data name="Common_Cancel"><value>取消</value></data>
   <data name="Common_Save"><value>儲存</value></data>
+  <data name="Common_Send"><value>傳送</value></data>
   <data name="Common_Create"><value>建立</value></data>
   <data name="Common_Retry"><value>重試</value></data>
   <data name="Common_Resume"><value>恢復</value></data>
@@ -228,6 +229,19 @@
   <data name="Home_BatchDeleteConfirmMessage"><value>確定要刪除所選的 {0} 條訊息？此操作不可撤銷，相關檔案也會被刪除。</value></data>
   <data name="Home_BatchDeleteConfirmAction"><value>確認刪除</value></data>
   <data name="Home_BatchDeleteFailed"><value>批量刪除失敗，請重試。</value></data>
+
+  <!-- 移動端 FAB -->
+  <data name="Home_MobileSend"><value>傳送訊息</value></data>
+  <data name="Home_MobileSendTitle"><value>傳送訊息</value></data>
+  <data name="Home_MobileSendPlaceholder"><value>輸入訊息內容…</value></data>
+
+  <!-- 縮圖設定 -->
+  <data name="Settings_ThumbnailGeneration"><value>縮圖與預覽圖</value></data>
+  <data name="Settings_ThumbnailHour"><value>每日自動產生時間（0–23 時）</value></data>
+  <data name="Settings_ThumbnailHourHint"><value>伺服器將於每天指定時間對未處理的圖片/影片產生預覽圖</value></data>
+  <data name="Settings_RunThumbnailNow"><value>立即產生預覽圖</value></data>
+  <data name="Settings_ThumbnailRunQueued"><value>預覽圖產生任務已觸發，後台處理中。</value></data>
+  <data name="Settings_ThumbnailRunFailed"><value>觸發任務失敗，請重試。</value></data>
 
   <data name="Search_PageTitle"><value>搜尋 · {0}</value></data>
   <data name="Search_DefaultTopicName"><value>主題</value></data>

@@ -105,6 +105,7 @@
   <!-- 通用 / Common -->
   <data name="Common_Cancel"><value>取消</value></data>
   <data name="Common_Save"><value>保存</value></data>
+  <data name="Common_Send"><value>发送</value></data>
   <data name="Common_Create"><value>创建</value></data>
   <data name="Common_Retry"><value>重试</value></data>
   <data name="Common_Resume"><value>恢复</value></data>
@@ -238,6 +239,19 @@
   <data name="Home_BatchDeleteConfirmMessage"><value>确定要删除所选的 {0} 条消息？此操作不可撤销，相关文件也会被删除。</value></data>
   <data name="Home_BatchDeleteConfirmAction"><value>确认删除</value></data>
   <data name="Home_BatchDeleteFailed"><value>批量删除失败，请重试。</value></data>
+
+  <!-- 移动端 FAB / Mobile FAB -->
+  <data name="Home_MobileSend"><value>发送消息</value></data>
+  <data name="Home_MobileSendTitle"><value>发送消息</value></data>
+  <data name="Home_MobileSendPlaceholder"><value>输入消息内容…</value></data>
+
+  <!-- 缩略图设置 / Thumbnail Settings -->
+  <data name="Settings_ThumbnailGeneration"><value>缩略图与预览图</value></data>
+  <data name="Settings_ThumbnailHour"><value>每日自动生成时间（0–23 时）</value></data>
+  <data name="Settings_ThumbnailHourHint"><value>服务端将在每天指定时间对未处理的图片/视频生成预览图</value></data>
+  <data name="Settings_RunThumbnailNow"><value>立即生成预览图</value></data>
+  <data name="Settings_ThumbnailRunQueued"><value>预览图生成任务已触发，后台处理中。</value></data>
+  <data name="Settings_ThumbnailRunFailed"><value>触发任务失败，请重试。</value></data>
 
   <!-- 搜索页 / Search -->
   <data name="Search_PageTitle"><value>搜索 · {0}</value></data>

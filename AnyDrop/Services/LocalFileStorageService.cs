@@ -17,6 +17,18 @@ public sealed class LocalFileStorageService(IConfiguration configuration) : IFil
         return safeName.Replace('\\', '/');
     }
 
+    public async Task<string> SaveFileAtPathAsync(Stream content, string storagePath, string mimeType, CancellationToken ct = default)
+    {
+        var safePath = storagePath.Replace('\\', '/').TrimStart('/');
+        var fullPath = GetFullPath(safePath);
+        var directory = Path.GetDirectoryName(fullPath)!;
+        Directory.CreateDirectory(directory);
+
+        await using var output = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await content.CopyToAsync(output, ct);
+        return safePath;
+    }
+
     public Task<Stream> GetFileAsync(string storagePath, CancellationToken ct = default)
     {
         var fullPath = GetFullPath(storagePath);

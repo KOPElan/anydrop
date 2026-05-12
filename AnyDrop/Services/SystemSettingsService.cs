@@ -35,12 +35,19 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return AuthResult<SecuritySettingsDto>.Failure("自动清理月数必须为 1、3 或 6。", StatusCodes.Status400BadRequest);
         }
 
+        // 验证缩略图生成小时范围（0–23）
+        if (request.ThumbnailGenerationHour is < 0 or > 23)
+        {
+            return AuthResult<SecuritySettingsDto>.Failure("缩略图生成小时必须在 0–23 之间。", StatusCodes.Status400BadRequest);
+        }
+
         var settings = await EnsureSettingsAsync(ct);
         settings.AutoFetchLinkPreview = request.AutoFetchLinkPreview;
         settings.BurnAfterReadingMinutes = request.BurnAfterReadingMinutes;
         settings.Language = request.Language;
         settings.AutoCleanupEnabled = request.AutoCleanupEnabled;
         settings.AutoCleanupMonths = request.AutoCleanupMonths;
+        settings.ThumbnailGenerationHour = request.ThumbnailGenerationHour;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(ct);
         return AuthResult<SecuritySettingsDto>.Success(MapToDto(settings));
@@ -91,8 +98,23 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         return (settings.AutoCleanupEnabled, settings.AutoCleanupMonths);
     }
 
+    public async Task<int> GetThumbnailGenerationHourAsync(CancellationToken ct = default)
+    {
+        var projection = await dbContext.SystemSettings
+            .AsNoTracking()
+            .Select(x => new { x.ThumbnailGenerationHour })
+            .FirstOrDefaultAsync(ct);
+        if (projection is not null)
+        {
+            return projection.ThumbnailGenerationHour;
+        }
+
+        var settings = await EnsureSettingsAsync(ct);
+        return settings.ThumbnailGenerationHour;
+    }
+
     private static SecuritySettingsDto MapToDto(SystemSettings s)
-        => new(s.AutoFetchLinkPreview, s.BurnAfterReadingMinutes, s.Language, s.AutoCleanupEnabled, s.AutoCleanupMonths);
+        => new(s.AutoFetchLinkPreview, s.BurnAfterReadingMinutes, s.Language, s.AutoCleanupEnabled, s.AutoCleanupMonths, s.ThumbnailGenerationHour);
 
     private async Task<SystemSettings> EnsureSettingsAsync(CancellationToken ct)
     {

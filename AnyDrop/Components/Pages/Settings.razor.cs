@@ -22,6 +22,8 @@ public partial class Settings
     private string _language = "zh-CN";
     private bool _autoCleanupEnabled;
     private int _autoCleanupMonths = 1;
+    private int _thumbnailGenerationHour = 2;
+    private bool _isRunningThumbnails;
     private string? _message;
     private string? _error;
 
@@ -77,6 +79,10 @@ public partial class Settings
             {
                 _autoCleanupMonths = months.GetInt32();
             }
+            if (data.TryGetProperty("thumbnailGenerationHour", out var thumbHour))
+            {
+                _thumbnailGenerationHour = thumbHour.GetInt32();
+            }
         }
 
         // 从 localStorage 读取主题设置
@@ -128,7 +134,8 @@ public partial class Settings
             burnAfterReadingMinutes = _burnAfterReadingMinutes,
             language = _language,
             autoCleanupEnabled = _autoCleanupEnabled,
-            autoCleanupMonths = _autoCleanupMonths
+            autoCleanupMonths = _autoCleanupMonths,
+            thumbnailGenerationHour = _thumbnailGenerationHour
         };
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
         if (!result.ok)
@@ -206,6 +213,32 @@ public partial class Settings
     {
         _isDarkMode = !_isDarkMode;
         await JSRuntime.InvokeVoidAsync("AnyDropTheme.set", _isDarkMode);
+    }
+
+    /// <summary>立即触发缩略图批处理任务。</summary>
+    private async Task RunThumbnailsNowAsync()
+    {
+        ResetMessages();
+        _isRunningThumbnails = true;
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<JsApiResult>(
+                "authInterop.postJson",
+                "/api/v1/settings/thumbnails/run",
+                new { });
+            if (result.ok || result.status == 202)
+            {
+                _message = L["Settings_ThumbnailRunQueued"];
+            }
+            else
+            {
+                _error = result.body?.error ?? L["Settings_ThumbnailRunFailed"];
+            }
+        }
+        finally
+        {
+            _isRunningThumbnails = false;
+        }
     }
 
     private void ResetMessages()

@@ -20,6 +20,8 @@ public static class SettingsEndpoints
         group.MapGet("/security", GetSecurityAsync);
         group.MapPut("/security", UpdateSecurityAsync);
         group.MapPost("/set-culture", SetCultureAsync);
+        group.MapPost("/thumbnails/run", RunThumbnailsAsync)
+            .WithSummary("立即触发缩略图后台批处理任务");
 
         return app;
     }
@@ -141,6 +143,14 @@ public static class SettingsEndpoints
     {
         var id = principal.FindFirstValue("sub") ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(id, out var userId) ? userId : null;
+    }
+
+    /// <summary>立即触发缩略图后台批处理（不等待完成，返回 202 Accepted）。</summary>
+    public static IResult RunThumbnailsAsync(ThumbnailGenerationBackgroundService backgroundService)
+    {
+        // 在后台异步执行，不阻塞 HTTP 响应
+        _ = backgroundService.RunAsync();
+        return Results.Accepted("/api/v1/settings/thumbnails/run", ApiEnvelope<object>.Ok(new { queued = true }));
     }
 }
 
