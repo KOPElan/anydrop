@@ -3,6 +3,7 @@
 @inject ITopicService TopicService
 @inject ISignalRService SignalR
 @inject IAppStateService AppState
+@inject NavigationManager Nav
 @implements IDisposable
 
 <div class="flex h-full overflow-hidden">
@@ -13,34 +14,58 @@
             {
                 <div class="fixed inset-0 bg-black/50" @onclick="() => _showSidebar = false"></div>
             }
-            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full bg-white dark:bg-gray-800 shadow-xl") overflow-y-auto touch-scroll">
-                <TopicSidebar OnTopicSelected="OnTopicSelected" />
+            <div class="@(_isWide ? "w-full" : "w-72 relative z-50 h-full shadow-xl")">
+                @* 毛玻璃背景层：独立 div，不含固定定位（fixed）子元素；背景模糊（backdrop-filter）不会为兄弟节点中的 fixed 弹窗创建新的包含块（containing block） *@
+                @if (!_isWide)
+                {
+                    <div class="absolute inset-0 glass pointer-events-none" aria-hidden="true"></div>
+                }
+                <div class="relative h-full z-10">
+                    <TopicSidebar OnTopicSelected="OnTopicSelected" />
+                </div>
             </div>
         </div>
     }
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/50">
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+        <div class="flex items-center gap-3 px-4 py-3 glass absolute w-full">
             @if (!_isWide)
             {
-                <button @onclick="() => _showSidebar = true" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-100 dark:active:bg-gray-700 transition-colors">
+                <button @onclick="() => _showSidebar = true" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-white/80 active:bg-black/5 dark:active:bg-white/10 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                     </svg>
                 </button>
             }
-            <span class="flex-1 font-semibold text-sm text-gray-700 dark:text-gray-300">
-                @(AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId)?.Name ?? "选择主题")
-            </span>
-            @if (AppState.CurrentTopicId.HasValue)
-            {
-                <button @onclick="() => _messageList?.EnterBatchSelectionMode()"
-                        aria-label="进入选择模式"
-                        class="text-sm text-indigo-600 dark:text-indigo-400 font-medium active:opacity-70 transition-opacity px-1 py-0.5">
-                    选择
-                </button>
-            }
+            <div class="flex-1 flex flex-col leading-tight">
+                <span class="font-bold text-lg text-gray-800 dark:text-white leading-tight">
+                    @(_currentTopic?.Name ?? "选择主题")
+                </span>                
+            </div>
+            <button aria-label="搜索" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-white/80 active:bg-black/5 dark:active:bg-white/10 transition-colors"
+                    @onclick='() => Nav.NavigateTo("/search")'>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+            </button>
+            <button aria-label="更多" @onclick="() => _showTopicMenu = true"
+                    class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-white/80 active:bg-black/5 dark:active:bg-white/10 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+                </svg>
+            </button>
         </div>
+
+        <!-- 标题栏占位：为 absolute 标题栏留出空间，防止内容（含选择工具栏）与之重叠 -->
+        <div class="flex-shrink-0 h-[60px]"></div>
+
+        @if (_showTopicMenu && _currentTopic is not null)
+        {
+            <TopicActionMenu Topic="_currentTopic"
+                             OnClose="() => _showTopicMenu = false"
+                             OnTopicChanged="LoadTopicsAsync"
+                             OnEnterSelectionMode="EnterSelectionModeFromMenu" />
+        }
 
         @if (AppState.CurrentTopicId.HasValue)
         {
@@ -64,7 +89,11 @@
 
     private bool _showSidebar;
     private bool _isWide = false;
+    private bool _showTopicMenu;
     private MessageList? _messageList;
+
+    private TopicDto? _currentTopic =>
+        AppState.Topics.FirstOrDefault(t => t.Id == AppState.CurrentTopicId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -95,6 +124,11 @@
         AppState.CurrentTopicId = topicId;
         _showSidebar = false;
         AppState.NotifyStateChanged();
+    }
+
+    private void EnterSelectionModeFromMenu()
+    {
+        _messageList?.EnterBatchSelectionMode();
     }
 
     public void Dispose()

@@ -20,4 +20,10 @@ public interface ISignalRService
 
     /// <summary>收到 TopicsUpdated 推送时触发。</summary>
     event Action<IReadOnlyList<TopicDto>>? TopicsUpdated;
+
+    /// <summary>收到 ReceiveShareItem 直推时触发（实时新消息）。</summary>
+    event Action<ShareItemDto>? ShareItemReceived;
+
+    /// <summary>收到 ShareItemsDeleted 推送时触发。</summary>
+    event Action<IReadOnlyList<Guid>>? ShareItemsDeleted;
 }

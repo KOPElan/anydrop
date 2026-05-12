@@ -7,15 +7,26 @@
 
 /* ── 自定义主题 ── */
 @theme {
-    --color-primary: #4f46e5;
-    --color-primary-light: #6366f1;
+    --color-primary: #3578F5;
+    --color-primary-light: #5090FF;
+}
+
+/* ── 动画关键帧 ── */
+@keyframes skeleton-wave {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes msg-fadein {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── 组件样式 ── */
 @layer components {
     .btn-primary {
         @apply w-full py-3 rounded-xl font-medium text-white transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
-        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        background: linear-gradient(135deg, #3578F5, #5090FF);
     }
 
     .btn-primary:active:not(:disabled) {
@@ -41,6 +52,8 @@
 
     .bubble-burn {
         @apply rounded-2xl p-3.5 break-words;
+        width: fit-content;
+        max-width: 85%;
         background: linear-gradient(135deg, rgba(255, 218, 214, 0.7), rgba(255, 200, 192, 0.6));
         border: 1px solid rgba(239, 68, 68, 0.2);
         box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08);
@@ -54,24 +67,70 @@
 
     .bubble-text {
         @apply rounded-2xl p-3.5 break-words;
-        background-color: #ffffff;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+        width: fit-content;
+        max-width: 85%;
+        background-color: #3578F5;
+        color: white;
+        box-shadow: 0 2px 8px rgba(53, 120, 245, 0.20);
     }
 
     .dark .bubble-text {
-        background-color: #1f2937;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        background-color: #2563EB;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.30);
+    }
+
+    .bubble-image {
+        @apply rounded-2xl overflow-hidden;
+        width: 100%;
+        max-width: 92%;
+        background-color: #3578F5;
+        box-shadow: 0 2px 8px rgba(53, 120, 245, 0.20);
+    }
+
+    .dark .bubble-image {
+        background-color: #2563EB;
     }
 
     .bubble-link {
         @apply rounded-2xl p-3.5 break-words;
-        background-color: #eff6ff;
-        border: 1px solid rgba(59, 130, 246, 0.15);
+        width: fit-content;
+        max-width: 85%;
+        background-color: #3578F5;
+        color: white;
+        box-shadow: 0 2px 8px rgba(53, 120, 245, 0.20);
     }
 
     .dark .bubble-link {
-        background-color: rgba(30, 58, 138, 0.2);
-        border-color: rgba(59, 130, 246, 0.2);
+        background-color: #2563EB;
+    }
+
+    .bubble-burn-image {
+        @apply rounded-2xl overflow-hidden;
+        width: 100%;
+        max-width: 92%;
+        background: linear-gradient(135deg, rgba(255, 218, 214, 0.7), rgba(255, 200, 192, 0.6));
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        box-shadow: 0 1px 3px rgba(239, 68, 68, 0.08);
+    }
+
+    .dark .bubble-burn-image {
+        background: linear-gradient(135deg, rgba(127, 29, 29, 0.35), rgba(153, 27, 27, 0.25));
+        border-color: rgba(239, 68, 68, 0.25);
+        box-shadow: 0 1px 3px rgba(239, 68, 68, 0.15);
+    }
+
+    .btn-send {
+        @apply w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-150 active:scale-90 disabled:opacity-40 disabled:active:scale-100;
+        background-color: #3578F5;
+    }
+
+    .btn-send:active:not(:disabled) {
+        background-color: #2563EB;
+    }
+
+    .upload-progress-bar {
+        @apply h-full transition-all duration-300 rounded-full;
+        background: linear-gradient(90deg, #3578F5, #5090FF);
     }
 
     .status-banner {
@@ -107,15 +166,40 @@
     }
 
     .nav-item-active svg {
-        @apply text-indigo-600 dark:text-indigo-400;
+        @apply text-blue-500 dark:text-blue-400;
     }
 
     .nav-item-active span {
-        @apply text-indigo-600 dark:text-indigo-400;
+        @apply text-blue-500 dark:text-blue-400;
     }
 
     .nav-item-inactive {
         @apply text-gray-400 dark:text-gray-500;
+    }
+
+    /* 骨架屏 shimmer */
+    .skeleton-shimmer {
+        @apply rounded-2xl;
+        background: linear-gradient(90deg,
+            rgba(210, 218, 232, 0.55) 0%,
+            rgba(232, 238, 250, 0.95) 50%,
+            rgba(210, 218, 232, 0.55) 100%);
+        background-size: 200% 100%;
+        animation: skeleton-wave 1.6s ease-in-out infinite;
+    }
+
+    .dark .skeleton-shimmer {
+        background: linear-gradient(90deg,
+            rgba(40, 50, 68, 0.85) 0%,
+            rgba(58, 70, 92, 1) 50%,
+            rgba(40, 50, 68, 0.85) 100%);
+        background-size: 200% 100%;
+        animation: skeleton-wave 1.6s ease-in-out infinite;
+    }
+
+    /* 消息列表淡入动画 */
+    .message-list-fadein {
+        animation: msg-fadein 0.22s ease-out;
     }
 }
 
@@ -141,13 +225,23 @@
         overflow: hidden;
     }
     .glass {
-        background: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.80);
         -webkit-backdrop-filter: blur(20px);
         backdrop-filter: blur(20px);
     }
     .dark .glass {
-        background: rgba(17, 24, 39, 0.8);
+        background: rgba(17, 24, 39, 0.85);
         -webkit-backdrop-filter: blur(20px);
         backdrop-filter: blur(20px);
+    }
+    .header-blue-glass {
+        background: rgba(255, 255, 255, 0.88);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
+    }
+    .dark .header-blue-glass {
+        background: rgba(17, 24, 39, 0.88);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
     }
 }

@@ -21,6 +21,8 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
 
     public event Action<HubConnectionState>? StateChanged;
     public event Action<IReadOnlyList<TopicDto>>? TopicsUpdated;
+    public event Action<ShareItemDto>? ShareItemReceived;
+    public event Action<IReadOnlyList<Guid>>? ShareItemsDeleted;
 
     public async Task StartAsync(CancellationToken ct = default)
     {
@@ -64,6 +66,16 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
         conn.On<IReadOnlyList<TopicDto>>("TopicsUpdated", topics =>
         {
             TopicsUpdated?.Invoke(topics);
+        });
+
+        conn.On<ShareItemDto>("ReceiveShareItem", item =>
+        {
+            ShareItemReceived?.Invoke(item);
+        });
+
+        conn.On<IReadOnlyList<Guid>>("ShareItemsDeleted", ids =>
+        {
+            ShareItemsDeleted?.Invoke(ids);
         });
     }
 

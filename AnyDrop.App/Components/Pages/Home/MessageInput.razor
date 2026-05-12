@@ -3,51 +3,52 @@
 @inject IPickerService Picker
 @inject IAppStateService AppState
 
-<div class="bg-white dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-800 px-3 py-2 safe-area-bottom">
+<div class="glass border-t border-white/50 dark:border-gray-700/50 px-3 pt-2 pb-1 safe-area-bottom fixed bottom-0 w-full">
     @if (_uploading)
     {
         <div class="mb-2 px-1">
             <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div class="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-300 rounded-full" style="width: @((_uploadProgress * 100).ToString("F0"))%"></div>
+                <div class="upload-progress-bar" style="width: @((_uploadProgress * 100).ToString("F0"))%;"></div>
             </div>
             <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">上传中 @((_uploadProgress * 100).ToString("F0"))%</p>
         </div>
     }
 
-    <div class="flex items-end gap-2">
-        <div class="flex gap-0.5">
-            <button @onclick="PickFileAndUploadAsync" disabled="@_uploading"
-                    class="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-40 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                </svg>
-            </button>
-            <button @onclick="PickPhotoAndUploadAsync" disabled="@_uploading"
-                    class="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-40 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                </svg>
-            </button>
-            <button @onclick="ToggleBurnAfterReading"
-                    disabled="@_uploading"
-                    title="阅后即焚"
-                    class="w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40 transition-colors @(_burnAfterReading ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/25" : "text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700")">
-                <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' @( _burnAfterReading ? 1 : 0 );">local_fire_department</span>
-            </button>
-        </div>
-
+    <!-- 输入行：文本框 + 发送按钮 -->
+    <div class="flex items-end gap-2 mb-2">
         <textarea @bind="_text" @bind:event="oninput" @onkeydown="OnKeyDown"
-                  placeholder="发送消息..."
+                  placeholder="输入消息..."
                   rows="1"
-                  class="flex-1 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:border-indigo-500/50 transition-shadow duration-150 max-h-32 overflow-y-auto"></textarea>
+                  class="flex-1 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:border-blue-400/50 transition-shadow duration-150 max-h-32 overflow-y-auto"></textarea>
 
         <button @onclick="SendTextAsync"
                 disabled="@(string.IsNullOrWhiteSpace(_text) || _uploading)"
-                class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-150 active:scale-90 disabled:opacity-40 disabled:active:scale-100"
-                style="background: linear-gradient(135deg, #4f46e5, #6366f1);">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3.478 2.404a.75.75 0 00-.926.941l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.404z" />
+                class="btn-send">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
             </svg>
+        </button>
+    </div>
+
+    <!-- 操作图标行 -->
+    <div class="flex items-center gap-1 px-1 pb-1">
+        <button @onclick="PickPhotoAndUploadAsync" disabled="@_uploading"
+                class="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-40 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+            </svg>
+        </button>
+        <button @onclick="PickFileAndUploadAsync" disabled="@_uploading"
+                class="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-40 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+            </svg>
+        </button>
+        <button @onclick="ToggleBurnAfterReading"
+                disabled="@_uploading"
+                title="阅后即焚"
+                class="w-9 h-9 rounded-xl flex items-center justify-center disabled:opacity-40 transition-colors @(_burnAfterReading ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/25" : "text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700")">
+            <span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' @( _burnAfterReading ? 1 : 0 );">local_fire_department</span>
         </button>
     </div>
 </div>
