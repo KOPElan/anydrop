@@ -146,10 +146,15 @@ public static class SettingsEndpoints
     }
 
     /// <summary>立即触发缩略图后台批处理（不等待完成，返回 202 Accepted）。</summary>
-    public static IResult RunThumbnailsAsync(ThumbnailGenerationBackgroundService backgroundService)
+    public static IResult RunThumbnailsAsync(
+        ThumbnailGenerationBackgroundService backgroundService,
+        ILoggerFactory loggerFactory)
     {
-        // 在后台异步执行，不阻塞 HTTP 响应
-        _ = backgroundService.RunAsync();
+        var logger = loggerFactory.CreateLogger("AnyDrop.Api.SettingsEndpoints");
+        // 在后台异步执行，不阻塞 HTTP 响应；通过 ContinueWith 捕获未处理异常并记录日志
+        _ = backgroundService.RunAsync().ContinueWith(
+            t => logger.LogError(t.Exception, "RunThumbnailsAsync: thumbnail background task failed."),
+            TaskContinuationOptions.OnlyOnFaulted);
         return Results.Accepted("/api/v1/settings/thumbnails/run", ApiEnvelope<object>.Ok(new { queued = true }));
     }
 }

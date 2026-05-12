@@ -91,7 +91,7 @@ public sealed class ThumbnailService(
 
         using var image = await Image.LoadAsync(originalStream, ct);
 
-        // 等比缩放到最长边 400px
+        // 等比缩放到最长边不超过 400px（ResizeMode.Max：保持宽高比，长边限制为给定尺寸）
         if (image.Width > MaxThumbnailSize || image.Height > MaxThumbnailSize)
         {
             image.Mutate(x => x.Resize(new ResizeOptions
@@ -126,7 +126,8 @@ public sealed class ThumbnailService(
 
         try
         {
-            // 使用 ffmpeg 提取第一帧，-vf thumbnail 选择最具代表性的帧
+            // 使用 ffmpeg 提取最具代表性的帧（-vf thumbnail 采样选取），
+            // 再通过 scale 将宽度缩放到最大 400px，高度设为 -1 自动保持宽高比
             var exitCode = await RunFfmpegAsync(
                 args: $"-y -i \"{originalFullPath}\" -vf \"thumbnail,scale={MaxThumbnailSize}:-1\" -frames:v 1 \"{tempOutput}\"",
                 ct: ct);
@@ -145,7 +146,8 @@ public sealed class ThumbnailService(
         {
             if (File.Exists(tempOutput))
             {
-                try { File.Delete(tempOutput); } catch { /* 忽略清理失败 */ }
+                try { File.Delete(tempOutput); }
+                catch (Exception ex) { logger.LogDebug(ex, "ThumbnailService: Failed to delete temp file {Path}.", tempOutput); }
             }
         }
     }
