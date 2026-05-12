@@ -23,51 +23,76 @@
     </div>
 }
 
-<div id="message-list-container"
-     class="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 message-scroll touch-scroll">
-    @if (AppState.HasMoreMessages)
-    {
-        <div class="text-center py-2">
-            <button @onclick="LoadMoreAsync"
-                    disabled="@_loadingMore"
-                    class="text-xs text-indigo-600 dark:text-indigo-400 font-medium disabled:opacity-50 active:opacity-70">
-                @(_loadingMore ? "加载中..." : "加载更多")
-            </button>
-        </div>
-    }
-
-    @if (AppState.Messages.Count == 0 && !_loading)
-    {
-        <div class="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">
-            暂无消息，发送第一条吧 👋
-        </div>
-    }
-    <div class="@(_selectionMode ? "h-24" : "h-12")"></div>
-    @if (AppState.Messages.Count <= 200)
-    {
-        @foreach (var msg in AppState.Messages)
+@if (_loading)
+{
+    <!-- 骨架屏：切换主题或首次加载时显示 -->
+    <div class="flex-1 min-h-0 overflow-hidden px-4 py-4 space-y-4">
+        <div class="h-12"></div>
+        <div class="skeleton-shimmer h-10 w-2/3"></div>
+        <div class="skeleton-shimmer h-10 w-1/2"></div>
+        <div class="skeleton-shimmer h-14 w-4/5"></div>
+        <div class="skeleton-shimmer h-10 w-2/5"></div>
+        <div class="skeleton-shimmer h-10 w-3/5"></div>
+        <div class="skeleton-shimmer h-14 w-1/2"></div>
+        <div class="skeleton-shimmer h-10 w-3/4"></div>
+    </div>
+}
+else
+{
+    <div id="message-list-container"
+         class="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 message-scroll touch-scroll message-list-fadein">
+        @if (AppState.HasMoreMessages)
         {
-            <MessageItem Item="msg"
-                         SelectionMode="_selectionMode"
-                         IsSelected="_selectedIds.Contains(msg.Id)"
-                         OnToggleSelect="ToggleSelect"
-                         OnEnterSelectionMode="EnterSelectionMode"
-                         OnDelete="DeleteSingleAsync" />
+            <div class="text-center py-2">
+                @if (_loadingMore)
+                {
+                    <div class="flex justify-center py-1">
+                        <div class="w-5 h-5 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                    </div>
+                }
+                else
+                {
+                    <button @onclick="LoadMoreAsync"
+                            class="text-xs text-indigo-600 dark:text-indigo-400 font-medium active:opacity-70">
+                        加载更多
+                    </button>
+                }
+            </div>
         }
-    }
-    else
-    {
-        <Virtualize Items="@(AppState.Messages as ICollection<ShareItemDto> ?? AppState.Messages.ToList())" Context="msg">
-            <MessageItem Item="msg"
-                         SelectionMode="_selectionMode"
-                         IsSelected="_selectedIds.Contains(msg.Id)"
-                         OnToggleSelect="ToggleSelect"
-                         OnEnterSelectionMode="EnterSelectionMode"
-                         OnDelete="DeleteSingleAsync" />
-        </Virtualize>
-    }
-    <div class="h-24"></div>
-</div>
+
+        @if (AppState.Messages.Count == 0)
+        {
+            <div class="flex items-center justify-center h-40 text-gray-400 dark:text-gray-500 text-sm">
+                暂无消息，发送第一条吧 👋
+            </div>
+        }
+        <div class="@(_selectionMode ? "h-24" : "h-12")"></div>
+        @if (AppState.Messages.Count <= 200)
+        {
+            @foreach (var msg in AppState.Messages)
+            {
+                <MessageItem Item="msg"
+                             SelectionMode="_selectionMode"
+                             IsSelected="_selectedIds.Contains(msg.Id)"
+                             OnToggleSelect="ToggleSelect"
+                             OnEnterSelectionMode="EnterSelectionMode"
+                             OnDelete="DeleteSingleAsync" />
+            }
+        }
+        else
+        {
+            <Virtualize Items="@(AppState.Messages as ICollection<ShareItemDto> ?? AppState.Messages.ToList())" Context="msg">
+                <MessageItem Item="msg"
+                             SelectionMode="_selectionMode"
+                             IsSelected="_selectedIds.Contains(msg.Id)"
+                             OnToggleSelect="ToggleSelect"
+                             OnEnterSelectionMode="EnterSelectionMode"
+                             OnDelete="DeleteSingleAsync" />
+            </Virtualize>
+        }
+        <div class="h-24"></div>
+    </div>
+}
 
 </div>
 

@@ -3,6 +3,7 @@
 @inject ISearchService SearchService
 @inject IAppStateService AppState
 @inject NavigationManager Nav
+@implements IDisposable
 
 <div class="flex flex-col h-full overflow-hidden">
     <!-- 标题栏 -->
@@ -21,7 +22,7 @@
         <div class="segmented-control">
             @foreach (var mode in _modes)
             {
-                <button @onclick="() => SetMode(mode.Key)"
+                <button @onclick="() => SetModeAsync(mode.Key)"
                         class="segmented-btn @(_mode == mode.Key ? "segmented-btn-active" : "segmented-btn-inactive")">
                     @mode.Value
                 </button>
@@ -42,7 +43,13 @@
                            class="input-base pl-9" />
                 </div>
             </div>
-            @if (_results.Count == 0 && !string.IsNullOrWhiteSpace(_keyword) && !_loading)
+            @if (_loading)
+            {
+                <div class="flex justify-center py-8">
+                    <div class="w-5 h-5 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                </div>
+            }
+            else if (_results.Count == 0 && !string.IsNullOrWhiteSpace(_keyword))
             {
                 <div class="text-center py-16 text-gray-400 dark:text-gray-500 text-sm">未找到相关内容</div>
             }
@@ -53,8 +60,17 @@
             @if (_hasMore)
             {
                 <div class="text-center py-4">
-                    <button @onclick="LoadMoreAsync" disabled="@_loading"
-                            class="text-xs text-indigo-600 dark:text-indigo-400 font-medium disabled:opacity-50 active:opacity-70">加载更多</button>
+                    @if (_loading)
+                    {
+                        <div class="flex justify-center py-2">
+                            <div class="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                        </div>
+                    }
+                    else
+                    {
+                        <button @onclick="LoadMoreAsync"
+                                class="text-xs text-indigo-600 dark:text-indigo-400 font-medium active:opacity-70">加载更多</button>
+                    }
                 </div>
             }
         }
@@ -62,10 +78,27 @@
         {
             @if (AppState.CurrentTopicId.HasValue)
             {
-                <ActiveDateCalendar TopicId="AppState.CurrentTopicId.Value" OnDateSelected="OnDateSelected" />
-                @foreach (var item in _results)
+                <ActiveDateCalendar TopicId="AppState.CurrentTopicId.Value"
+                                    SelectedDate="_selectedDate"
+                                    OnDateSelected="OnDateSelectedAsync" />
+                @if (_loading)
                 {
-                    <SearchResultItem Item="item" />
+                    <div class="space-y-1 px-4">
+                        <div class="skeleton-shimmer h-16 w-full rounded-xl"></div>
+                        <div class="skeleton-shimmer h-16 w-full rounded-xl"></div>
+                        <div class="skeleton-shimmer h-12 w-full rounded-xl"></div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _results)
+                    {
+                        <SearchResultItem Item="item" />
+                    }
+                    @if (_results.Count == 0 && _selectedDate.HasValue)
+                    {
+                        <div class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">该日期暂无消息</div>
+                    }
                 }
             }
             else
@@ -78,21 +111,45 @@
             <div class="flex gap-1.5 px-4 py-3 flex-wrap">
                 @foreach (var type in _contentTypes)
                 {
-                    <button @onclick="() => SetContentType(type.Key)"
+                    <button @onclick="() => SetContentTypeAsync(type.Key)"
                             class="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 active:scale-95 @(_contentType == type.Key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300")">
                         @type.Value
                     </button>
                 }
             </div>
-            @foreach (var item in _results)
+            @if (_loading)
             {
-                <SearchResultItem Item="item" />
+                <div class="space-y-1 px-4">
+                    <div class="skeleton-shimmer h-16 w-full rounded-xl"></div>
+                    <div class="skeleton-shimmer h-16 w-full rounded-xl"></div>
+                    <div class="skeleton-shimmer h-12 w-full rounded-xl"></div>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in _results)
+                {
+                    <SearchResultItem Item="item" />
+                }
+                @if (_results.Count == 0)
+                {
+                    <div class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">暂无该类型消息</div>
+                }
             }
             @if (_hasMore)
             {
                 <div class="text-center py-4">
-                    <button @onclick="LoadMoreAsync" disabled="@_loading"
-                            class="text-xs text-indigo-600 dark:text-indigo-400 font-medium disabled:opacity-50 active:opacity-70">加载更多</button>
+                    @if (_loading)
+                    {
+                        <div class="flex justify-center py-2">
+                            <div class="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                        </div>
+                    }
+                    else
+                    {
+                        <button @onclick="LoadMoreAsync"
+                                class="text-xs text-indigo-600 dark:text-indigo-400 font-medium active:opacity-70">加载更多</button>
+                    }
                 </div>
             }
         }
@@ -103,6 +160,7 @@
     private string _mode = "keyword";
     private string _keyword = string.Empty;
     private ShareContentType _contentType = ShareContentType.Text;
+    private DateOnly? _selectedDate;
     private List<ShareItemDto> _results = [];
     private bool _loading;
     private bool _hasMore;
@@ -127,11 +185,26 @@
         [ShareContentType.Link] = "链接"
     };
 
-    private void SetMode(string mode)
+    private async Task SetModeAsync(string mode)
     {
         _mode = mode;
         _results.Clear();
         _cursor = null;
+        _hasMore = false;
+
+        // 切换到"类型"时自动加载默认类型；切换到"日期"时自动加载今天
+        if (mode == "type")
+        {
+            await SetContentTypeAsync(_contentType);
+            return;
+        }
+        if (mode == "date" && AppState.CurrentTopicId.HasValue)
+        {
+            _selectedDate = DateOnly.FromDateTime(DateTime.Today);
+            await LoadByDateAsync(_selectedDate.Value);
+            return;
+        }
+        StateHasChanged();
     }
 
     private void OnKeywordInput(ChangeEventArgs e)
@@ -153,21 +226,37 @@
                     _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : null;
                     _hasMore = items.Count >= PageSize;
                     _loading = false;
-                    StateHasChanged();
                 }
+                StateHasChanged();
             });
         }, null, 300, System.Threading.Timeout.Infinite);
     }
 
-    private async Task OnDateSelected(DateOnly date)
+    private async Task OnDateSelectedAsync(DateOnly date)
+    {
+        _selectedDate = date;
+        await LoadByDateAsync(date);
+    }
+
+    private async Task LoadByDateAsync(DateOnly date)
     {
         if (!AppState.CurrentTopicId.HasValue) return;
         _results.Clear();
-        var items = await SearchService.GetByDateAsync(AppState.CurrentTopicId.Value, date);
-        _results.AddRange(items);
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var items = await SearchService.GetByDateAsync(AppState.CurrentTopicId.Value, date);
+            _results.AddRange(items);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
     }
 
-    private async Task SetContentType(ShareContentType type)
+    private async Task SetContentTypeAsync(ShareContentType type)
     {
         _contentType = type;
         _results.Clear();
@@ -175,26 +264,46 @@
         _hasMore = false;
         if (!AppState.CurrentTopicId.HasValue) return;
         _loading = true;
-        const int limit = PageSize;
-        var items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, type, limit: limit);
-        _results.AddRange(items);
-        _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : null;
-        _hasMore = items.Count >= limit;
-        _loading = false;
+        StateHasChanged();
+        try
+        {
+            var items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, type, limit: PageSize);
+            _results.AddRange(items);
+            _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : null;
+            _hasMore = items.Count >= PageSize;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task LoadMoreAsync()
     {
         if (!AppState.CurrentTopicId.HasValue) return;
         _loading = true;
-        IReadOnlyList<ShareItemDto> items;
-        if (_mode == "keyword")
-            items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, limit: PageSize, before: _cursor);
-        else
-            items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, _contentType, limit: PageSize, before: _cursor);
-        _results.AddRange(items);
-        _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : _cursor;
-        _hasMore = items.Count >= PageSize;
-        _loading = false;
+        StateHasChanged();
+        try
+        {
+            IReadOnlyList<ShareItemDto> items;
+            if (_mode == "keyword")
+                items = await SearchService.SearchAsync(AppState.CurrentTopicId.Value, _keyword, limit: PageSize, before: _cursor);
+            else
+                items = await SearchService.GetByTypeAsync(AppState.CurrentTopicId.Value, _contentType, limit: PageSize, before: _cursor);
+            _results.AddRange(items);
+            _cursor = items.Count > 0 ? items[^1].CreatedAt.ToString("O") : _cursor;
+            _hasMore = items.Count >= PageSize;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
     }
 }
