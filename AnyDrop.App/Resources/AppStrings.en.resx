@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Layout -->
+  <data name="Layout_OfflineBanner"><value>📡 No network connection</value></data>
+  <data name="Layout_ReconnectingBanner"><value>🔄 Real-time connection lost, reconnecting...</value></data>
+
+  <!-- Auth Layout -->
+  <data name="AuthLayout_Subtitle"><value>Cross-device content sharing</value></data>
+
+  <!-- Common -->
+  <data name="Common_Back"><value>Back</value></data>
+  <data name="Common_Save"><value>Save</value></data>
+  <data name="Common_Cancel"><value>Cancel</value></data>
+  <data name="Common_Create"><value>Create</value></data>
+  <data name="Common_Delete"><value>Delete</value></data>
+  <data name="Common_Deleting"><value>Deleting...</value></data>
+  <data name="Common_Nickname"><value>Nickname</value></data>
+  <data name="Common_Password"><value>Password</value></data>
+  <data name="Common_ConfirmPassword"><value>Confirm Password</value></data>
+  <data name="Common_Edit"><value>Edit</value></data>
+  <data name="Common_LoadMore"><value>Load More</value></data>
+
+  <!-- Language Names -->
+  <data name="Lang_ZhCN"><value>简体中文</value></data>
+  <data name="Lang_ZhTW"><value>繁體中文</value></data>
+  <data name="Lang_En"><value>English</value></data>
+
+  <!-- Login Page -->
+  <data name="Login_Title"><value>Sign In</value></data>
+  <data name="Login_ConfigServer"><value>Configure server</value></data>
+  <data name="Login_PasswordLabel"><value>Password</value></data>
+  <data name="Login_PasswordPlaceholder"><value>Enter your password</value></data>
+  <data name="Login_Submit"><value>Sign In</value></data>
+  <data name="Login_Submitting"><value>Signing in...</value></data>
+  <data name="Login_InvalidCredentials"><value>Incorrect password, please try again.</value></data>
+
+  <!-- Server Setup Page -->
+  <data name="Setup_Title"><value>Configure Server</value></data>
+  <data name="Setup_Subtitle"><value>Enter your AnyDrop server address to get started</value></data>
+  <data name="Setup_ServerAddress"><value>Server Address</value></data>
+  <data name="Setup_Connect"><value>Connect</value></data>
+  <data name="Setup_Connecting"><value>Connecting...</value></data>
+  <data name="Setup_ConnectFailed"><value>Cannot connect to server. Please check the address.</value></data>
+
+  <!-- Account Setup Page -->
+  <data name="SetupAccount_Title"><value>Create Account</value></data>
+  <data name="SetupAccount_Subtitle"><value>First time setup — set your nickname and password</value></data>
+  <data name="SetupAccount_NicknamePlaceholder"><value>Enter nickname</value></data>
+  <data name="SetupAccount_PasswordPlaceholder"><value>Enter password</value></data>
+  <data name="SetupAccount_ConfirmPasswordPlaceholder"><value>Enter password again</value></data>
+  <data name="SetupAccount_NicknameRequired"><value>Please enter a nickname</value></data>
+  <data name="SetupAccount_PasswordRequired"><value>Please enter a password</value></data>
+  <data name="SetupAccount_PasswordMismatch"><value>Passwords do not match</value></data>
+  <data name="SetupAccount_Creating"><value>Creating...</value></data>
+  <data name="SetupAccount_Submit"><value>Create Account</value></data>
+  <data name="SetupAccount_Failed"><value>Creation failed, please try again.</value></data>
+
+  <!-- Settings Page -->
+  <data name="Settings_Title"><value>Settings</value></data>
+  <data name="Settings_Profile"><value>Profile</value></data>
+  <data name="Settings_ChangePassword"><value>Change Password</value></data>
+  <data name="Settings_CurrentPassword"><value>Current Password</value></data>
+  <data name="Settings_NewPassword"><value>New Password</value></data>
+  <data name="Settings_WrongPassword"><value>Incorrect current password</value></data>
+  <data name="Settings_PasswordChangeFailed"><value>Change failed, please try again</value></data>
+  <data name="Settings_UpdatePassword"><value>Change Password</value></data>
+  <data name="Settings_Appearance"><value>Appearance &amp; Language</value></data>
+  <data name="Settings_DarkMode"><value>Dark Mode</value></data>
+  <data name="Settings_Language"><value>Interface Language</value></data>
+  <data name="Settings_DangerZone"><value>Danger Zone</value></data>
+  <data name="Settings_ChangeServerUrl"><value>Change Server Address</value></data>
+  <data name="Settings_UpdateServerUrl"><value>Update Server Address</value></data>
+  <data name="Settings_Logout"><value>Sign Out</value></data>
+
+  <!-- Sidebar -->
+  <data name="Sidebar_Topics"><value>Topics</value></data>
+  <data name="Sidebar_NewTopic"><value>+ New</value></data>
+  <data name="Sidebar_Pinned"><value>📌 Pinned</value></data>
+  <data name="Sidebar_ArchivedTopics"><value>Archived Topics</value></data>
+  <data name="Sidebar_Settings"><value>Settings</value></data>
+  <data name="Sidebar_CreateTopicTitle"><value>New Topic</value></data>
+  <data name="Sidebar_TopicNamePlaceholder"><value>Topic name</value></data>
+
+  <!-- Topic Action Menu -->
+  <data name="TopicAction_Rename"><value>Rename</value></data>
+  <data name="TopicAction_SetIcon"><value>Set Icon</value></data>
+  <data name="TopicAction_Unpin"><value>Unpin</value></data>
+  <data name="TopicAction_Pin"><value>Pin</value></data>
+  <data name="TopicAction_Unarchive"><value>Unarchive</value></data>
+  <data name="TopicAction_Archive"><value>Archive</value></data>
+  <data name="TopicAction_SelectMessages"><value>Select Messages</value></data>
+  <data name="TopicAction_ConfirmDelete"><value>Delete topic "{0}"? This cannot be undone.</value></data>
+  <data name="TopicAction_SaveIcon"><value>Save Icon</value></data>
+
+  <!-- Message List -->
+  <data name="MessageList_Cancel"><value>Cancel</value></data>
+  <data name="MessageList_Selected"><value>{0} selected</value></data>
+  <data name="MessageList_NoMessages"><value>No messages yet, send the first one 👋</value></data>
+
+  <!-- Message Item -->
+  <data name="MessageItem_SelectText"><value>Select Text</value></data>
+  <data name="MessageItem_SaveImage"><value>Save Image</value></data>
+  <data name="MessageItem_DefaultImage"><value>Image</value></data>
+  <data name="MessageItem_DefaultVideo"><value>Video</value></data>
+
+  <!-- Message Input -->
+  <data name="MessageInput_Placeholder"><value>Type a message...</value></data>
+  <data name="MessageInput_Uploading"><value>Uploading</value></data>
+  <data name="MessageInput_BurnAfterReading"><value>Burn After Reading</value></data>
+
+  <!-- Home Page -->
+  <data name="Home_SelectTopic"><value>Select a topic</value></data>
+
+  <!-- Search Page -->
+  <data name="Search_Title"><value>Search</value></data>
+  <data name="Search_Keyword"><value>Keyword</value></data>
+  <data name="Search_Date"><value>Date</value></data>
+  <data name="Search_Type"><value>Type</value></data>
+  <data name="Search_InputPlaceholder"><value>Enter keyword to search...</value></data>
+  <data name="Search_NoResults"><value>No matching content found</value></data>
+  <data name="Search_NoMessagesOnDate"><value>No messages on this date</value></data>
+  <data name="Search_NoTopicSelected"><value>Please select a topic on the home page first</value></data>
+  <data name="Search_NoContentType"><value>No messages of this type</value></data>
+  <data name="Search_Text"><value>Text</value></data>
+  <data name="Search_Image"><value>Image</value></data>
+  <data name="Search_Video"><value>Video</value></data>
+  <data name="Search_File"><value>File</value></data>
+  <data name="Search_Link"><value>Link</value></data>
+
+</root>

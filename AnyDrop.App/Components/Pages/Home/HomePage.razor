@@ -4,6 +4,7 @@
 @inject ISignalRService SignalR
 @inject IAppStateService AppState
 @inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> L
 @implements IDisposable
 
 <div class="flex h-full overflow-hidden">
@@ -39,7 +40,7 @@
             }
             <div class="flex-1 flex flex-col leading-tight">
                 <span class="font-bold text-lg text-gray-800 dark:text-white leading-tight">
-                    @(_currentTopic?.Name ?? "选择主题")
+                    @(_currentTopic?.Name ?? L["Home_SelectTopic"])
                 </span>                
             </div>
             <button aria-label="搜索" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-white/80 active:bg-black/5 dark:active:bg-white/10 transition-colors"

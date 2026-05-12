@@ -2,13 +2,14 @@
 @layout AuthLayout
 @inject IServerConfigService ServerConfig
 @inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> L
 
 <div class="space-y-4">
-    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">配置服务端</h2>
-    <p class="text-sm text-gray-500 dark:text-gray-400">输入您的 AnyDrop 服务端地址以开始使用</p>
+    <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">@L["Setup_Title"]</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">@L["Setup_Subtitle"]</p>
 
     <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">服务端地址</label>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">@L["Setup_ServerAddress"]</label>
         <input @bind="_url"
                @bind:event="oninput"
                type="url"
@@ -26,11 +27,11 @@
             class="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
         @if (_loading)
         {
-            <span>连接中...</span>
+            <span>@L["Setup_Connecting"]</span>
         }
         else
         {
-            <span>连接</span>
+            <span>@L["Setup_Connect"]</span>
         }
     </button>
 </div>
@@ -49,7 +50,7 @@
         var valid = await ServerConfig.ValidateUrlAsync(_url);
         if (!valid)
         {
-            _error = "无法连接到服务端，请检查地址是否正确。";
+            _error = L["Setup_ConnectFailed"];
             _loading = false;
             return;
         }

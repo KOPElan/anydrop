@@ -1,4 +1,5 @@
-﻿using AnyDrop.App.Infrastructure;
+﻿using System.Globalization;
+using AnyDrop.App.Infrastructure;
 using AnyDrop.App.Services;
 using Microsoft.Extensions.Logging;
 
@@ -17,6 +18,18 @@ namespace AnyDrop.App
                 });
 
             builder.Services.AddMauiBlazorWebView();
+
+            // 多语言本地化
+            builder.Services.AddLocalization();
+
+            // 在构建 App 之前应用存储的语言偏好，确保首次渲染使用正确语言
+            var initialLang = LocalizationService.NormalizeToSupported(
+                Microsoft.Maui.Storage.Preferences.Get("anydrop_language", string.Empty) is { Length: > 0 } stored
+                    ? stored
+                    : CultureInfo.CurrentUICulture.Name);
+            var initialCulture = new CultureInfo(initialLang);
+            CultureInfo.DefaultThreadCurrentCulture = initialCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = initialCulture;
 
 #if ANDROID
             // 允许 BlazorWebView 加载 HTTP 资源（混合内容），自托管服务器通常使用 HTTP
@@ -39,6 +52,7 @@ namespace AnyDrop.App
 
             // 基础设施
             builder.Services.AddSingleton<AppEventBus>();
+            builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
             builder.Services.AddSingleton<ISecureTokenStorage, SecureTokenStorage>();
             builder.Services.AddSingleton<IServerConfigService, ServerConfigService>();
             builder.Services.AddSingleton<IConnectivityService, ConnectivityService>();
