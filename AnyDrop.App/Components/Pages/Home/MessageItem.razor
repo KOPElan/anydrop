@@ -294,6 +294,9 @@
     private const int LongPressMs = 600;
     private static readonly string VideoThumbnailFallbackDataUrl = $"data:image/svg+xml,{Uri.EscapeDataString("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 270'><rect width='480' height='270' fill='%231d2430'/><circle cx='240' cy='135' r='34' fill='rgba(255,255,255,0.16)'/><polygon points='228,115 228,155 262,135' fill='white'/></svg>")}";
 
+    // 记录上次构建 URL 时的 Item.Id，避免父组件每次 re-render 都重复触发 SecureStorage 读取
+    private Guid _lastUrlItemId = Guid.Empty;
+
     private void CancelLongPress()
     {
         _longPressTimer?.Dispose();
@@ -304,16 +307,25 @@
     {
         if (Item.ContentType is ShareContentType.Image or ShareContentType.Video)
         {
-            _fileUrl = await BuildFileUrlAsync(download: false);
-            _thumbnailUrl = await BuildThumbnailUrlAsync();
-            _videoExpanded = false;
-            StateHasChanged();
+            // 只在 Item.Id 发生变化时重新构建 URL，避免父组件每次 re-render 都触发 SecureStorage 读取
+            if (Item.Id != _lastUrlItemId)
+            {
+                _lastUrlItemId = Item.Id;
+                _fileUrl = await BuildFileUrlAsync(download: false);
+                _thumbnailUrl = await BuildThumbnailUrlAsync();
+                _videoExpanded = false;
+                StateHasChanged();
+            }
         }
         else
         {
-            _fileUrl = string.Empty;
-            _thumbnailUrl = string.Empty;
-            _videoExpanded = false;
+            if (_lastUrlItemId != Guid.Empty)
+            {
+                _fileUrl = string.Empty;
+                _thumbnailUrl = string.Empty;
+                _videoExpanded = false;
+                _lastUrlItemId = Guid.Empty;
+            }
         }
     }
 

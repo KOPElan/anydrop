@@ -67,9 +67,19 @@
         if (string.IsNullOrWhiteSpace(_text)) return;
         var textToSend = _text;
         _text = string.Empty;
-        var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
-        AppState.Messages.Add(item);
-        AppState.NotifyMessageAdded();
+        try
+        {
+            var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
+            // 防止竞态：SignalR 推送可能在 HTTP 响应返回前已将该条消息加入列表
+            if (!AppState.Messages.Any(m => m.Id == item.Id))
+                AppState.Messages.Add(item);
+            AppState.NotifyMessageAdded();
+        }
+        catch
+        {
+            // 发送失败时恢复输入内容，避免用户无感知地丢失消息
+            _text = textToSend;
+        }
     }
 
     private async Task PickFileAndUploadAsync()
@@ -94,7 +104,9 @@
         try
         {
             var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
-            AppState.Messages.Add(item);
+            // 防止竞态：SignalR 推送可能已先于 HTTP 响应将文件消息加入列表
+            if (!AppState.Messages.Any(m => m.Id == item.Id))
+                AppState.Messages.Add(item);
             AppState.NotifyMessageAdded();
         }
         finally

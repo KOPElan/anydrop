@@ -249,14 +249,10 @@ else
 
     private void OnMessageAdded()
     {
-        InvokeAsync(async () =>
-        {
-            StateHasChanged();
-            if (_isNearBottom)
-            {
-                RequestScrollToBottom();
-            }
-        });
+        // AppState.OnChange 已经触发了 StateHasChanged，此处只需同步设置滚动标志。
+        // OnAfterRenderAsync 在本次 render 完成后会检测该标志并执行滚动。
+        if (_isNearBottom)
+            _pendingScrollToBottom = true;
     }
 
     private void RequestScrollToBottom()
