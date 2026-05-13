@@ -5,6 +5,7 @@
 @inject ITopicService TopicService
 @inject IConnectivityService Connectivity
 @inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> L
 
 <div class="flex flex-col h-full bg-white dark:bg-gray-900">
     <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -13,15 +14,15 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
         </button>
-        <h1 class="font-semibold text-sm text-gray-800 dark:text-gray-100">分享至 AnyDrop</h1>
+        <h1 class="font-semibold text-sm text-gray-800 dark:text-gray-100">@L["Share_Title"]</h1>
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-4 touch-scroll">
         @if (!Connectivity.IsOnline)
         {
             <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-3 text-sm text-amber-700 dark:text-amber-300">
-                📡 无网络连接，内容已暂存。
-                <button @onclick="SendAsync" class="underline font-medium ml-1">重试</button>
+                @L["Share_OfflineBanner"]
+                <button @onclick="SendAsync" class="underline font-medium ml-1">@L["Share_Retry"]</button>
             </div>
         }
 
@@ -43,9 +44,9 @@
         }
 
         <div>
-            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">选择目标主题</label>
+            <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">@L["Share_SelectTopic"]</label>
             <select @bind="_selectedTopicId" class="input-base appearance-none">
-                <option value="">-- 请选择主题 --</option>
+                <option value="">@L["Share_SelectTopicPlaceholder"]</option>
                 @foreach (var topic in _topics)
                 {
                     <option value="@topic.Id">@topic.Name</option>
@@ -63,7 +64,7 @@
         <button @onclick="SendAsync"
                 disabled="@(_sending || string.IsNullOrEmpty(_selectedTopicId))"
                 class="btn-primary">
-            @(_sending ? "发送中..." : "发送")
+            @(_sending ? L["Share_Sending"] : L["Share_Send"])
         </button>
     </div>
 </div>
@@ -108,7 +109,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"发送失败：{ex.Message}";
+            _error = string.Format(L["Share_SendFailed"], ex.Message);
             _sending = false;
         }
     }

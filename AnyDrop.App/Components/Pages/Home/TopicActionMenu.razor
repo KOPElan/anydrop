@@ -1,5 +1,6 @@
 @inject ITopicService TopicService
 @inject IAppStateService AppState
+@inject IStringLocalizer<AppStrings> L
 
 @if (_showMenu && Topic is not null)
 {
@@ -17,8 +18,8 @@
                     <input @bind="_editName" type="text"
                            class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     <div class="flex gap-2">
-                        <button @onclick="() => _editMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
-                        <button @onclick="RenameAsync" class="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">保存</button>
+                        <button @onclick="() => _editMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">@L["Common_Cancel"]</button>
+                        <button @onclick="RenameAsync" class="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">@L["Common_Save"]</button>
                     </div>
                 </div>
             }
@@ -35,32 +36,32 @@
                         }
                     </div>
                     <div class="flex gap-2">
-                        <button @onclick="() => _iconMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
-                        <button @onclick="SaveIconAsync" class="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">保存图标</button>
+                        <button @onclick="() => _iconMode = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">@L["Common_Cancel"]</button>
+                        <button @onclick="SaveIconAsync" class="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">@L["TopicAction_SaveIcon"]</button>
                     </div>
                 </div>
             }
             else if (_confirmDelete)
             {
                 <div class="py-2 space-y-2">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 text-center">确认删除主题「@Topic.Name」？此操作不可撤销。</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 text-center">@string.Format(L["TopicAction_ConfirmDelete"], Topic.Name)</p>
                     <div class="flex gap-2">
-                        <button @onclick="() => _confirmDelete = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">取消</button>
-                        <button @onclick="DeleteAsync" class="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium">删除</button>
+                        <button @onclick="() => _confirmDelete = false" class="flex-1 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">@L["Common_Cancel"]</button>
+                        <button @onclick="DeleteAsync" class="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium">@L["Common_Delete"]</button>
                     </div>
                 </div>
             }
             else
             {
-                <ActionItem Icon="edit" Label="重命名" OnClick="() => { _editMode = true; _editName = Topic.Name; }" />
-                <ActionItem Icon="image" Label="设置图标" OnClick="OpenIconMode" />
-                <ActionItem Icon="@(Topic.IsPinned ? "keep_off" : "keep")" Label="@(Topic.IsPinned ? "取消置顶" : "置顶")" OnClick="TogglePinAsync" />
-                <ActionItem Icon="@(Topic.IsArchived ? "unarchive" : "archive")" Label="@(Topic.IsArchived ? "取消归档" : "归档")" OnClick="ToggleArchiveAsync" />
+                <ActionItem Icon="edit" Label="@L["TopicAction_Rename"]" OnClick="() => { _editMode = true; _editName = Topic.Name; }" />
+                <ActionItem Icon="image" Label="@L["TopicAction_SetIcon"]" OnClick="OpenIconMode" />
+                <ActionItem Icon="@(Topic.IsPinned ? "keep_off" : "keep")" Label="@(Topic.IsPinned ? L["TopicAction_Unpin"] : L["TopicAction_Pin"])" OnClick="TogglePinAsync" />
+                <ActionItem Icon="@(Topic.IsArchived ? "unarchive" : "archive")" Label="@(Topic.IsArchived ? L["TopicAction_Unarchive"] : L["TopicAction_Archive"])" OnClick="ToggleArchiveAsync" />
                 @if (OnEnterSelectionMode.HasDelegate)
                 {
-                    <ActionItem Icon="checklist" Label="选择消息" OnClick="SelectMessagesAsync" />
+                    <ActionItem Icon="checklist" Label="@L["TopicAction_SelectMessages"]" OnClick="SelectMessagesAsync" />
                 }
-                <ActionItem Icon="delete" Label="删除" OnClick="() => _confirmDelete = true" Danger="true" />
+                <ActionItem Icon="delete" Label="@L["Common_Delete"]" OnClick="() => _confirmDelete = true" Danger="true" />
             }
         </div>
     </div>

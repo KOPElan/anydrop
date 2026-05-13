@@ -4,26 +4,27 @@
 @inject ISignalRService SignalR
 @inject INotificationService Notifications
 @inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> L
 
 <div class="space-y-5">
     <div class="text-center">
-        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">创建账号</h2>
-        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">首次使用，请设置您的昵称和密码</p>
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">@L["SetupAccount_Title"]</h2>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">@L["SetupAccount_Subtitle"]</p>
     </div>
 
     <div>
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">昵称</label>
-        <input @bind="_nickname" type="text" placeholder="请输入昵称" class="input-base" />
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">@L["Common_Nickname"]</label>
+        <input @bind="_nickname" type="text" placeholder="@L["SetupAccount_NicknamePlaceholder"]" class="input-base" />
     </div>
 
     <div>
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">密码</label>
-        <input @bind="_password" type="password" placeholder="请输入密码" class="input-base" />
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">@L["Common_Password"]</label>
+        <input @bind="_password" type="password" placeholder="@L["SetupAccount_PasswordPlaceholder"]" class="input-base" />
     </div>
 
     <div>
-        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">确认密码</label>
-        <input @bind="_confirmPassword" type="password" placeholder="再次输入密码" class="input-base" />
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1.5">@L["Common_ConfirmPassword"]</label>
+        <input @bind="_confirmPassword" type="password" placeholder="@L["SetupAccount_ConfirmPasswordPlaceholder"]" class="input-base" />
     </div>
 
     @if (_error is not null)
@@ -34,7 +35,7 @@
     <button @onclick="SetupAsync"
             disabled="@(_loading)"
             class="btn-primary">
-        @(_loading ? "创建中..." : "创建账号")
+        @(_loading ? L["SetupAccount_Creating"] : L["SetupAccount_Submit"])
     </button>
 </div>
 
@@ -47,9 +48,9 @@
 
     private async Task SetupAsync()
     {
-        if (string.IsNullOrWhiteSpace(_nickname)) { _error = "请输入昵称"; return; }
-        if (string.IsNullOrWhiteSpace(_password)) { _error = "请输入密码"; return; }
-        if (_password != _confirmPassword) { _error = "两次密码不一致"; return; }
+        if (string.IsNullOrWhiteSpace(_nickname)) { _error = L["SetupAccount_NicknameRequired"]; return; }
+        if (string.IsNullOrWhiteSpace(_password)) { _error = L["SetupAccount_PasswordRequired"]; return; }
+        if (_password != _confirmPassword) { _error = L["SetupAccount_PasswordMismatch"]; return; }
 
         _loading = true;
         _error = null;
@@ -63,7 +64,7 @@
         }
         else
         {
-            _error = result.Error ?? "创建失败，请重试。";
+            _error = result.Error ?? L["SetupAccount_Failed"];
             _loading = false;
         }
     }

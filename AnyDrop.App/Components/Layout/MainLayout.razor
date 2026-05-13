@@ -3,19 +3,20 @@
 @inject NavigationManager Nav
 @inject IConnectivityService Connectivity
 @inject ISignalRService SignalR
+@inject IStringLocalizer<AppStrings> L
 @implements IDisposable
 
 <div class="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
     @if (_showOfflineBanner)
     {
         <div class="status-banner bg-yellow-500 text-white">
-            📡 无网络连接
+            @L["Layout_OfflineBanner"]
         </div>
     }
     @if (_signalRDisconnected)
     {
         <div class="status-banner bg-orange-400 text-white">
-            🔄 实时连接断开，正在重连...
+            @L["Layout_ReconnectingBanner"]
         </div>
     }
 

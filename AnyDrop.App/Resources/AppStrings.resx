@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- 布局 / Layout -->
+  <data name="Layout_OfflineBanner"><value>📡 无网络连接</value></data>
+  <data name="Layout_ReconnectingBanner"><value>🔄 实时连接断开，正在重连...</value></data>
+
+  <!-- 认证布局副标题 / Auth Layout -->
+  <data name="AuthLayout_Subtitle"><value>跨设备内容共享</value></data>
+
+  <!-- 通用 / Common -->
+  <data name="Common_Back"><value>返回</value></data>
+  <data name="Common_Save"><value>保存</value></data>
+  <data name="Common_Cancel"><value>取消</value></data>
+  <data name="Common_Create"><value>创建</value></data>
+  <data name="Common_Delete"><value>删除</value></data>
+  <data name="Common_Deleting"><value>删除中...</value></data>
+  <data name="Common_Nickname"><value>昵称</value></data>
+  <data name="Common_Password"><value>密码</value></data>
+  <data name="Common_ConfirmPassword"><value>确认密码</value></data>
+  <data name="Common_Edit"><value>编辑</value></data>
+  <data name="Common_LoadMore"><value>加载更多</value></data>
+
+  <!-- 语言名称 / Language Names -->
+  <data name="Lang_ZhCN"><value>简体中文</value></data>
+  <data name="Lang_ZhTW"><value>繁體中文</value></data>
+  <data name="Lang_En"><value>English</value></data>
+
+  <!-- 登录页 / Login Page -->
+  <data name="Login_Title"><value>登录</value></data>
+  <data name="Login_ConfigServer"><value>配置服务端地址</value></data>
+  <data name="Login_PasswordLabel"><value>密码</value></data>
+  <data name="Login_PasswordPlaceholder"><value>输入您的密码</value></data>
+  <data name="Login_Submit"><value>登录</value></data>
+  <data name="Login_Submitting"><value>登录中...</value></data>
+  <data name="Login_InvalidCredentials"><value>密码错误，请重试。</value></data>
+
+  <!-- 服务端配置页 / Server Setup Page -->
+  <data name="Setup_Title"><value>配置服务端</value></data>
+  <data name="Setup_Subtitle"><value>输入您的 AnyDrop 服务端地址以开始使用</value></data>
+  <data name="Setup_ServerAddress"><value>服务端地址</value></data>
+  <data name="Setup_Connect"><value>连接</value></data>
+  <data name="Setup_Connecting"><value>连接中...</value></data>
+  <data name="Setup_ConnectFailed"><value>无法连接到服务端，请检查地址是否正确。</value></data>
+
+  <!-- 账号创建页 / Account Setup Page -->
+  <data name="SetupAccount_Title"><value>创建账号</value></data>
+  <data name="SetupAccount_Subtitle"><value>首次使用，请设置您的昵称和密码</value></data>
+  <data name="SetupAccount_NicknamePlaceholder"><value>请输入昵称</value></data>
+  <data name="SetupAccount_PasswordPlaceholder"><value>请输入密码</value></data>
+  <data name="SetupAccount_ConfirmPasswordPlaceholder"><value>再次输入密码</value></data>
+  <data name="SetupAccount_NicknameRequired"><value>请输入昵称</value></data>
+  <data name="SetupAccount_PasswordRequired"><value>请输入密码</value></data>
+  <data name="SetupAccount_PasswordMismatch"><value>两次密码不一致</value></data>
+  <data name="SetupAccount_Creating"><value>创建中...</value></data>
+  <data name="SetupAccount_Submit"><value>创建账号</value></data>
+  <data name="SetupAccount_Failed"><value>创建失败，请重试。</value></data>
+
+  <!-- 设置页 / Settings Page -->
+  <data name="Settings_Title"><value>设置</value></data>
+  <data name="Settings_Profile"><value>个人资料</value></data>
+  <data name="Settings_ChangePassword"><value>修改密码</value></data>
+  <data name="Settings_CurrentPassword"><value>当前密码</value></data>
+  <data name="Settings_NewPassword"><value>新密码</value></data>
+  <data name="Settings_WrongPassword"><value>当前密码错误</value></data>
+  <data name="Settings_PasswordChangeFailed"><value>修改失败，请重试</value></data>
+  <data name="Settings_UpdatePassword"><value>修改密码</value></data>
+  <data name="Settings_Appearance"><value>外观与语言</value></data>
+  <data name="Settings_DarkMode"><value>深色模式</value></data>
+  <data name="Settings_Language"><value>界面语言</value></data>
+  <data name="Settings_DangerZone"><value>危险区域</value></data>
+  <data name="Settings_ChangeServerUrl"><value>修改服务端地址</value></data>
+  <data name="Settings_UpdateServerUrl"><value>更换服务端地址</value></data>
+  <data name="Settings_Logout"><value>退出登录</value></data>
+
+  <!-- 侧边栏 / Sidebar -->
+  <data name="Sidebar_Topics"><value>主题</value></data>
+  <data name="Sidebar_NewTopic"><value>+ 新建</value></data>
+  <data name="Sidebar_Pinned"><value>📌 置顶</value></data>
+  <data name="Sidebar_ArchivedTopics"><value>已归档主题</value></data>
+  <data name="Sidebar_Settings"><value>设置</value></data>
+  <data name="Sidebar_CreateTopicTitle"><value>新建主题</value></data>
+  <data name="Sidebar_TopicNamePlaceholder"><value>主题名称</value></data>
+
+  <!-- 主题操作菜单 / Topic Action Menu -->
+  <data name="TopicAction_Rename"><value>重命名</value></data>
+  <data name="TopicAction_SetIcon"><value>设置图标</value></data>
+  <data name="TopicAction_Unpin"><value>取消置顶</value></data>
+  <data name="TopicAction_Pin"><value>置顶</value></data>
+  <data name="TopicAction_Unarchive"><value>取消归档</value></data>
+  <data name="TopicAction_Archive"><value>归档</value></data>
+  <data name="TopicAction_SelectMessages"><value>选择消息</value></data>
+  <data name="TopicAction_ConfirmDelete"><value>确认删除主题「{0}」？此操作不可撤销。</value></data>
+  <data name="TopicAction_SaveIcon"><value>保存图标</value></data>
+
+  <!-- 消息列表 / Message List -->
+  <data name="MessageList_Cancel"><value>取消</value></data>
+  <data name="MessageList_Selected"><value>已选 {0} 条</value></data>
+  <data name="MessageList_NoMessages"><value>暂无消息，发送第一条吧 👋</value></data>
+
+  <!-- 消息条目 / Message Item -->
+  <data name="MessageItem_SelectText"><value>选择文本</value></data>
+  <data name="MessageItem_SaveImage"><value>保存图片</value></data>
+  <data name="MessageItem_DefaultImage"><value>图片</value></data>
+  <data name="MessageItem_DefaultVideo"><value>视频</value></data>
+
+  <!-- 消息输入框 / Message Input -->
+  <data name="MessageInput_Placeholder"><value>输入消息...</value></data>
+  <data name="MessageInput_Uploading"><value>上传中</value></data>
+  <data name="MessageInput_BurnAfterReading"><value>阅后即焚</value></data>
+
+  <!-- 首页 / Home Page -->
+  <data name="Home_SelectTopic"><value>选择主题</value></data>
+  <data name="Home_CreateTopicHint"><value>请从左侧选择或创建一个主题</value></data>
+  <data name="Home_SearchAriaLabel"><value>搜索</value></data>
+  <data name="Home_MoreAriaLabel"><value>更多</value></data>
+
+  <!-- 路由加载 / Routes Loading -->
+  <data name="Routes_Loading"><value>正在加载...</value></data>
+
+  <!-- 连接失败 / Connection Failed -->
+  <data name="ConnectionFailed_Title"><value>连接失败</value></data>
+  <data name="ConnectionFailed_Message"><value>无法连接到服务器，请检查服务器地址设置后重试。</value></data>
+  <data name="ConnectionFailed_OK"><value>确定</value></data>
+
+  <!-- 外部分享页 / External Share Page -->
+  <data name="Share_Title"><value>分享至 AnyDrop</value></data>
+  <data name="Share_OfflineBanner"><value>📡 无网络连接，内容已暂存。</value></data>
+  <data name="Share_Retry"><value>重试</value></data>
+  <data name="Share_SelectTopic"><value>选择目标主题</value></data>
+  <data name="Share_SelectTopicPlaceholder"><value>-- 请选择主题 --</value></data>
+  <data name="Share_Send"><value>发送</value></data>
+  <data name="Share_Sending"><value>发送中...</value></data>
+  <data name="Share_SendFailed"><value>发送失败：{0}</value></data>
+
+  <!-- 搜索页 / Search Page -->
+  <data name="Search_Title"><value>搜索</value></data>
+  <data name="Search_Keyword"><value>关键词</value></data>
+  <data name="Search_Date"><value>日期</value></data>
+  <data name="Search_Type"><value>类型</value></data>
+  <data name="Search_InputPlaceholder"><value>输入关键词搜索...</value></data>
+  <data name="Search_NoResults"><value>未找到相关内容</value></data>
+  <data name="Search_NoMessagesOnDate"><value>该日期暂无消息</value></data>
+  <data name="Search_NoTopicSelected"><value>请先在主页选择主题</value></data>
+  <data name="Search_NoContentType"><value>暂无该类型消息</value></data>
+  <data name="Search_Text"><value>文本</value></data>
+  <data name="Search_Image"><value>图片</value></data>
+  <data name="Search_Video"><value>视频</value></data>
+  <data name="Search_File"><value>文件</value></data>
+  <data name="Search_Link"><value>链接</value></data>
+
+</root>
