@@ -546,8 +546,7 @@
             @* 发送按钮（方形，渐变）*@
             <div class="input-send-wrap ml-2">
                 <button type="button"
-                        class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                        style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);"
+                        class="chat-send-btn flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                         disabled="@_isSending"
                         @onclick="SendAsync">
                     <span class="material-symbols-outlined"
@@ -654,8 +653,7 @@
                 @* 发送按钮（与输入框一体，方形渐变）*@
                 <div class="input-send-wrap ml-2">
                     <button type="button"
-                            class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                            style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);"
+                            class="chat-send-btn flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                             disabled="@_isSending"
                             @onclick="SendFromMobileModalAsync">
                         @if (_isSending)

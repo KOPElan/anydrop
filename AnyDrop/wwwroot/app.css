@@ -1028,6 +1028,32 @@
         to   { transform: translateY(0); opacity: 1; }
     }
 
+    /* ─── 聊天发送按钮（桌面端和移动端浮动面板共用渐变样式）─── */
+    .chat-send-btn {
+        background: linear-gradient(135deg, #6366f1, #3b82f6);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .chat-send-btn:hover:not(:disabled) {
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+    }
+
+    /* ─── Settings 卡片图标容器（缩略图等带图标标题的区块）─── */
+    .settings-icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 2.25rem;
+        width: 2.25rem;
+        border-radius: 0.75rem;
+        background: var(--color-primary-fixed);
+        flex-shrink: 0;
+    }
+
+    .settings-icon-text {
+        color: var(--color-primary);
+    }
+
     /* ─── 骨架屏加载动画 ─── */
     @keyframes skeleton-shimmer {
         0%   { background-position: -400px 0; }

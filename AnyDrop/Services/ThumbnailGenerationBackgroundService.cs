@@ -7,6 +7,9 @@ public sealed class ThumbnailGenerationBackgroundService(
     IServiceProvider serviceProvider,
     ILogger<ThumbnailGenerationBackgroundService> logger) : BackgroundService
 {
+    // 保证同一时间只有一个批处理实例运行（定时触发与 API 手动触发互斥）
+    private readonly SemaphoreSlim _runLock = new(1, 1);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("ThumbnailGenerationBackgroundService started.");
@@ -49,15 +52,31 @@ public sealed class ThumbnailGenerationBackgroundService(
         logger.LogInformation("ThumbnailGenerationBackgroundService stopped.");
     }
 
-    /// <summary>立即执行一次缩略图批处理（可由 API 手动触发）。</summary>
+    /// <summary>
+    /// 立即执行一次缩略图批处理（可由 API 手动触发）。
+    /// 若已有批处理在运行，直接返回（幂等，不会并发启动多次）。
+    /// </summary>
     public async Task RunAsync(CancellationToken ct = default)
     {
-        using var scope = serviceProvider.CreateScope();
-        var thumbnailService = scope.ServiceProvider.GetRequiredService<IThumbnailService>();
+        if (!await _runLock.WaitAsync(0, ct))
+        {
+            logger.LogInformation("ThumbnailGenerationBackgroundService: Batch already running, skipping duplicate trigger.");
+            return;
+        }
 
-        logger.LogInformation("ThumbnailGenerationBackgroundService: Starting thumbnail batch.");
-        var count = await thumbnailService.ProcessPendingThumbnailsAsync(ct);
-        logger.LogInformation("ThumbnailGenerationBackgroundService: Generated {Count} thumbnails.", count);
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var thumbnailService = scope.ServiceProvider.GetRequiredService<IThumbnailService>();
+
+            logger.LogInformation("ThumbnailGenerationBackgroundService: Starting thumbnail batch.");
+            var count = await thumbnailService.ProcessPendingThumbnailsAsync(ct);
+            logger.LogInformation("ThumbnailGenerationBackgroundService: Generated {Count} thumbnails.", count);
+        }
+        finally
+        {
+            _runLock.Release();
+        }
     }
 
     private async Task<int> GetTargetHourAsync(CancellationToken ct)

@@ -102,7 +102,7 @@ public partial class Home : IAsyncDisposable
     // 条件滚到底（收到新消息时，仅当用户处于底部附近才滚动）
     private bool _shouldScrollIfNearBottom;
 
-    // 消息加载中状态（初次加载、切换主题时显示骨架屏）
+    // 消息加载中状态（切换主题/初次加载时显示骨架屏；发送消息后刷新不触发骨架屏）
     private bool _isLoadingMessages;
 
     // 移动端发送 Modal 状态
@@ -383,8 +383,9 @@ public partial class Home : IAsyncDisposable
         {
             await ShareService.SendTextAsync(trimmedText, _selectedTopicId, burnAfterReading: _burnAfterReading);
             _inputText = string.Empty;
-            // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示
-            await LoadSelectedTopicMessagesAsync();
+            // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示；
+            // showSkeleton=false 避免清空现有列表并显示骨架屏
+            await LoadSelectedTopicMessagesAsync(showSkeleton: false);
         }
         finally
         {
@@ -995,18 +996,26 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    private async Task LoadSelectedTopicMessagesAsync(CancellationToken ct = default)
+    private async Task LoadSelectedTopicMessagesAsync(bool showSkeleton = true, CancellationToken ct = default)
     {
-        _messages.Clear();
-        _messageIds.Clear();
-        _expandedVideoIds.Clear();
+        if (showSkeleton)
+        {
+            // 切换主题时清空消息列表，展示骨架屏过渡动画
+            _messages.Clear();
+            _messageIds.Clear();
+            _expandedVideoIds.Clear();
+        }
+
         if (!_selectedTopicId.HasValue)
         {
             return;
         }
 
-        _isLoadingMessages = true;
-        StateHasChanged();
+        if (showSkeleton)
+        {
+            _isLoadingMessages = true;
+            StateHasChanged();
+        }
 
         try
         {
@@ -1031,7 +1040,10 @@ public partial class Home : IAsyncDisposable
         }
         finally
         {
-            _isLoadingMessages = false;
+            if (showSkeleton)
+            {
+                _isLoadingMessages = false;
+            }
         }
     }
 

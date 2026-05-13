@@ -32,6 +32,54 @@ public class SystemSettingsServiceTests
         (await sut.IsAutoFetchLinkPreviewEnabledAsync()).Should().BeFalse();
     }
 
+    // ── ThumbnailGenerationHour 校验 ──────────────────────────────────────────
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(24)]
+    [InlineData(100)]
+    public async Task UpdateSecuritySettingsAsync_WithInvalidThumbnailHour_ShouldFail(int invalidHour)
+    {
+        await using var db = CreateDbContext();
+        var sut = new SystemSettingsService(db);
+
+        var request = new UpdateSecuritySettingsRequest(true, 10, "zh-CN", false, 1, invalidHour);
+        var result = await sut.UpdateSecuritySettingsAsync(request);
+
+        result.Succeeded.Should().BeFalse();
+        result.StatusCode.Should().Be(400);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(23)]
+    public async Task UpdateSecuritySettingsAsync_WithValidThumbnailHour_ShouldPersist(int validHour)
+    {
+        await using var db = CreateDbContext();
+        var sut = new SystemSettingsService(db);
+
+        var request = new UpdateSecuritySettingsRequest(true, 10, "zh-CN", false, 1, validHour);
+        var result = await sut.UpdateSecuritySettingsAsync(request);
+
+        result.Succeeded.Should().BeTrue();
+        var retrieved = await sut.GetThumbnailGenerationHourAsync();
+        retrieved.Should().Be(validHour);
+    }
+
+    [Fact]
+    public async Task GetThumbnailGenerationHourAsync_WhenNoSettings_ShouldReturnDefault()
+    {
+        await using var db = CreateDbContext();
+        var sut = new SystemSettingsService(db);
+
+        // 初始化设置（使用 GetSecuritySettingsAsync 触发 EnsureSettingsAsync）
+        await sut.GetSecuritySettingsAsync();
+        var hour = await sut.GetThumbnailGenerationHourAsync();
+
+        hour.Should().Be(2); // 默认值
+    }
+
     private static AnyDropDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()

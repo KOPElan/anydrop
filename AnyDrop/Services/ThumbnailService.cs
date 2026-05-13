@@ -63,23 +63,46 @@ public sealed class ThumbnailService(
     /// <inheritdoc />
     public async Task<int> ProcessPendingThumbnailsAsync(CancellationToken ct = default)
     {
-        var pending = await dbContext.ShareItems
-            .Where(x => x.ThumbnailPath == null
-                        && (x.ContentType == ShareContentType.Image || x.ContentType == ShareContentType.Video))
-            .OrderBy(x => x.CreatedAt)
-            .Select(x => x.Id)
-            .ToListAsync(ct);
-
-        logger.LogInformation("ThumbnailService: Processing {Count} pending items.", pending.Count);
-
+        // 分批处理，每次最多加载 BatchSize 条 ID，避免一次性加载全部数据导致内存峰值
+        const int BatchSize = 100;
         var success = 0;
-        foreach (var id in pending)
+        DateTimeOffset? cursor = null;
+
+        while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var result = await GenerateThumbnailAsync(id, ct);
-            if (result is not null) success++;
+
+            var query = dbContext.ShareItems
+                .Where(x => x.ThumbnailPath == null
+                            && (x.ContentType == ShareContentType.Image || x.ContentType == ShareContentType.Video));
+
+            if (cursor.HasValue)
+            {
+                query = query.Where(x => x.CreatedAt > cursor.Value);
+            }
+
+            var batch = await query
+                .OrderBy(x => x.CreatedAt)
+                .Take(BatchSize)
+                .Select(x => new { x.Id, x.CreatedAt })
+                .ToListAsync(ct);
+
+            if (batch.Count == 0) break;
+
+            logger.LogDebug("ThumbnailService: Processing batch of {Count} pending items.", batch.Count);
+
+            foreach (var item in batch)
+            {
+                ct.ThrowIfCancellationRequested();
+                var result = await GenerateThumbnailAsync(item.Id, ct);
+                if (result is not null) success++;
+            }
+
+            cursor = batch[^1].CreatedAt;
+            if (batch.Count < BatchSize) break;
         }
 
+        logger.LogInformation("ThumbnailService: Generated {Count} thumbnails.", success);
         return success;
     }
 
@@ -114,7 +137,19 @@ public sealed class ThumbnailService(
     private async Task<string?> GenerateVideoThumbnailAsync(ShareItem item, CancellationToken ct)
     {
         var basePath = Path.GetFullPath(configuration["Storage:BasePath"] ?? "data/files");
-        var originalFullPath = Path.GetFullPath(Path.Combine(basePath, item.Content.TrimStart('/')));
+
+        // 防路径穿越：规范化路径后验证仍在 basePath 下（与 LocalFileStorageService.GetFullPath 逻辑一致）
+        var safePath = item.Content.Replace('\\', '/').TrimStart('/');
+        var originalFullPath = Path.GetFullPath(Path.Combine(basePath, safePath));
+        var baseWithSep = basePath.EndsWith(Path.DirectorySeparatorChar)
+            ? basePath
+            : basePath + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!originalFullPath.StartsWith(baseWithSep, comparison))
+        {
+            logger.LogWarning("ThumbnailService: Path traversal attempt detected for ShareItem {Id}.", item.Id);
+            return null;
+        }
 
         if (!File.Exists(originalFullPath))
         {
@@ -169,7 +204,24 @@ public sealed class ThumbnailService(
             using var process = System.Diagnostics.Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start ffmpeg process.");
 
+            // 必须异步读取 stdout 和 stderr，否则管道缓冲区满后进程阻塞，
+            // 导致 WaitForExitAsync 永远不返回（后台任务卡死）。
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
+            var stderrTask = process.StandardError.ReadToEndAsync(ct);
+
             await process.WaitForExitAsync(ct);
+
+            // 等待管道读取完毕
+            await stdoutTask;
+            var stderr = await stderrTask;
+
+            if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(stderr))
+            {
+                // 截断日志，避免超长 ffmpeg 输出塞满日志
+                logger.LogDebug("ThumbnailService: ffmpeg stderr (first 500 chars): {Stderr}",
+                    stderr[..Math.Min(500, stderr.Length)]);
+            }
+
             return process.ExitCode;
         }
         catch (System.ComponentModel.Win32Exception ex)
