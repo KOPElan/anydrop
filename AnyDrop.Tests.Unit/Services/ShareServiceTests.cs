@@ -123,6 +123,45 @@ public class ShareServiceTests
     }
 
     [Fact]
+    public async Task SendFileAsync_Image_WhenScheduledThumbnailGenerationDisabled_ShouldGenerateThumbnailAsync()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateServiceWithThumbnailSettings(
+            dbContext,
+            scheduledThumbnailGenerationEnabled: false,
+            out var thumbnailServiceMock);
+
+        var thumbnailTriggered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        thumbnailServiceMock
+            .Setup(x => x.GenerateThumbnailAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Callback(() => thumbnailTriggered.TrySetResult(true))
+            .ReturnsAsync((string?)null);
+
+        await using var stream = new MemoryStream([1, 2, 3]);
+        var dto = await service.SendFileAsync(stream, "photo.png", "image/png");
+
+        var completedTask = await Task.WhenAny(thumbnailTriggered.Task, Task.Delay(300));
+        completedTask.Should().Be(thumbnailTriggered.Task);
+        thumbnailServiceMock.Verify(x => x.GenerateThumbnailAsync(dto.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendFileAsync_Image_WhenScheduledThumbnailGenerationEnabled_ShouldNotGenerateThumbnailAsync()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateServiceWithThumbnailSettings(
+            dbContext,
+            scheduledThumbnailGenerationEnabled: true,
+            out var thumbnailServiceMock);
+
+        await using var stream = new MemoryStream([1, 2, 3]);
+        await service.SendFileAsync(stream, "photo.png", "image/png");
+        await Task.Delay(150);
+
+        thumbnailServiceMock.Verify(x => x.GenerateThumbnailAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task SendTextAsync_Link_WhenAutoFetchDisabled_ShouldNotTriggerMetadataFetchFailure()
     {
         await using var dbContext = CreateDbContext();
@@ -259,6 +298,62 @@ public class ShareServiceTests
             .Options;
 
         return new AnyDropDbContext(options);
+    }
+
+    private static ShareService CreateServiceWithThumbnailSettings(
+        AnyDropDbContext dbContext,
+        bool scheduledThumbnailGenerationEnabled,
+        out Mock<IThumbnailService> thumbnailServiceMock)
+    {
+        var clientProxyMock = new Mock<IClientProxy>();
+        clientProxyMock
+            .Setup(proxy => proxy.SendCoreAsync(
+                It.IsAny<string>(),
+                It.IsAny<object?[]>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var hubClientsMock = new Mock<IHubClients>();
+        hubClientsMock.Setup(clients => clients.All).Returns(clientProxyMock.Object);
+
+        var hubContextMock = new Mock<IHubContext<ShareHub>>();
+        hubContextMock.Setup(context => context.Clients).Returns(hubClientsMock.Object);
+
+        var topicServiceMock = new Mock<ITopicService>();
+        topicServiceMock
+            .Setup(x => x.GetAllTopicsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TopicDto>());
+
+        var fileStorageServiceMock = new Mock<IFileStorageService>();
+        fileStorageServiceMock
+            .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("saved/file.bin");
+
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
+
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var systemSettingsMock = new Mock<ISystemSettingsService>();
+        systemSettingsMock.Setup(x => x.IsAutoFetchLinkPreviewEnabledAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        systemSettingsMock.Setup(x => x.IsScheduledThumbnailGenerationEnabledAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduledThumbnailGenerationEnabled);
+
+        thumbnailServiceMock = new Mock<IThumbnailService>();
+        thumbnailServiceMock
+            .Setup(x => x.GenerateThumbnailAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        return new ShareService(
+            dbContext,
+            hubContextMock.Object,
+            topicServiceMock.Object,
+            fileStorageServiceMock.Object,
+            thumbnailServiceMock.Object,
+            linkMetadataService,
+            systemSettingsMock.Object,
+            scopeFactoryMock.Object,
+            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }
 
     private static ShareService CreateService(

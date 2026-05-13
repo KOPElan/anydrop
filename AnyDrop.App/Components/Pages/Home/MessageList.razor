@@ -41,7 +41,6 @@
 else
 {
     <div id="message-list-container"
-         @onscroll="HandleScrollAsync"
          class="flex-1 min-h-0 overflow-y-auto px-4 pt-16 pb-3 space-y-3 message-scroll touch-scroll message-list-fadein">
         @if (AppState.HasMoreMessages)
         {
@@ -118,6 +117,8 @@ else
     private bool _isNearBottom = true;
     private bool _pendingScrollToBottom;
     private readonly HashSet<Guid> _selectedIds = [];
+    private DotNetObjectReference<MessageList>? _dotNetRef;
+    private bool _nearBottomObserverInitialized;
 
     private Guid _lastTopicId;
 
@@ -147,6 +148,13 @@ else
         {
             _pendingScrollToBottom = false;
             await ScrollToBottomAsync();
+        }
+
+        if (!_loading && !_nearBottomObserverInitialized)
+        {
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("scrollUtils.setupNearBottomObserver", "message-list-container", _dotNetRef, 120);
+            _nearBottomObserverInitialized = true;
         }
     }
 
@@ -269,16 +277,16 @@ else
         }
     }
 
-    private async Task HandleScrollAsync()
+    [JSInvokable]
+    public Task OnNearBottomChanged(bool isNearBottom)
     {
-        try
+        if (_isNearBottom == isNearBottom)
         {
-            _isNearBottom = await JS.InvokeAsync<bool>("scrollUtils.isNearBottom", "message-list-container", 120);
+            return Task.CompletedTask;
         }
-        catch
-        {
-            _isNearBottom = true;
-        }
+
+        _isNearBottom = isNearBottom;
+        return InvokeAsync(StateHasChanged);
     }
 
     private async Task ScrollToLatestAsync()
@@ -363,7 +371,26 @@ else
         SignalR.ShareItemsDeleted -= OnShareItemsDeleted;
         AppState.OnChange -= StateHasChanged;
         AppState.MessageAdded -= OnMessageAdded;
-        return ValueTask.CompletedTask;
+        var dotNetRef = _dotNetRef;
+        _dotNetRef = null;
+        _nearBottomObserverInitialized = false;
+        return new ValueTask(CleanupNearBottomObserverAsync(dotNetRef));
+    }
+
+    private async Task CleanupNearBottomObserverAsync(DotNetObjectReference<MessageList>? dotNetRef)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("scrollUtils.cleanupNearBottomObserver", "message-list-container");
+        }
+        catch
+        {
+            // ignore cleanup failures during component dispose
+        }
+        finally
+        {
+            dotNetRef?.Dispose();
+        }
     }
 
     private async Task ShowConnectionFailedAsync()

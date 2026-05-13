@@ -215,10 +215,15 @@ AnyDropInterop.setupMessageScrollObserver = function (element, dotNetRef) {
     existingCleanup();
   }
 
-  const update = () => {
+  let rafId = 0;
+  let lastIsNearBottom = null;
+
+  const notifyIfChanged = () => {
     if (!element) return;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     const isNearBottom = distanceFromBottom <= 120;
+    if (lastIsNearBottom === isNearBottom) return;
+    lastIsNearBottom = isNearBottom;
     dotNetRef.invokeMethodAsync('OnMessageListScrollPositionChanged', isNearBottom)
       .catch((err) => {
         if (err && typeof err.message === 'string' && err.message.includes('disposed')) return;
@@ -226,11 +231,23 @@ AnyDropInterop.setupMessageScrollObserver = function (element, dotNetRef) {
       });
   };
 
-  element.addEventListener('scroll', update, { passive: true });
-  update();
+  const onScroll = () => {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      notifyIfChanged();
+    });
+  };
+
+  element.addEventListener('scroll', onScroll, { passive: true });
+  notifyIfChanged();
 
   const cleanup = () => {
-    element.removeEventListener('scroll', update);
+    element.removeEventListener('scroll', onScroll);
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
   };
   _messageScrollCleanups.set(element, cleanup);
 };

@@ -50,7 +50,17 @@ public partial class TopicSearch
     private List<DateOnly?> _pickerCalendarDays = [];
     private IReadOnlyCollection<DateOnly> _pickerActiveDates = [];
     private static IReadOnlyList<string> PickerWeekDays
-        => CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames;
+    {
+        get
+        {
+            var dateTimeFormat = CultureInfo.CurrentCulture.DateTimeFormat;
+            var weekDays = dateTimeFormat.AbbreviatedDayNames;
+            var start = (int)dateTimeFormat.FirstDayOfWeek;
+            return Enumerable.Range(0, 7)
+                .Select(i => weekDays[(start + i) % 7])
+                .ToArray();
+        }
+    }
 
     // ─── 媒体/文件/链接 标签页通用 ───
     private List<ShareItemDto> _typeResults = [];
@@ -61,6 +71,7 @@ public partial class TopicSearch
     // ─── 图片大图预览 ───
     private string? _previewImageUrl;
     private string? _previewVideoUrl;
+    private static readonly string VideoThumbnailFallbackDataUrl = $"data:image/svg+xml,{Uri.EscapeDataString("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 270'><rect width='480' height='270' fill='%231d2430'/><circle cx='240' cy='135' r='34' fill='rgba(255,255,255,0.16)'/><polygon points='228,115 228,155 262,135' fill='white'/></svg>")}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -249,7 +260,8 @@ public partial class TopicSearch
     {
         _pickerCalendarDays.Clear();
         var firstDay = new DateOnly(_pickerYear, _pickerMonth, 1);
-        var startDayOfWeek = (int)firstDay.DayOfWeek;
+        var firstDayOfWeek = (int)CultureInfo.CurrentCulture.DateTimeFormat.FirstDayOfWeek;
+        var startDayOfWeek = ((int)firstDay.DayOfWeek - firstDayOfWeek + 7) % 7;
         for (var i = 0; i < startDayOfWeek; i++)
         {
             _pickerCalendarDays.Add(null);
@@ -266,7 +278,15 @@ public partial class TopicSearch
     {
         var start = new DateOnly(_pickerYear, _pickerMonth, 1);
         var end = start.AddMonths(1).AddDays(-1);
-        _pickerActiveDates = await ShareService.GetTopicActiveDatesAsync(TopicId, start, end);
+        try
+        {
+            _pickerActiveDates = await ShareService.GetTopicActiveDatesAsync(TopicId, start, end);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load picker active dates for topic {TopicId}", TopicId);
+            _pickerActiveDates = [];
+        }
     }
 
     private async Task ToggleDatePickerPanel()

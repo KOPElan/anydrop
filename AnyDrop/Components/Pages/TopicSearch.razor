@@ -294,7 +294,8 @@
                                 <div class="relative cursor-pointer" @onclick="() => OpenVideoPreview(GetFileUrl(msg.Id))">
                                     <img class="w-full max-h-48 object-cover bg-on-surface/10"
                                          src="@GetThumbnailUrl(msg.Id)"
-                                         onerror="this.onerror=null;this.src='@GetFileUrl(msg.Id)'"
+                                         onerror="this.onerror=null;this.src=this.getAttribute('data-fallback')"
+                                         data-fallback="@VideoThumbnailFallbackDataUrl"
                                          alt="@(msg.FileName ?? L["Search_Tab_Video"])" />
                                     <div class="absolute inset-0 flex items-center justify-center">
                                         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">
@@ -452,7 +453,8 @@
                                     <div class="relative cursor-pointer" @onclick="() => OpenVideoPreview(GetFileUrl(msg.Id))">
                                         <img class="w-full max-h-52 object-cover bg-on-surface/10"
                                              src="@GetThumbnailUrl(msg.Id)"
-                                             onerror="this.onerror=null;this.src='@GetFileUrl(msg.Id)'"
+                                             onerror="this.onerror=null;this.src=this.getAttribute('data-fallback')"
+                                             data-fallback="@VideoThumbnailFallbackDataUrl"
                                              alt="@(msg.FileName ?? L["Search_Tab_Video"])" />
                                         <div class="absolute inset-0 flex items-center justify-center">
                                             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">

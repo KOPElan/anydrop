@@ -723,6 +723,11 @@ public partial class Home : IAsyncDisposable
     [JSInvokable]
     public Task OnMessageListScrollPositionChanged(bool isNearBottom)
     {
+        if (_isNearMessageListBottom == isNearBottom)
+        {
+            return Task.CompletedTask;
+        }
+
         _isNearMessageListBottom = isNearBottom;
         return InvokeAsync(StateHasChanged);
     }
