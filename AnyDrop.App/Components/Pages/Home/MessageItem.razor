@@ -166,7 +166,7 @@
                                     <img src="@_thumbnailUrl"
                                          alt="video-preview"
                                          onerror="this.onerror=null;this.src=this.getAttribute('data-fallback');"
-                                         data-fallback="@_fileUrl"
+                                         data-fallback="@VideoThumbnailFallbackDataUrl"
                                          class="w-full h-52 object-cover" />
                                     <div class="absolute inset-0 flex items-center justify-center">
                                         <div class="w-12 h-12 rounded-full bg-black/45 flex items-center justify-center text-white">
@@ -291,6 +291,7 @@
     private bool _selectionMode => SelectionMode;
     private System.Threading.Timer? _longPressTimer;
     private const int LongPressMs = 600;
+    private static readonly string VideoThumbnailFallbackDataUrl = $"data:image/svg+xml,{Uri.EscapeDataString("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 270'><rect width='480' height='270' fill='%231d2430'/><circle cx='240' cy='135' r='34' fill='rgba(255,255,255,0.16)'/><polygon points='228,115 228,155 262,135' fill='white'/></svg>")}";
 
     private void CancelLongPress()
     {

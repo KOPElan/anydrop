@@ -183,12 +183,13 @@ public sealed class ShareService(
         dbContext.ShareItems.Add(item);
         await dbContext.SaveChangesAsync(ct);
 
+        var shouldGenerateThumbnailInBackground = false;
         if (contentType is ShareContentType.Image or ShareContentType.Video)
         {
             var scheduledGenerationEnabled = await systemSettingsService.IsScheduledThumbnailGenerationEnabledAsync(ct);
             if (!scheduledGenerationEnabled)
             {
-                await thumbnailService.GenerateThumbnailAsync(item.Id, ct);
+                shouldGenerateThumbnailInBackground = true;
             }
         }
 
@@ -201,7 +202,24 @@ public sealed class ShareService(
             await hubContext.Clients.All.SendAsync("TopicsUpdated", topics, CancellationToken.None);
         }
 
+        if (shouldGenerateThumbnailInBackground)
+        {
+            _ = GenerateThumbnailInBackgroundAsync(item.Id);
+        }
+
         return dto;
+    }
+
+    private async Task GenerateThumbnailInBackgroundAsync(Guid itemId)
+    {
+        try
+        {
+            await thumbnailService.GenerateThumbnailAsync(itemId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Background thumbnail generation failed for item {ItemId}", itemId);
+        }
     }
 
     public async Task<IReadOnlyList<ShareItemDto>> GetRecentAsync(int count = 50, CancellationToken ct = default)

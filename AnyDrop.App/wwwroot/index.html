@@ -38,6 +38,7 @@
     </script>
     <script>
         window.scrollUtils = {
+            _nearBottomObservers: {},
             scrollToBottom: function(elementId) {
                 var el = document.getElementById(elementId);
                 if (!el) return;
@@ -52,6 +53,50 @@
                 var el = document.getElementById(elementId);
                 if (!el) return true;
                 return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+            },
+            setupNearBottomObserver: function (elementId, dotNetRef, threshold) {
+                var el = document.getElementById(elementId);
+                if (!el || !dotNetRef) return;
+
+                threshold = threshold || 120;
+                window.scrollUtils.cleanupNearBottomObserver(elementId);
+
+                var rafId = 0;
+                var lastIsNearBottom = null;
+
+                var notifyIfChanged = function () {
+                    if (!el) return;
+                    var isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+                    if (lastIsNearBottom === isNearBottom) return;
+                    lastIsNearBottom = isNearBottom;
+                    dotNetRef.invokeMethodAsync('OnNearBottomChanged', isNearBottom)
+                        .catch(function () { });
+                };
+
+                var onScroll = function () {
+                    if (rafId) return;
+                    rafId = requestAnimationFrame(function () {
+                        rafId = 0;
+                        notifyIfChanged();
+                    });
+                };
+
+                el.addEventListener('scroll', onScroll, { passive: true });
+                notifyIfChanged();
+
+                window.scrollUtils._nearBottomObservers[elementId] = function () {
+                    el.removeEventListener('scroll', onScroll);
+                    if (rafId) {
+                        cancelAnimationFrame(rafId);
+                        rafId = 0;
+                    }
+                };
+            },
+            cleanupNearBottomObserver: function (elementId) {
+                var cleanup = window.scrollUtils._nearBottomObservers[elementId];
+                if (!cleanup) return;
+                cleanup();
+                delete window.scrollUtils._nearBottomObservers[elementId];
             }
         };
         window.blazorCulture = {
