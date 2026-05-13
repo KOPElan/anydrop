@@ -271,8 +271,8 @@
   <data name="Search_NoResults"><value>No messages found containing "{0}"</value></data>
   <data name="Search_ResultCount"><value>{0} results</value></data>
   <data name="Search_ResultSuffixPartial"><value> (showing latest part)</value></data>
-  <data name="Search_DateBack7Days"><value>Back 7 days</value></data>
-  <data name="Search_DateForward7Days"><value>Forward 7 days</value></data>
+  <data name="Search_DateBack7Days"><value>Previous day</value></data>
+  <data name="Search_DateForward7Days"><value>Next day</value></data>
   <data name="Search_PickDate"><value>Select date</value></data>
   <data name="Search_DateMessageCount"><value>{0} messages</value></data>
   <data name="Search_DateHint"><value>Click a date to view all messages on that day</value></data>

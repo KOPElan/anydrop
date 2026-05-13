@@ -150,74 +150,34 @@
         @* ═══════════════════ 日期查找 ═══════════════════ *@
         else if (_activeTab == "date")
         {
-            @* ─── 7 天日历条（最大宽度限制，宽屏不拉伸）─── *@
+            @* ─── 日期导航条（前/后一天 + 当前日期按钮）─── *@
             <div class="px-3 pt-4 pb-2">
                 <div class="mx-auto max-w-lg flex items-center gap-1">
-                    @* 向前导航（更早日期） *@
+                    @* 向前一天 *@
                     <button type="button"
-                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container"
                             title="@L["Search_DateBack7Days"]"
-                            @onclick="() => ShiftCalendarAsync(-7)">
+                            @onclick="() => ShiftSelectedDateAsync(-1)">
                         <span class="material-symbols-outlined" style="font-size: 18px;">chevron_left</span>
                     </button>
 
-                    @* 7 天格子 *@
-                    <div class="flex flex-1 gap-1">
-                        @foreach (var day in CalendarDays)
-                        {
-                            var isSelected = day == _selectedDate;
-                            var hasMessages = _activeDates.Contains(day);
-                            var isFuture = day > Today;
-
-                            <button type="button"
-                                    disabled="@isFuture"
-                                    class="flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 transition-all disabled:opacity-30 disabled:pointer-events-none"
-                                    style="color: @(isSelected ? "var(--color-primary)" : "var(--color-on-surface-variant);")"
-                                    @onclick="() => SelectCalendarDateAsync(day)">
-                                <span class="text-[10px] font-medium leading-none">
-                                    @day.ToString("ddd", System.Globalization.CultureInfo.CurrentCulture)
-                                </span>
-                                @* 日期数字：选中时显示实心圆形背景，否则透明 *@
-                                <span class="flex h-8 w-8 items-center justify-center text-sm font-bold rounded-full transition-all"
-                                      style="@(isSelected
-                                          ? "background: var(--color-primary); color: #fff;"
-                                          : "")">
-                                    @day.Day
-                                </span>
-                                @* 有消息指示点：仅点，不改背景色 *@
-                                <span class="w-1.5 h-1.5 rounded-full mt-0.5 transition-opacity @(hasMessages && !isSelected ? "opacity-100" : "opacity-0")"
-                                      style="background: var(--color-primary);"></span>
-                            </button>
-                        }
-                    </div>
-
-                    @* 向后导航（更近日期） *@
+                    @* 当前日期（点击打开日历） *@
                     <button type="button"
-                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
-                            title="@L["Search_DateForward7Days"]"
-                            disabled="@(!CanGoForward)"
-                            @onclick="() => ShiftCalendarAsync(7)">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                            class="flex flex-1 h-9 items-center justify-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                            title="@L["Search_PickDate"]"
+                            @onclick="ToggleDatePickerPanel">
+                        <span class="material-symbols-outlined text-on-surface-variant" style="font-size: 16px;">calendar_month</span>
+                        <span>@FormatDateLabel(_selectedDate)</span>
                     </button>
 
-                    @* 日历选择器按钮 *@
-                    <div class="relative shrink-0">
-                        @if (_isLoadingActiveDates)
-                        {
-                            <span class="flex h-8 w-8 items-center justify-center">
-                                <span class="material-symbols-outlined animate-spin text-on-surface-variant/50" style="font-size: 18px;">progress_activity</span>
-                            </span>
-                        }
-                        else
-                        {
-                            <button type="button"
-                                    class="flex h-8 w-8 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container"
-                                    title="@L["Search_PickDate"]"
-                                    @onclick="ToggleDatePickerPanel">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">calendar_month</span>
-                            </button>
-                        }
-                    </div>
+                    @* 向后一天（不超过今天） *@
+                    <button type="button"
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                            title="@L["Search_DateForward7Days"]"
+                            disabled="@(!CanGoForward)"
+                            @onclick="() => ShiftSelectedDateAsync(1)">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                    </button>
                 </div>
 
                 @if (_showDatePickerPanel)

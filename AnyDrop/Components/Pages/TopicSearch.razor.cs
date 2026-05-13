@@ -44,11 +44,6 @@ public partial class TopicSearch
     private bool _isLoadingDate;
     private bool _dateSearchPerformed;
 
-    // 日历条：当前 7 天窗口的起始日期（周一对齐，不超过今天）
-    private DateOnly _calendarWindowStart;
-    // 有消息记录的日期集合（当前窗口内）
-    private IReadOnlyCollection<DateOnly> _activeDates = [];
-    private bool _isLoadingActiveDates;
     private bool _showDatePickerPanel;
     private int _pickerYear;
     private int _pickerMonth;
@@ -69,7 +64,6 @@ public partial class TopicSearch
 
     protected override async Task OnInitializedAsync()
     {
-        _calendarWindowStart = CalcDefaultWindowStart();
         _pickerYear = _selectedDate.Year;
         _pickerMonth = _selectedDate.Month;
         BuildPickerCalendarDays();
@@ -120,7 +114,6 @@ public partial class TopicSearch
 
         if (tab == "date")
         {
-            await LoadCalendarActiveDatesAsync();
             // 默认加载今天的消息（_selectedDate 已初始化为今天）
             await LoadDateResultsAsync();
         }
@@ -200,51 +193,21 @@ public partial class TopicSearch
 
     // ─────────────────────────── 日期查找 ───────────────────────────
 
-    /// <summary>计算默认日历窗口起始（今天往前推 6 天，确保今天可见）。</summary>
-    private static DateOnly CalcDefaultWindowStart()
-    {
-        return DateOnly.FromDateTime(DateTime.Today).AddDays(-6);
-    }
-
-    /// <summary>日历条窗口中的 7 天列表（升序）。</summary>
-    private IEnumerable<DateOnly> CalendarDays
-        => Enumerable.Range(0, 7).Select(i => _calendarWindowStart.AddDays(i));
-
     /// <summary>今天日期，用于禁止导航到未来。</summary>
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
 
-    private bool CanGoForward => _calendarWindowStart.AddDays(6) < Today;
+    private bool CanGoForward => _selectedDate < Today;
 
-    private async Task ShiftCalendarAsync(int days)
+    private async Task ShiftSelectedDateAsync(int days)
     {
-        var candidate = _calendarWindowStart.AddDays(days);
-        // 不允许窗口末尾超过今天
-        if (days > 0 && candidate.AddDays(6) > Today)
+        var candidate = _selectedDate.AddDays(days);
+        if (days > 0 && candidate > Today)
         {
-            candidate = Today.AddDays(-6);
+            candidate = Today;
         }
 
-        _calendarWindowStart = candidate;
-        await LoadCalendarActiveDatesAsync();
-    }
-
-    private async Task LoadCalendarActiveDatesAsync()
-    {
-        _isLoadingActiveDates = true;
-        try
-        {
-            var end = _calendarWindowStart.AddDays(6);
-            _activeDates = await ShareService.GetTopicActiveDatesAsync(TopicId, _calendarWindowStart, end);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to load active dates for topic {TopicId}", TopicId);
-            _activeDates = [];
-        }
-        finally
-        {
-            _isLoadingActiveDates = false;
-        }
+        _selectedDate = candidate;
+        await LoadDateResultsAsync();
     }
 
     private async Task SelectCalendarDateAsync(DateOnly date)

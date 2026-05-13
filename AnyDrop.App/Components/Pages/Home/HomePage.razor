@@ -29,7 +29,7 @@
     }
 
     <div class="flex-1 flex flex-col overflow-hidden relative">
-        <div class="flex items-center gap-3 px-4 py-3 glass absolute w-full">
+        <div class="flex items-center gap-3 px-4 py-3 glass absolute w-full z-40">
             @if (!_isWide)
             {
                 <button @onclick="() => _showSidebar = true" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-white/80 active:bg-black/5 dark:active:bg-white/10 transition-colors">

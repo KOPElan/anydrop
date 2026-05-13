@@ -273,8 +273,8 @@
   <data name="Search_NoResults"><value>未找到包含“{0}”的消息</value></data>
   <data name="Search_ResultCount"><value>共 {0} 条结果</value></data>
   <data name="Search_ResultSuffixPartial"><value>（显示最新部分）</value></data>
-  <data name="Search_DateBack7Days"><value>向前 7 天</value></data>
-  <data name="Search_DateForward7Days"><value>向后 7 天</value></data>
+  <data name="Search_DateBack7Days"><value>前一天</value></data>
+  <data name="Search_DateForward7Days"><value>后一天</value></data>
   <data name="Search_PickDate"><value>选择具体日期</value></data>
   <data name="Search_DateMessageCount"><value>{0} 条消息</value></data>
   <data name="Search_DateHint"><value>点击日期查看当天的所有消息</value></data>
