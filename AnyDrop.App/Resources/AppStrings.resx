@@ -150,6 +150,27 @@
 
   <!-- 首页 / Home Page -->
   <data name="Home_SelectTopic"><value>选择主题</value></data>
+  <data name="Home_CreateTopicHint"><value>请从左侧选择或创建一个主题</value></data>
+  <data name="Home_SearchAriaLabel"><value>搜索</value></data>
+  <data name="Home_MoreAriaLabel"><value>更多</value></data>
+
+  <!-- 路由加载 / Routes Loading -->
+  <data name="Routes_Loading"><value>正在加载...</value></data>
+
+  <!-- 连接失败 / Connection Failed -->
+  <data name="ConnectionFailed_Title"><value>连接失败</value></data>
+  <data name="ConnectionFailed_Message"><value>无法连接到服务器，请检查服务器地址设置后重试。</value></data>
+  <data name="ConnectionFailed_OK"><value>确定</value></data>
+
+  <!-- 外部分享页 / External Share Page -->
+  <data name="Share_Title"><value>分享至 AnyDrop</value></data>
+  <data name="Share_OfflineBanner"><value>📡 无网络连接，内容已暂存。</value></data>
+  <data name="Share_Retry"><value>重试</value></data>
+  <data name="Share_SelectTopic"><value>选择目标主题</value></data>
+  <data name="Share_SelectTopicPlaceholder"><value>-- 请选择主题 --</value></data>
+  <data name="Share_Send"><value>发送</value></data>
+  <data name="Share_Sending"><value>发送中...</value></data>
+  <data name="Share_SendFailed"><value>发送失败：</value></data>
 
   <!-- 搜索页 / Search Page -->
   <data name="Search_Title"><value>搜索</value></data>

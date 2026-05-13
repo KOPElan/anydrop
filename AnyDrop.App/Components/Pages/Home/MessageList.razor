@@ -319,9 +319,9 @@ else
         {
             await MainThread.InvokeOnMainThreadAsync(() =>
                 Application.Current.MainPage.DisplayAlert(
-                    "连接失败",
-                    "无法连接到服务器，请检查服务器地址设置后重试。",
-                    "确定"));
+                    L["ConnectionFailed_Title"],
+                    L["ConnectionFailed_Message"],
+                    L["ConnectionFailed_OK"]));
         }
 #endif
         Nav.NavigateTo("/login");

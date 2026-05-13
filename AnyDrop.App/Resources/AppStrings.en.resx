@@ -150,6 +150,27 @@
 
   <!-- Home Page -->
   <data name="Home_SelectTopic"><value>Select a topic</value></data>
+  <data name="Home_CreateTopicHint"><value>Select or create a topic from the left panel</value></data>
+  <data name="Home_SearchAriaLabel"><value>Search</value></data>
+  <data name="Home_MoreAriaLabel"><value>More</value></data>
+
+  <!-- Routes Loading -->
+  <data name="Routes_Loading"><value>Loading...</value></data>
+
+  <!-- Connection Failed -->
+  <data name="ConnectionFailed_Title"><value>Connection Failed</value></data>
+  <data name="ConnectionFailed_Message"><value>Unable to connect to the server. Please check your server address and try again.</value></data>
+  <data name="ConnectionFailed_OK"><value>OK</value></data>
+
+  <!-- External Share Page -->
+  <data name="Share_Title"><value>Share to AnyDrop</value></data>
+  <data name="Share_OfflineBanner"><value>📡 No network connection. Content has been saved locally.</value></data>
+  <data name="Share_Retry"><value>Retry</value></data>
+  <data name="Share_SelectTopic"><value>Select target topic</value></data>
+  <data name="Share_SelectTopicPlaceholder"><value>-- Select a topic --</value></data>
+  <data name="Share_Send"><value>Send</value></data>
+  <data name="Share_Sending"><value>Sending...</value></data>
+  <data name="Share_SendFailed"><value>Send failed: </value></data>
 
   <!-- Search Page -->
   <data name="Search_Title"><value>Search</value></data>

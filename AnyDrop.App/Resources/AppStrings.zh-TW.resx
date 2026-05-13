@@ -150,6 +150,27 @@
 
   <!-- 首頁 / Home Page -->
   <data name="Home_SelectTopic"><value>選擇主題</value></data>
+  <data name="Home_CreateTopicHint"><value>請從左側選擇或建立一個主題</value></data>
+  <data name="Home_SearchAriaLabel"><value>搜尋</value></data>
+  <data name="Home_MoreAriaLabel"><value>更多</value></data>
+
+  <!-- 路由載入 / Routes Loading -->
+  <data name="Routes_Loading"><value>載入中...</value></data>
+
+  <!-- 連線失敗 / Connection Failed -->
+  <data name="ConnectionFailed_Title"><value>連線失敗</value></data>
+  <data name="ConnectionFailed_Message"><value>無法連線到伺服器，請確認伺服器位址設定後重試。</value></data>
+  <data name="ConnectionFailed_OK"><value>確定</value></data>
+
+  <!-- 外部分享頁 / External Share Page -->
+  <data name="Share_Title"><value>分享至 AnyDrop</value></data>
+  <data name="Share_OfflineBanner"><value>📡 無網路連線，內容已暫存。</value></data>
+  <data name="Share_Retry"><value>重試</value></data>
+  <data name="Share_SelectTopic"><value>選擇目標主題</value></data>
+  <data name="Share_SelectTopicPlaceholder"><value>-- 請選擇主題 --</value></data>
+  <data name="Share_Send"><value>傳送</value></data>
+  <data name="Share_Sending"><value>傳送中...</value></data>
+  <data name="Share_SendFailed"><value>傳送失敗：</value></data>
 
   <!-- 搜尋頁 / Search Page -->
   <data name="Search_Title"><value>搜尋</value></data>
