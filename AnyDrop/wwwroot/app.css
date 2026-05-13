@@ -964,6 +964,121 @@
     .search-msg-card:hover .search-msg-arrow {
         color: var(--color-primary);
     }
+
+    /* ─── 移动端 FAB 发送按钮 ─── */
+    .mobile-fab {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        /* 桌面输入框在移动端隐藏 */
+        .chat-footer-desktop {
+            display: none;
+        }
+
+        /* FAB 按钮固定在右下角 */
+        .mobile-fab {
+            display: flex;
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 45;
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 1rem;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+            transition: transform 200ms ease, box-shadow 200ms ease;
+        }
+
+        .mobile-fab:hover {
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.50);
+        }
+
+        .mobile-fab:active {
+            transform: scale(0.94);
+        }
+    }
+
+    /* ─── 移动端浮动输入面板 ─── */
+    .mobile-input-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 46;
+        background: rgba(25, 28, 29, 0.40);
+        animation: overlay-in 200ms ease both;
+    }
+
+    .mobile-input-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 47;
+        padding: 0.75rem 1rem 1.5rem;
+        animation: mobile-panel-slide-up 260ms var(--ease-bounce) both;
+    }
+
+    @keyframes mobile-panel-slide-up {
+        from { transform: translateY(100%); opacity: 0; }
+        to   { transform: translateY(0); opacity: 1; }
+    }
+
+    /* ─── 聊天发送按钮（桌面端和移动端浮动面板共用渐变样式）─── */
+    .chat-send-btn {
+        background: linear-gradient(135deg, #6366f1, #3b82f6);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .chat-send-btn:hover:not(:disabled) {
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+    }
+
+    /* ─── Settings 卡片图标容器（缩略图等带图标标题的区块）─── */
+    .settings-icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 2.25rem;
+        width: 2.25rem;
+        border-radius: 0.75rem;
+        background: var(--color-primary-fixed);
+        flex-shrink: 0;
+    }
+
+    .settings-icon-text {
+        color: var(--color-primary);
+    }
+
+    /* ─── 骨架屏加载动画 ─── */
+    @keyframes skeleton-shimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position: 400px 0; }
+    }
+
+    .skeleton-bubble,
+    .skeleton-line {
+        background: linear-gradient(
+            90deg,
+            rgba(194, 198, 216, 0.30) 25%,
+            rgba(194, 198, 216, 0.55) 50%,
+            rgba(194, 198, 216, 0.30) 75%
+        );
+        background-size: 800px 100%;
+        animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    }
+
+    /* ─── 视频缩略图容器 ─── */
+    .video-thumb-container {
+        position: relative;
+        min-height: 80px;
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 0.75rem;
+    }
 }
 
 /* ═══════════════════════════════════════
@@ -1181,6 +1296,11 @@ html.dark .modal-content {
     border-color: rgba(60, 68, 80, 0.55);
 }
 
+/* ── 移动端浮动输入面板（暗色模式）── */
+html.dark .mobile-input-backdrop {
+    background: rgba(0, 0, 0, 0.60);
+}
+
 /* ── 侧边栏项目悬停 ── */
 html.dark .sidebar-item:hover {
     background: rgba(50, 55, 62, 0.60);
@@ -1200,4 +1320,29 @@ html.dark input[type="number"] {
 }
 html.dark textarea::placeholder {
     color: rgba(176, 181, 196, 0.45);
+}
+
+/* ── 主题切换平滑过渡效果 ── */
+html {
+    transition:
+        background-color 250ms ease,
+        color 250ms ease;
+}
+
+html body {
+    transition:
+        background 300ms ease,
+        color 250ms ease;
+}
+
+/* ── 暗色模式骨架屏颜色覆盖 ── */
+html.dark .skeleton-bubble,
+html.dark .skeleton-line {
+    background: linear-gradient(
+        90deg,
+        rgba(60, 68, 80, 0.35) 25%,
+        rgba(80, 90, 105, 0.55) 50%,
+        rgba(60, 68, 80, 0.35) 75%
+    );
+    background-size: 800px 100%;
 }

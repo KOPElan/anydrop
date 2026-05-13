@@ -276,3 +276,16 @@ AnyDropInterop.getBrowserTimeZone = function () {
     return 'UTC';
   }
 };
+
+/**
+ * 触发文件选择输入框的点击事件，用于打开系统文件选择器。
+ * 桌面端按钮和移动端浮动面板均使用此方法触发同一对 <input type="file"> 元素。
+ * @param {HTMLInputElement} element - 文件输入元素
+ */
+AnyDropInterop.triggerClick = function (element) {
+  if (!element) {
+    console.warn('[AnyDrop] triggerClick: element is null or undefined, file picker could not be opened.');
+    return;
+  }
+  element.click();
+};

@@ -102,6 +102,16 @@ public partial class Home : IAsyncDisposable
     // 条件滚到底（收到新消息时，仅当用户处于底部附近才滚动）
     private bool _shouldScrollIfNearBottom;
 
+    // 消息加载中状态（切换主题/初次加载时显示骨架屏；发送消息后刷新不触发骨架屏）
+    private bool _isLoadingMessages;
+
+    // 移动端发送 Modal 状态
+    private bool _showMobileSendModal;
+    private string _mobileInputText = string.Empty;
+
+    // 视频"点击展开播放"集合（thumbnail-first 交互）
+    private readonly HashSet<Guid> _expandedVideoIds = [];
+
     protected override async Task OnInitializedAsync()
     {
         // 读取 highlight 查询参数（从搜索页跳转过来时定位消息）
@@ -373,8 +383,9 @@ public partial class Home : IAsyncDisposable
         {
             await ShareService.SendTextAsync(trimmedText, _selectedTopicId, burnAfterReading: _burnAfterReading);
             _inputText = string.Empty;
-            // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示
-            await LoadSelectedTopicMessagesAsync();
+            // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示；
+            // showSkeleton=false 避免清空现有列表并显示骨架屏
+            await LoadSelectedTopicMessagesAsync(showSkeleton: false);
         }
         finally
         {
@@ -815,6 +826,80 @@ public partial class Home : IAsyncDisposable
         _previewImageUrl = null;
     }
 
+    // ── 移动端 FAB 发送 Modal ──────────────────────────────────────────────────
+
+    /// <summary>打开移动端快速发送浮动面板。</summary>
+    private void OpenMobileSendModal()
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            _validationError = L["Home_SelectTopicFirst"];
+            return;
+        }
+        _mobileInputText = string.Empty;
+        _validationError = null;
+        _showMobileSendModal = true;
+    }
+
+    /// <summary>关闭移动端浮动面板并清空输入。</summary>
+    private void CloseMobileSendModal()
+    {
+        _showMobileSendModal = false;
+        _mobileInputText = string.Empty;
+        _validationError = null;
+    }
+
+    /// <summary>从移动端浮动面板发送文本消息：成功后自动关闭面板。</summary>
+    private async Task SendFromMobileModalAsync()
+    {
+        _inputText = _mobileInputText;
+        await SendAsync();
+        // SendAsync 成功时会清空 _inputText，以此判断是否发送成功
+        if (string.IsNullOrWhiteSpace(_inputText) && _validationError == null)
+        {
+            _mobileInputText = string.Empty;
+            _showMobileSendModal = false;
+        }
+        else
+        {
+            // 发送失败（验证错误等），保留面板显示错误
+            _mobileInputText = _inputText;
+            _inputText = string.Empty;
+        }
+    }
+
+    /// <summary>触发图片/视频文件选择器（桌面端按钮和移动端浮动面板共用）。</summary>
+    private async Task TriggerImageInputAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.triggerClick", _imageInputRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to trigger image file input.");
+        }
+    }
+
+    /// <summary>触发附件文件选择器（桌面端按钮和移动端浮动面板共用）。</summary>
+    private async Task TriggerAttachmentInputAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.triggerClick", _attachmentInputRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to trigger attachment file input.");
+        }
+    }
+
+    /// <summary>展开视频气泡，使其从缩略图状态变为播放器状态。</summary>
+    private void ExpandVideo(Guid messageId)
+    {
+        _expandedVideoIds.Add(messageId);
+    }
+
     public async ValueTask DisposeAsync()
     {
         // 清理 JS 拖放事件监听器，防止内存泄漏
@@ -911,33 +996,55 @@ public partial class Home : IAsyncDisposable
         }
     }
 
-    private async Task LoadSelectedTopicMessagesAsync(CancellationToken ct = default)
+    private async Task LoadSelectedTopicMessagesAsync(bool showSkeleton = true, CancellationToken ct = default)
     {
-        _messages.Clear();
-        _messageIds.Clear();
+        if (showSkeleton)
+        {
+            // 切换主题时清空消息列表，展示骨架屏过渡动画
+            _messages.Clear();
+            _messageIds.Clear();
+            _expandedVideoIds.Clear();
+        }
+
         if (!_selectedTopicId.HasValue)
         {
             return;
         }
 
-        var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
-        if (response is null)
+        if (showSkeleton)
         {
-            _selectedTopicId = null;
-            await TopicStateService.SetSelectedTopicAsync(null);
-            return;
+            _isLoadingMessages = true;
+            StateHasChanged();
         }
 
-        // 服务端返回最新 N 条（降序），逆序后使列表保持时间升序（最旧在顶，最新在底）
-        foreach (var msg in response.Messages.Reverse())
+        try
         {
-            if (_messageIds.Add(msg.Id))
+            var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
+            if (response is null)
             {
-                _messages.Add(msg);
+                _selectedTopicId = null;
+                await TopicStateService.SetSelectedTopicAsync(null);
+                return;
+            }
+
+            // 服务端返回最新 N 条（降序），逆序后使列表保持时间升序（最旧在顶，最新在底）
+            foreach (var msg in response.Messages.Reverse())
+            {
+                if (_messageIds.Add(msg.Id))
+                {
+                    _messages.Add(msg);
+                }
+            }
+
+            _shouldScrollToBottom = true;
+        }
+        finally
+        {
+            if (showSkeleton)
+            {
+                _isLoadingMessages = false;
             }
         }
-
-        _shouldScrollToBottom = true;
     }
 
     private async Task LoadSelectedTopicMetaAsync(CancellationToken ct = default)
@@ -968,6 +1075,8 @@ public partial class Home : IAsyncDisposable
         => download
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
+
+    private static string GetThumbnailUrl(Guid itemId) => $"/api/v1/share-items/{itemId}/thumbnail";
 
     /// <summary>将字节数格式化为人类可读的大小字符串。</summary>
     private static string FormatFileSize(long bytes)

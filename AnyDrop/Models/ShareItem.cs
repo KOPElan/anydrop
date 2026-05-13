@@ -27,5 +27,8 @@ public sealed class ShareItem
 
     public Guid? TopicId { get; set; }
 
-    public ShareItemDto ToDto() => new(Id, ContentType, Content, FileName, FileSize, MimeType, LinkTitle, LinkDescription, CreatedAt, ExpiresAt, TopicId);
+    /// <summary>缩略图/预览图的存储相对路径，图片或视频上传后由后台任务生成，为 null 表示尚未生成。</summary>
+    public string? ThumbnailPath { get; set; }
+
+    public ShareItemDto ToDto() => new(Id, ContentType, Content, FileName, FileSize, MimeType, LinkTitle, LinkDescription, CreatedAt, ExpiresAt, TopicId, ThumbnailPath);
 }

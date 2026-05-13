@@ -146,7 +146,24 @@
     <div @ref="_messageListRef"
          id="message-list"
          class="absolute inset-0 overflow-y-auto px-6 space-y-6 chat-message-list">
-        @if (!_selectedTopicId.HasValue)
+        @if (_isLoadingMessages)
+        {
+            @* 加载骨架屏 *@
+            <div class="max-w-4xl mx-auto w-full pt-4 space-y-4">
+                @for (var i = 0; i < 4; i++)
+                {
+                    <div class="flex flex-col items-start max-w-2xl m-2">
+                        <div class="skeleton-bubble w-64 h-16 rounded-2xl rounded-tl-sm"></div>
+                        <div class="skeleton-line w-24 h-3 mt-2 ml-2 rounded-full"></div>
+                    </div>
+                    <div class="flex flex-col items-start max-w-2xl m-2 ml-16">
+                        <div class="skeleton-bubble w-48 h-12 rounded-2xl rounded-tl-sm"></div>
+                        <div class="skeleton-line w-20 h-3 mt-2 ml-2 rounded-full"></div>
+                    </div>
+                }
+            </div>
+        }
+        else if (!_selectedTopicId.HasValue)
         {
             <div class="flex h-full flex-col items-center justify-center text-center">
                 <span class="material-symbols-outlined text-5xl text-on-surface-variant/30">chat_bubble_outline</span>
@@ -218,11 +235,12 @@
 
                         case ShareContentType.Image:
                                 <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-lg transition-all duration-150">
-                                @* 点击图片在 Modal 中预览原图 *@
+                                @* 点击图片在 Modal 中预览原图（thumbnail-first：缩略图加载，点击查看原图）*@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
                                     <img class="max-h-72 w-full object-contain transition-transform duration-200 hover:scale-[1.02]"
-                                         src="@GetFileUrl(message.Id)"
+                                         src="@GetThumbnailUrl(message.Id)"
+                                         onerror="this.onerror=null;this.src='@GetFileUrl(message.Id)'"
                                          alt="@message.FileName" />
                                 </div>
                                 <div class="flex items-center justify-between px-1">
@@ -249,9 +267,30 @@
                         case ShareContentType.Video:
                                 <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
-                                    <video class="w-full max-h-64 rounded-xl"
-                                           controls
-                                           src="@GetFileUrl(message.Id)"></video>
+                                    @if (_expandedVideoIds.Contains(message.Id))
+                                    {
+                                        @* 展开后显示原始视频播放器 *@
+                                        <video class="w-full max-h-64 rounded-xl"
+                                               controls
+                                               autoplay
+                                               src="@GetFileUrl(message.Id)"></video>
+                                    }
+                                    else
+                                    {
+                                        @* 缩略图 + 播放按钮遮罩（点击后加载原视频）*@
+                                        <div class="relative cursor-pointer video-thumb-container"
+                                             @onclick="() => ExpandVideo(message.Id)">
+                                            <img class="w-full max-h-64 object-cover rounded-xl bg-black/20"
+                                                 src="@GetThumbnailUrl(message.Id)"
+                                                 onerror="this.onerror=null;this.style.minHeight='120px';this.style.background='rgba(0,0,0,0.3)'"
+                                                 alt="@message.FileName" />
+                                            <div class="absolute inset-0 flex items-center justify-center">
+                                                <div class="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform hover:scale-110">
+                                                    <span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
@@ -455,30 +494,33 @@
     }
     else
     {
-        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
+        @* 桌面端输入框（移动端隐藏，改用 FAB）*@
+        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass chat-footer-desktop" style="pointer-events: none;">
         <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
         <div class="input-wrapper chat-input-card px-4 py-3">
             @* 附件按钮（带右侧分割线）*@
             <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
-                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
-                       style="color: var(--color-on-surface-variant);"
-                      title="@L["Home_UploadImageOrVideo"]">
-                        <span class="material-symbols-outlined text-base">image</span>
-                    <input @ref="_imageInputRef" type="file" class="hidden" multiple accept="image/*,video/*" />
-                </label>
-                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
-                       style="color: var(--color-on-surface-variant);"
-                      title="@L["Home_UploadAttachment"]">
-                        <span class="material-symbols-outlined text-base">attach_file</span>
-                    <input @ref="_attachmentInputRef" type="file" class="hidden" multiple />
-                </label>
+                <button type="button"
+                        class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                        style="color: var(--color-on-surface-variant);"
+                        title="@L["Home_UploadImageOrVideo"]"
+                        @onclick="TriggerImageInputAsync">
+                    <span class="material-symbols-outlined text-base">image</span>
+                </button>
+                <button type="button"
+                        class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                        style="color: var(--color-on-surface-variant);"
+                        title="@L["Home_UploadAttachment"]"
+                        @onclick="TriggerAttachmentInputAsync">
+                    <span class="material-symbols-outlined text-base">attach_file</span>
+                </button>
                 @* 阅后即焚切换按钮 *@
                 <button type="button"
                         class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
                         style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
-                    title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
+                        title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
                         @onclick="ToggleBurnAfterReading">
-                        <span class="material-symbols-outlined text-base"
+                    <span class="material-symbols-outlined text-base"
                           style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
                         timer
                     </span>
@@ -504,8 +546,7 @@
             @* 发送按钮（方形，渐变）*@
             <div class="input-send-wrap ml-2">
                 <button type="button"
-                        class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                        style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);"
+                        class="chat-send-btn flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                         disabled="@_isSending"
                         @onclick="SendAsync">
                     <span class="material-symbols-outlined"
@@ -515,6 +556,12 @@
         </div>
         </div>
     </footer>
+
+    @* 文件输入（始终挂载到 DOM，供桌面端和移动端浮动面板共享触发）*@
+    <div style="position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; pointer-events: none;">
+        <input @ref="_imageInputRef" type="file" multiple accept="image/*,video/*" tabindex="-1" aria-hidden="true" />
+        <input @ref="_attachmentInputRef" type="file" multiple tabindex="-1" aria-hidden="true" />
+    </div>
     }
 
     @* ─────────── 批量删除二次确认 Modal ─────────── *@
@@ -536,6 +583,88 @@
                             style="background: var(--color-error);"
                             disabled="@_isBatchDeleting"
                             @onclick="ConfirmBatchDeleteAsync">@L["Home_BatchDeleteConfirmAction"]</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ─────────── 移动端 FAB 按钮（仅移动端显示，选择模式下隐藏）─────────── *@
+    @if (!_isSelectMode && _selectedTopicId.HasValue)
+    {
+        <button type="button"
+                class="mobile-fab"
+                aria-label="@L["Home_MobileSend"]"
+                @onclick="OpenMobileSendModal">
+            <span class="material-symbols-outlined"
+                  style="font-size: 26px; font-variation-settings: 'FILL' 1;">edit</span>
+        </button>
+    }
+
+    @* ─────────── 移动端浮动输入面板 ─────────── *@
+    @if (_showMobileSendModal)
+    {
+        @* 半透明背景遮罩，点击关闭面板 *@
+        <div class="mobile-input-backdrop" @onclick="CloseMobileSendModal" role="button" aria-label="@L["Common_Close"]"></div>
+        @* 浮动输入卡片，锚定在屏幕底部，布局与桌面端输入卡片一致 *@
+        <div class="mobile-input-panel" role="dialog" aria-modal="true" aria-label="@L["Home_MobileSend"]" @onclick:stopPropagation>
+            <div class="input-wrapper chat-input-card px-4 py-3">
+                @* 附件按钮区域（移动端响应式布局会自动移到第二行）*@
+                <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
+                    <button type="button"
+                            class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                            style="color: var(--color-on-surface-variant);"
+                            title="@L["Home_UploadImageOrVideo"]"
+                            @onclick="TriggerImageInputAsync">
+                        <span class="material-symbols-outlined text-base">image</span>
+                    </button>
+                    <button type="button"
+                            class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                            style="color: var(--color-on-surface-variant);"
+                            title="@L["Home_UploadAttachment"]"
+                            @onclick="TriggerAttachmentInputAsync">
+                        <span class="material-symbols-outlined text-base">attach_file</span>
+                    </button>
+                    @* 阅后即焚切换按钮 *@
+                    <button type="button"
+                            class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
+                            style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
+                            title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
+                            @onclick="ToggleBurnAfterReading">
+                        <span class="material-symbols-outlined text-base"
+                              style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
+                            timer
+                        </span>
+                    </button>
+                </div>
+                @* 文本输入框 *@
+                <div class="input-textarea-wrap">
+                    <textarea class="w-full resize-none bg-transparent py-2 px-4 text-[15px] font-medium outline-none"
+                              style="border: none; max-height: 8rem; field-sizing: content; color: var(--color-on-surface);"
+                              placeholder="@L["Home_InputPlaceholder"]"
+                              maxlength="10000"
+                              rows="1"
+                              @bind="_mobileInputText"
+                              @bind:event="oninput"></textarea>
+                    @if (!string.IsNullOrWhiteSpace(_validationError))
+                    {
+                        <p class="px-4 text-xs text-error">@_validationError</p>
+                    }
+                </div>
+                @* 发送按钮（与输入框一体，方形渐变）*@
+                <div class="input-send-wrap ml-2">
+                    <button type="button"
+                            class="chat-send-btn flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                            disabled="@_isSending"
+                            @onclick="SendFromMobileModalAsync">
+                        @if (_isSending)
+                        {
+                            <span class="material-symbols-outlined animate-spin" style="font-size: 20px;">progress_activity</span>
+                        }
+                        else
+                        {
+                            <span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">arrow_upward</span>
+                        }
+                    </button>
                 </div>
             </div>
         </div>

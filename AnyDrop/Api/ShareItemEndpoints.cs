@@ -26,6 +26,10 @@ public static class ShareItemEndpoints
             .WithName("GetShareItemFile")
             .WithSummary("Get a shared file");
 
+        group.MapGet("/{id:guid}/thumbnail", GetThumbnailAsync)
+            .WithName("GetShareItemThumbnail")
+            .WithSummary("Get the thumbnail/preview image for an image or video share item");
+
         group.MapDelete("/cleanup", CleanupOldMessagesAsync)
             .WithName("CleanupOldMessages")
             .WithSummary("Manually clean up messages older than the specified number of months");
@@ -140,11 +144,42 @@ public static class ShareItemEndpoints
         return TypedResults.Ok(ApiEnvelope<object>.Ok(new { deleted = deletedCount }));
     }
 
-        private static bool ShouldForceAttachment(string mimeType)
+    /// <summary>
+    /// 获取图片或视频的缩略图文件流。若缩略图尚未生成则返回 404，客户端应回退到原始文件。
+    /// </summary>
+    public static async Task<Results<FileStreamHttpResult, NotFound<ApiEnvelope<object>>>> GetThumbnailAsync(
+        Guid id,
+        AnyDropDbContext dbContext,
+        IFileStorageService fileStorageService,
+        CancellationToken cancellationToken)
+    {
+        var item = await dbContext.ShareItems
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new { x.ThumbnailPath })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (item is null || string.IsNullOrWhiteSpace(item.ThumbnailPath))
         {
-            return mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
-                   || mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)
-                   || mimeType.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-                   || mimeType.Equals("text/javascript", StringComparison.OrdinalIgnoreCase);
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图尚未生成"));
         }
+
+        try
+        {
+            var stream = await fileStorageService.GetFileAsync(item.ThumbnailPath, cancellationToken);
+            return TypedResults.File(stream, "image/jpeg", enableRangeProcessing: true);
+        }
+        catch (FileNotFoundException)
+        {
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图文件不存在"));
+        }
+    }
+
+    private static bool ShouldForceAttachment(string mimeType)
+    {
+        return mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
+               || mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)
+               || mimeType.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
+               || mimeType.Equals("text/javascript", StringComparison.OrdinalIgnoreCase);
+    }
 }

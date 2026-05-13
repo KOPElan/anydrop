@@ -46,7 +46,8 @@ public sealed record SecuritySettingsDto(
     int BurnAfterReadingMinutes,
     string Language,
     bool AutoCleanupEnabled,
-    int AutoCleanupMonths);
+    int AutoCleanupMonths,
+    int ThumbnailGenerationHour = 2);
 
 /// <summary>更新安全与偏好设置请求。</summary>
 public sealed record UpdateSecuritySettingsRequest(
@@ -54,7 +55,8 @@ public sealed record UpdateSecuritySettingsRequest(
     int BurnAfterReadingMinutes,
     string Language,
     bool AutoCleanupEnabled,
-    int AutoCleanupMonths);
+    int AutoCleanupMonths,
+    int ThumbnailGenerationHour = 2);
 
 /// <summary>手动清理操作结果。</summary>
 public sealed record CleanupResult(int DeletedCount);
@@ -133,7 +135,8 @@ public sealed record ShareItemDto(
     string? LinkDescription,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ExpiresAt,
-    Guid? TopicId
+    Guid? TopicId,
+    string? ThumbnailPath = null
 );
 
 /// <summary>发送文本消息请求。BurnAfterReading=true 时按系统配置时长自动过期。</summary>
