@@ -206,8 +206,9 @@ public sealed class ThumbnailService(
 
             // 必须异步读取 stdout 和 stderr，否则管道缓冲区满后进程阻塞，
             // 导致 WaitForExitAsync 永远不返回（后台任务卡死）。
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
-            var stderrTask = process.StandardError.ReadToEndAsync(ct);
+            // 读取时通过限制最大字节数避免大视频产生的海量日志消耗内存。
+            var stdoutTask = ReadLimitedAsync(process.StandardOutput, maxChars: 2000, ct);
+            var stderrTask = ReadLimitedAsync(process.StandardError, maxChars: 2000, ct);
 
             await process.WaitForExitAsync(ct);
 
@@ -215,11 +216,12 @@ public sealed class ThumbnailService(
             await stdoutTask;
             var stderr = await stderrTask;
 
-            if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(stderr))
+            if (process.ExitCode != 0)
             {
-                // 截断日志，避免超长 ffmpeg 输出塞满日志
-                logger.LogDebug("ThumbnailService: ffmpeg stderr (first 500 chars): {Stderr}",
-                    stderr[..Math.Min(500, stderr.Length)]);
+                logger.LogWarning(
+                    "ThumbnailService: ffmpeg exited with code {Code}. Stderr (truncated): {Stderr}",
+                    process.ExitCode,
+                    string.IsNullOrWhiteSpace(stderr) ? "(empty)" : stderr);
             }
 
             return process.ExitCode;
@@ -229,5 +231,18 @@ public sealed class ThumbnailService(
             logger.LogWarning(ex, "ThumbnailService: ffmpeg not found on PATH. Video thumbnails will not be generated.");
             return -1;
         }
+    }
+
+    /// <summary>
+    /// 从 <see cref="System.IO.TextReader"/> 异步读取最多 <paramref name="maxChars"/> 个字符，
+    /// 剩余部分丢弃（继续读取以防管道阻塞），返回已读取的片段。
+    /// </summary>
+    private static async Task<string> ReadLimitedAsync(System.IO.TextReader reader, int maxChars, CancellationToken ct)
+    {
+        var buffer = new char[maxChars];
+        int read = await reader.ReadAsync(buffer.AsMemory(0, maxChars), ct);
+        // 丢弃剩余输出，确保管道不阻塞
+        _ = reader.ReadToEndAsync(ct);
+        return new string(buffer, 0, read);
     }
 }

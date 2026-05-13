@@ -93,6 +93,18 @@ public class LocalFileStorageServiceTests : IDisposable
             .WithMessage("*Invalid storage path*");
     }
 
+    [Fact]
+    public async Task GetFileAsync_WithPathTraversal_ShouldThrow()
+    {
+        // GetFileAsync 同样受 basePath 前缀校验保护，越界路径应抛出异常
+        var traversalPath = "../../etc/passwd";
+
+        var act = async () => await _service.GetFileAsync(traversalPath);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Invalid storage path*");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_basePath))

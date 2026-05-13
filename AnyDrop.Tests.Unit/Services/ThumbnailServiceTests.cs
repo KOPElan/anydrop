@@ -97,9 +97,10 @@ public class ThumbnailServiceTests
         await db.SaveChangesAsync();
 
         var storageMock = new Mock<IFileStorageService>();
+        await using var invalidData = new MemoryStream("not_an_image"u8.ToArray());
         storageMock
             .Setup(s => s.GetFileAsync(item.Content, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MemoryStream("not_an_image"u8.ToArray()));
+            .ReturnsAsync(invalidData);
 
         var sut = CreateService(db, storageMock.Object);
         var act = async () => await sut.GenerateThumbnailAsync(item.Id);

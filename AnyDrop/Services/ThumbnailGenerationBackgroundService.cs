@@ -85,4 +85,10 @@ public sealed class ThumbnailGenerationBackgroundService(
         var settingsService = scope.ServiceProvider.GetRequiredService<ISystemSettingsService>();
         return await settingsService.GetThumbnailGenerationHourAsync(ct);
     }
+
+    public override void Dispose()
+    {
+        _runLock.Dispose();
+        base.Dispose();
+    }
 }
