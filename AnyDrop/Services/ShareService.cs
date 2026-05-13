@@ -12,6 +12,7 @@ public sealed class ShareService(
     IHubContext<ShareHub> hubContext,
     ITopicService topicService,
     IFileStorageService fileStorageService,
+    IThumbnailService thumbnailService,
     LinkMetadataService linkMetadataService,
     ISystemSettingsService systemSettingsService,
     IServiceScopeFactory scopeFactory,
@@ -181,6 +182,15 @@ public sealed class ShareService(
 
         dbContext.ShareItems.Add(item);
         await dbContext.SaveChangesAsync(ct);
+
+        if (contentType is ShareContentType.Image or ShareContentType.Video)
+        {
+            var scheduledGenerationEnabled = await systemSettingsService.IsScheduledThumbnailGenerationEnabledAsync(ct);
+            if (!scheduledGenerationEnabled)
+            {
+                await thumbnailService.GenerateThumbnailAsync(item.Id, ct);
+            }
+        }
 
         var dto = item.ToDto();
         await hubContext.Clients.All.SendAsync("ReceiveShareItem", dto, CancellationToken.None);

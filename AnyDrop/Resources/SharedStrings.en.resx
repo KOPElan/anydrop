@@ -242,11 +242,14 @@
   <data name="Home_MobileSend"><value>Send message</value></data>
   <data name="Home_MobileSendTitle"><value>Send Message</value></data>
   <data name="Home_MobileSendPlaceholder"><value>Type your message...</value></data>
+  <data name="Home_BackToLatest"><value>Back to latest</value></data>
 
   <!-- Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>Thumbnails &amp; Previews</value></data>
   <data name="Settings_ThumbnailHour"><value>Daily generation time (hour 0–23)</value></data>
   <data name="Settings_ThumbnailHourHint"><value>The server will generate thumbnails for unprocessed images/videos at the specified hour each day</value></data>
+  <data name="Settings_ThumbnailScheduleEnabled"><value>Enable scheduled batch generation</value></data>
+  <data name="Settings_ThumbnailScheduleEnabledHint"><value>Default off: generate previews immediately after upload. Turn this on under constrained resources to use scheduled background batches and stop immediate generation.</value></data>
   <data name="Settings_RunThumbnailNow"><value>Generate thumbnails now</value></data>
   <data name="Settings_ThumbnailRunQueued"><value>Thumbnail generation task triggered, processing in background.</value></data>
   <data name="Settings_ThumbnailRunFailed"><value>Failed to trigger task. Please try again.</value></data>

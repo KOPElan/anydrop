@@ -41,7 +41,8 @@
 else
 {
     <div id="message-list-container"
-         class="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 message-scroll touch-scroll message-list-fadein">
+         @onscroll="HandleScrollAsync"
+         class="flex-1 min-h-0 overflow-y-auto px-4 pt-16 pb-3 space-y-3 message-scroll touch-scroll message-list-fadein">
         @if (AppState.HasMoreMessages)
         {
             <div class="text-center py-2">
@@ -95,6 +96,15 @@ else
     </div>
 }
 
+@if (!_loading && !_isNearBottom && AppState.Messages.Count > 0)
+{
+    <button @onclick="ScrollToLatestAsync"
+            class="absolute bottom-24 right-4 z-20 px-3 py-2 rounded-full text-xs font-semibold text-white shadow-lg"
+            style="background: linear-gradient(135deg, #4f46e5, #2563eb);">
+        @L["MessageList_BackToLatest"]
+    </button>
+}
+
 </div>
 
 @code {
@@ -104,6 +114,8 @@ else
     private bool _loadingMore;
     private bool _selectionMode;
     private bool _deleting;
+    private bool _isNearBottom = true;
+    private bool _pendingScrollToBottom;
     private readonly HashSet<Guid> _selectedIds = [];
 
     private Guid _lastTopicId;
@@ -128,6 +140,15 @@ else
         AppState.MessageAdded += OnMessageAdded;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingScrollToBottom)
+        {
+            _pendingScrollToBottom = false;
+            await ScrollToBottomAsync();
+        }
+    }
+
     private async Task LoadMessagesAsync()
     {
         _loading = true;
@@ -142,7 +163,7 @@ else
             AppState.HasMoreMessages = result.HasMore;
             AppState.MessageCursor = result.NextCursor;
             AppState.NotifyStateChanged();
-            await ScrollToBottomAsync();
+            RequestScrollToBottom();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
@@ -196,7 +217,10 @@ else
             if (AppState.Messages.Any(m => m.Id == item.Id)) return;
             AppState.Messages.Add(item);
             AppState.NotifyStateChanged();
-            await ScrollToBottomAsync();
+            if (_isNearBottom)
+            {
+                RequestScrollToBottom();
+            }
         });
     }
 
@@ -219,8 +243,16 @@ else
         InvokeAsync(async () =>
         {
             StateHasChanged();
-            await ScrollToBottomAsync();
+            if (_isNearBottom)
+            {
+                RequestScrollToBottom();
+            }
         });
+    }
+
+    private void RequestScrollToBottom()
+    {
+        _pendingScrollToBottom = true;
     }
 
     private async Task ScrollToBottomAsync()
@@ -228,8 +260,29 @@ else
         try
         {
             await JS.InvokeVoidAsync("scrollUtils.scrollToBottom", "message-list-container");
+            _isNearBottom = await JS.InvokeAsync<bool>("scrollUtils.isNearBottom", "message-list-container", 120);
         }
-        catch { /* ignore */ }
+        catch
+        {
+            _isNearBottom = true;
+        }
+    }
+
+    private async Task HandleScrollAsync()
+    {
+        try
+        {
+            _isNearBottom = await JS.InvokeAsync<bool>("scrollUtils.isNearBottom", "message-list-container", 120);
+        }
+        catch
+        {
+            _isNearBottom = true;
+        }
+    }
+
+    private async Task ScrollToLatestAsync()
+    {
+        await ScrollToBottomAsync();
     }
 
     private void EnterSelectionMode(Guid id)

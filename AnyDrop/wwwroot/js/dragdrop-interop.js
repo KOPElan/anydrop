@@ -4,6 +4,7 @@ window.AnyDropInterop = window.AnyDropInterop || {
 
 // 保存每个元素的清理函数，避免重复注册
 const _dropZoneCleanups = new WeakMap();
+const _messageScrollCleanups = new WeakMap();
 
 /**
  * 通过 XMLHttpRequest 上传文件列表到 /api/v1/files，支持进度报告。
@@ -203,6 +204,43 @@ AnyDropInterop.cleanupDropZone = function (element) {
   if (cleanup) {
     cleanup();
     _dropZoneCleanups.delete(element);
+  }
+};
+
+AnyDropInterop.setupMessageScrollObserver = function (element, dotNetRef) {
+  if (!element || !dotNetRef) return;
+
+  const existingCleanup = _messageScrollCleanups.get(element);
+  if (existingCleanup) {
+    existingCleanup();
+  }
+
+  const update = () => {
+    if (!element) return;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    const isNearBottom = distanceFromBottom <= 120;
+    dotNetRef.invokeMethodAsync('OnMessageListScrollPositionChanged', isNearBottom)
+      .catch((err) => {
+        if (err && typeof err.message === 'string' && err.message.includes('disposed')) return;
+        console.debug('[AnyDrop] message scroll observer callback failed:', err);
+      });
+  };
+
+  element.addEventListener('scroll', update, { passive: true });
+  update();
+
+  const cleanup = () => {
+    element.removeEventListener('scroll', update);
+  };
+  _messageScrollCleanups.set(element, cleanup);
+};
+
+AnyDropInterop.cleanupMessageScrollObserver = function (element) {
+  if (!element) return;
+  const cleanup = _messageScrollCleanups.get(element);
+  if (cleanup) {
+    cleanup();
+    _messageScrollCleanups.delete(element);
   }
 };
 

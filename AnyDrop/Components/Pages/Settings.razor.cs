@@ -23,6 +23,7 @@ public partial class Settings
     private bool _autoCleanupEnabled;
     private int _autoCleanupMonths = 1;
     private int _thumbnailGenerationHour = 2;
+    private bool _scheduledThumbnailGenerationEnabled;
     private bool _isRunningThumbnails;
     private string? _message;
     private string? _error;
@@ -83,6 +84,10 @@ public partial class Settings
             {
                 _thumbnailGenerationHour = thumbHour.GetInt32();
             }
+            if (data.TryGetProperty("scheduledThumbnailGenerationEnabled", out var scheduledThumbnails))
+            {
+                _scheduledThumbnailGenerationEnabled = scheduledThumbnails.GetBoolean();
+            }
         }
 
         // 从 localStorage 读取主题设置
@@ -135,7 +140,8 @@ public partial class Settings
             language = _language,
             autoCleanupEnabled = _autoCleanupEnabled,
             autoCleanupMonths = _autoCleanupMonths,
-            thumbnailGenerationHour = _thumbnailGenerationHour
+            thumbnailGenerationHour = _thumbnailGenerationHour,
+            scheduledThumbnailGenerationEnabled = _scheduledThumbnailGenerationEnabled
         };
         var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
         if (!result.ok)

@@ -234,11 +234,14 @@
   <data name="Home_MobileSend"><value>傳送訊息</value></data>
   <data name="Home_MobileSendTitle"><value>傳送訊息</value></data>
   <data name="Home_MobileSendPlaceholder"><value>輸入訊息內容…</value></data>
+  <data name="Home_BackToLatest"><value>回到最新訊息</value></data>
 
   <!-- 縮圖設定 -->
   <data name="Settings_ThumbnailGeneration"><value>縮圖與預覽圖</value></data>
   <data name="Settings_ThumbnailHour"><value>每日自動產生時間（0–23 時）</value></data>
   <data name="Settings_ThumbnailHourHint"><value>伺服器將於每天指定時間對未處理的圖片/影片產生預覽圖</value></data>
+  <data name="Settings_ThumbnailScheduleEnabled"><value>啟用排程批次產生</value></data>
+  <data name="Settings_ThumbnailScheduleEnabledHint"><value>預設關閉：上傳後立即產生預覽圖。資源緊張時可開啟排程，開啟後將停止即時產生。</value></data>
   <data name="Settings_RunThumbnailNow"><value>立即產生預覽圖</value></data>
   <data name="Settings_ThumbnailRunQueued"><value>預覽圖產生任務已觸發，後台處理中。</value></data>
   <data name="Settings_ThumbnailRunFailed"><value>觸發任務失敗，請重試。</value></data>

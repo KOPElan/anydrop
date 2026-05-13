@@ -186,7 +186,7 @@
                 var isBurnMessage = message.ExpiresAt.HasValue;
                 var bubbleClass = isBurnMessage ? "burn-after-reading" : "";
                 var isSelected = _selectedMessageIds.Contains(message.Id);
-                <div class="flex items-start gap-3 m-6 @(_isSelectMode ? "cursor-pointer select-none" : "")"
+                <div class="flex items-start gap-3 my-4 mx-2 md:m-6 max-w-full @(_isSelectMode ? "cursor-pointer select-none" : "")"
                      @key="message.Id"
                      data-message-id="@message.Id"
                      @onclick="() => OnMessageRowClick(message.Id)">
@@ -199,11 +199,11 @@
                             </span>
                         </div>
                     }
-                    <div class="flex flex-col items-start max-w-2xl message-bubble @bubbleClass @(isSelected ? "ring-2 ring-primary/60" : "")">
+                    <div class="flex flex-col items-start min-w-0 max-w-full md:max-w-2xl message-bubble @bubbleClass @(isSelected ? "ring-2 ring-primary/60" : "")">
                     @switch (message.ContentType)
                     {
                         case ShareContentType.Link:
-                                <div class="bubble-link bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm max-w-full transition-all duration-150">
+                                <div class="bubble-link bg-surface-container-lowest p-3 rounded-3xl rounded-tl-lg shadow-sm max-w-full min-w-0 transition-all duration-150">
                                 <div class="flex items-center gap-2 text-primary mb-3">
                                     <span class="material-symbols-outlined text-sm">link</span>
                                     <span class="text-xs font-semibold uppercase tracking-wide">@L["Home_Link"]</span>
@@ -234,14 +234,14 @@
                             break;
 
                         case ShareContentType.Image:
-                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-lg transition-all duration-150">
+                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg max-w-full md:max-w-lg transition-all duration-150">
                                 @* 点击图片在 Modal 中预览原图（thumbnail-first：缩略图加载，点击查看原图）*@
                                 <div class="rounded-xl overflow-hidden mb-3 cursor-zoom-in"
                                      @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
-                                    <img class="max-h-72 w-full object-contain transition-transform duration-200 hover:scale-[1.02]"
-                                         src="@GetThumbnailUrl(message.Id)"
-                                         onerror="this.onerror=null;this.src='@GetFileUrl(message.Id)'"
-                                         alt="@message.FileName" />
+                                    <img class="h-56 max-h-56 w-full object-cover transition-transform duration-200 hover:scale-[1.02]"
+                                          src="@GetThumbnailUrl(message.Id)"
+                                          onerror="this.onerror=null;this.src='@GetFileUrl(message.Id)'"
+                                          alt="@message.FileName" />
                                 </div>
                                 <div class="flex items-center justify-between px-1">
                                     <div class="flex items-center gap-3">
@@ -265,7 +265,7 @@
                             break;
 
                         case ShareContentType.Video:
-                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-lg transition-all duration-150">
+                                <div class="bubble-text p-3 rounded-3xl rounded-tl-lg w-full max-w-full md:max-w-lg transition-all duration-150">
                                 <div class="rounded-xl overflow-hidden mb-3">
                                     @if (_expandedVideoIds.Contains(message.Id))
                                     {
@@ -314,7 +314,7 @@
                             break;
 
                         case ShareContentType.File:
-                                <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg flex items-center gap-4 w-full max-w-md transition-all duration-150">
+                                <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg flex items-center gap-4 w-full max-w-full md:max-w-md transition-all duration-150">
                                 <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 flex-shrink-0">
                                     <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">description</span>
                                 </div>
@@ -333,7 +333,7 @@
                             break;
 
                         default:
-                            <div class="bubble-text px-6 py-4 rounded-3xl rounded-tl-lg transition-all duration-150 max-w-md">
+                            <div class="bubble-text px-6 py-4 rounded-3xl rounded-tl-lg transition-all duration-150 max-w-full md:max-w-md">
                                 <p class="text-[15px] font-medium leading-relaxed whitespace-pre-wrap break-words text-white">@message.Content</p>
                             </div>
                             break;
@@ -362,8 +362,8 @@
             <div class="max-w-4xl mx-auto w-full">
             @foreach (var pending in _pendingUploads)
             {
-                <div class="flex flex-col items-start max-w-2xl message-bubble m-6" @key="pending.TempId">
-                    <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg w-full max-w-md flex flex-col gap-3">
+                <div class="flex flex-col items-start max-w-full md:max-w-2xl message-bubble my-4 mx-2 md:m-6" @key="pending.TempId">
+                    <div class="bubble-text px-5 py-4 rounded-3xl rounded-tl-lg w-full max-w-full md:max-w-md flex flex-col gap-3">
                         @* 文件信息行 *@
                         <div class="flex items-center gap-3">
                             <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 flex-shrink-0">
@@ -407,6 +407,17 @@
             </div>
         }
     </div>
+
+    @if (_selectedTopicId.HasValue && !_isNearMessageListBottom && (_messages.Count > 0 || _pendingUploads.Count > 0))
+    {
+        <button type="button"
+                class="fixed bottom-28 right-6 z-40 flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
+                style="background: linear-gradient(135deg, #6366f1, #3b82f6);"
+                @onclick="ScrollToLatestAsync">
+            <span class="material-symbols-outlined" style="font-size: 16px;">south</span>
+            @L["Home_BackToLatest"]
+        </button>
+    }
 
     @* ─────────── 拖放覆盖层（纯视觉提示）─────────── *@
     @if (_isDragging)

@@ -300,12 +300,19 @@ public class ShareServiceTests
         var systemSettingsMock = new Mock<ISystemSettingsService>();
         systemSettingsMock.Setup(x => x.IsAutoFetchLinkPreviewEnabledAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(autoFetchEnabled);
+        systemSettingsMock.Setup(x => x.IsScheduledThumbnailGenerationEnabledAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var thumbnailServiceMock = new Mock<IThumbnailService>();
+        thumbnailServiceMock
+            .Setup(x => x.GenerateThumbnailAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
 
         return new ShareService(
             dbContext,
             hubContextMock.Object,
             topicServiceMock.Object,
             fileStorageServiceMock.Object,
+            thumbnailServiceMock.Object,
             linkMetadataService,
             systemSettingsMock.Object,
             scopeFactoryMock.Object,

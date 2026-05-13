@@ -136,12 +136,16 @@
   <data name="MessageList_Cancel"><value>Cancel</value></data>
   <data name="MessageList_Selected"><value>{0} selected</value></data>
   <data name="MessageList_NoMessages"><value>No messages yet, send the first one 👋</value></data>
+  <data name="MessageList_BackToLatest"><value>Back to new messages</value></data>
 
   <!-- Message Item -->
   <data name="MessageItem_SelectText"><value>Select Text</value></data>
   <data name="MessageItem_SaveImage"><value>Save Image</value></data>
   <data name="MessageItem_DefaultImage"><value>Image</value></data>
   <data name="MessageItem_DefaultVideo"><value>Video</value></data>
+  <data name="MessageItem_ExpiringSoon"><value>Deleting soon</value></data>
+  <data name="MessageItem_DeleteAfterMinutes"><value>Delete in {0} min</value></data>
+  <data name="MessageItem_DeleteAfterSeconds"><value>Delete in {0} sec</value></data>
 
   <!-- Message Input -->
   <data name="MessageInput_Placeholder"><value>Type a message...</value></data>
@@ -151,6 +155,7 @@
   <!-- Home Page -->
   <data name="Home_SelectTopic"><value>Select a topic</value></data>
   <data name="Home_CreateTopicHint"><value>Select or create a topic from the left panel</value></data>
+  <data name="Home_LoadingData"><value>Loading conversation data...</value></data>
   <data name="Home_SearchAriaLabel"><value>Search</value></data>
   <data name="Home_MoreAriaLabel"><value>More</value></data>
 

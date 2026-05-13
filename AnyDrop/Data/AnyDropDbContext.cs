@@ -101,6 +101,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             entity.Property(e => e.AutoCleanupEnabled).HasDefaultValue(false);
             entity.Property(e => e.AutoCleanupMonths).HasDefaultValue(1);
             entity.Property(e => e.ThumbnailGenerationHour).HasDefaultValue(2);
+            entity.Property(e => e.ScheduledThumbnailGenerationEnabled).HasDefaultValue(false);
             entity.Property(e => e.UpdatedAt)
                 .HasConversion(
                     value => value.UtcDateTime,
@@ -115,6 +116,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 AutoCleanupEnabled = false,
                 AutoCleanupMonths = 1,
                 ThumbnailGenerationHour = 2,
+                ScheduledThumbnailGenerationEnabled = false,
                 UpdatedAt = DateTimeOffset.Parse("2026-04-19T00:00:00Z")
             });
         });

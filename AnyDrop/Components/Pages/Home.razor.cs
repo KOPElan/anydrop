@@ -111,6 +111,7 @@ public partial class Home : IAsyncDisposable
 
     // 视频"点击展开播放"集合（thumbnail-first 交互）
     private readonly HashSet<Guid> _expandedVideoIds = [];
+    private bool _isNearMessageListBottom = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -263,6 +264,7 @@ public partial class Home : IAsyncDisposable
             {
                 await JS.InvokeVoidAsync("AnyDropInterop.setupFileInput", _imageInputRef, _dotNetRef);
                 await JS.InvokeVoidAsync("AnyDropInterop.setupFileInput", _attachmentInputRef, _dotNetRef);
+                await JS.InvokeVoidAsync("AnyDropInterop.setupMessageScrollObserver", _messageListRef, _dotNetRef);
             }
             catch (Exception ex)
             {
@@ -718,6 +720,13 @@ public partial class Home : IAsyncDisposable
         return InvokeAsync(StateHasChanged);
     }
 
+    [JSInvokable]
+    public Task OnMessageListScrollPositionChanged(bool isNearBottom)
+    {
+        _isNearMessageListBottom = isNearBottom;
+        return InvokeAsync(StateHasChanged);
+    }
+
     /// <summary>切换阅后即焚模式。</summary>
     private void ToggleBurnAfterReading()
     {
@@ -900,12 +909,20 @@ public partial class Home : IAsyncDisposable
         _expandedVideoIds.Add(messageId);
     }
 
+    private async Task ScrollToLatestAsync()
+    {
+        _shouldScrollToBottom = true;
+        _isNearMessageListBottom = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
     public async ValueTask DisposeAsync()
     {
         // 清理 JS 拖放事件监听器，防止内存泄漏
         try
         {
             await JS.InvokeVoidAsync("AnyDropInterop.cleanupDropZone", _chatSectionRef);
+            await JS.InvokeVoidAsync("AnyDropInterop.cleanupMessageScrollObserver", _messageListRef);
         }
         catch (JSDisconnectedException)
         {

@@ -40,7 +40,13 @@
         window.scrollUtils = {
             scrollToBottom: function(elementId) {
                 var el = document.getElementById(elementId);
-                if (el) { el.scrollTop = el.scrollHeight; }
+                if (!el) return;
+                el.scrollTop = el.scrollHeight;
+                setTimeout(function () {
+                    if (el) {
+                        el.scrollTop = el.scrollHeight;
+                    }
+                }, 250);
             },
             isNearBottom: function(elementId, threshold) {
                 var el = document.getElementById(elementId);

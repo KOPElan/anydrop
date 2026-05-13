@@ -57,9 +57,6 @@
             </button>
         </div>
 
-        <!-- 标题栏占位：为 absolute 标题栏留出空间，防止内容（含选择工具栏）与之重叠 -->
-        <div class="flex-shrink-0 h-[60px]"></div>
-
         @if (_showTopicMenu && _currentTopic is not null)
         {
             <TopicActionMenu Topic="_currentTopic"
@@ -68,7 +65,14 @@
                              OnEnterSelectionMode="EnterSelectionModeFromMenu" />
         }
 
-        @if (AppState.CurrentTopicId.HasValue)
+        @if (_isLoadingHome)
+        {
+            <div class="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500 dark:text-gray-400">
+                <div class="w-6 h-6 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                <p class="text-sm">@L["Home_LoadingData"]</p>
+            </div>
+        }
+        else if (AppState.CurrentTopicId.HasValue)
         {
             <MessageList @ref="_messageList" TopicId="AppState.CurrentTopicId.Value" />
             <MessageInput TopicId="AppState.CurrentTopicId.Value" />
@@ -91,6 +95,7 @@
     private bool _showSidebar;
     private bool _isWide = false;
     private bool _showTopicMenu;
+    private bool _isLoadingHome = true;
     private MessageList? _messageList;
 
     private TopicDto? _currentTopic =>
@@ -108,6 +113,8 @@
         {
             try { await SignalR.StartAsync(); } catch { /* ignore */ }
         }
+
+        _isLoadingHome = false;
     }
 
     private async Task LoadTopicsAsync()

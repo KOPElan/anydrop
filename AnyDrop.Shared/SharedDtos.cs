@@ -47,7 +47,8 @@ public sealed record SecuritySettingsDto(
     string Language,
     bool AutoCleanupEnabled,
     int AutoCleanupMonths,
-    int ThumbnailGenerationHour = 2);
+    int ThumbnailGenerationHour = 2,
+    bool ScheduledThumbnailGenerationEnabled = false);
 
 /// <summary>更新安全与偏好设置请求。</summary>
 public sealed record UpdateSecuritySettingsRequest(
@@ -56,7 +57,8 @@ public sealed record UpdateSecuritySettingsRequest(
     string Language,
     bool AutoCleanupEnabled,
     int AutoCleanupMonths,
-    int ThumbnailGenerationHour = 2);
+    int ThumbnailGenerationHour = 2,
+    bool ScheduledThumbnailGenerationEnabled = false);
 
 /// <summary>手动清理操作结果。</summary>
 public sealed record CleanupResult(int DeletedCount);

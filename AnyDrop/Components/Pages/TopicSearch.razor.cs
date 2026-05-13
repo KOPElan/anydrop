@@ -49,6 +49,13 @@ public partial class TopicSearch
     // 有消息记录的日期集合（当前窗口内）
     private IReadOnlyCollection<DateOnly> _activeDates = [];
     private bool _isLoadingActiveDates;
+    private bool _showDatePickerPanel;
+    private int _pickerYear;
+    private int _pickerMonth;
+    private List<DateOnly?> _pickerCalendarDays = [];
+    private IReadOnlyCollection<DateOnly> _pickerActiveDates = [];
+    private static IReadOnlyList<string> PickerWeekDays
+        => CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames;
 
     // ─── 媒体/文件/链接 标签页通用 ───
     private List<ShareItemDto> _typeResults = [];
@@ -58,10 +65,14 @@ public partial class TopicSearch
 
     // ─── 图片大图预览 ───
     private string? _previewImageUrl;
+    private string? _previewVideoUrl;
 
     protected override async Task OnInitializedAsync()
     {
         _calendarWindowStart = CalcDefaultWindowStart();
+        _pickerYear = _selectedDate.Year;
+        _pickerMonth = _selectedDate.Month;
+        BuildPickerCalendarDays();
         await LoadTopicNameAsync();
     }
 
@@ -240,6 +251,9 @@ public partial class TopicSearch
     {
         if (date > Today) return;
         _selectedDate = date;
+        _pickerYear = date.Year;
+        _pickerMonth = date.Month;
+        BuildPickerCalendarDays();
         await LoadDateResultsAsync();
     }
 
@@ -265,28 +279,86 @@ public partial class TopicSearch
         }
     }
 
-    private async Task HandleDatePickerChanged(ChangeEventArgs e)
-    {
-        if (DateOnly.TryParse(e.Value?.ToString(), out var date) && date <= Today)
-        {
-            _selectedDate = date;
-            // 将日历窗口移到包含所选日期的位置：以 date 为末端，往前取 6 天
-            _calendarWindowStart = date.AddDays(-6);
-            // 若窗口末端超过今天，则以今天为末端（始终显示今天）
-            if (_calendarWindowStart.AddDays(6) > Today)
-            {
-                _calendarWindowStart = Today.AddDays(-6);
-            }
+    private string _pickerMonthTitle => new DateTime(_pickerYear, _pickerMonth, 1).ToString("Y", CultureInfo.CurrentCulture);
+    private bool CanGoNextPickerMonth => new DateOnly(_pickerYear, _pickerMonth, 1) < new DateOnly(Today.Year, Today.Month, 1);
 
-            await LoadCalendarActiveDatesAsync();
-            await LoadDateResultsAsync();
+    private void BuildPickerCalendarDays()
+    {
+        _pickerCalendarDays.Clear();
+        var firstDay = new DateOnly(_pickerYear, _pickerMonth, 1);
+        var startDayOfWeek = (int)firstDay.DayOfWeek;
+        for (var i = 0; i < startDayOfWeek; i++)
+        {
+            _pickerCalendarDays.Add(null);
+        }
+
+        var daysInMonth = DateTime.DaysInMonth(_pickerYear, _pickerMonth);
+        for (var day = 1; day <= daysInMonth; day++)
+        {
+            _pickerCalendarDays.Add(new DateOnly(_pickerYear, _pickerMonth, day));
         }
     }
 
-    /// <summary>触发隐藏的 date input 弹出系统日历选择器。</summary>
-    private async Task OpenDatePickerAsync()
+    private async Task LoadPickerActiveDatesAsync()
     {
-        await JS.InvokeVoidAsync("AnyDropInterop.showDatePicker", "datepicker-hidden");
+        var start = new DateOnly(_pickerYear, _pickerMonth, 1);
+        var end = start.AddMonths(1).AddDays(-1);
+        _pickerActiveDates = await ShareService.GetTopicActiveDatesAsync(TopicId, start, end);
+    }
+
+    private async Task ToggleDatePickerPanel()
+    {
+        _showDatePickerPanel = !_showDatePickerPanel;
+        if (_showDatePickerPanel)
+        {
+            _pickerYear = _selectedDate.Year;
+            _pickerMonth = _selectedDate.Month;
+            BuildPickerCalendarDays();
+            await LoadPickerActiveDatesAsync();
+        }
+    }
+
+    private async Task PrevPickerMonthAsync()
+    {
+        if (_pickerMonth == 1)
+        {
+            _pickerYear--;
+            _pickerMonth = 12;
+        }
+        else
+        {
+            _pickerMonth--;
+        }
+
+        BuildPickerCalendarDays();
+        await LoadPickerActiveDatesAsync();
+    }
+
+    private async Task NextPickerMonthAsync()
+    {
+        if (!CanGoNextPickerMonth)
+        {
+            return;
+        }
+
+        if (_pickerMonth == 12)
+        {
+            _pickerYear++;
+            _pickerMonth = 1;
+        }
+        else
+        {
+            _pickerMonth++;
+        }
+
+        BuildPickerCalendarDays();
+        await LoadPickerActiveDatesAsync();
+    }
+
+    private async Task SelectPickerDateAsync(DateOnly date)
+    {
+        _showDatePickerPanel = false;
+        await SelectCalendarDateAsync(date);
     }
 
     // ─────────────────────────── 媒体/文件/链接 ───────────────────────────
@@ -355,6 +427,16 @@ public partial class TopicSearch
         _previewImageUrl = null;
     }
 
+    private void OpenVideoPreview(string url)
+    {
+        _previewVideoUrl = url;
+    }
+
+    private void CloseVideoPreview()
+    {
+        _previewVideoUrl = null;
+    }
+
     // ─────────────────────────── 工具方法 ───────────────────────────
 
     private IEnumerable<IGrouping<DateOnly, ShareItemDto>> GroupByDate(List<ShareItemDto> items)
@@ -379,6 +461,8 @@ public partial class TopicSearch
         => download
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
+
+    private static string GetThumbnailUrl(Guid itemId) => $"/api/v1/share-items/{itemId}/thumbnail";
 
     private static string FormatFileSize(long bytes)
     {
