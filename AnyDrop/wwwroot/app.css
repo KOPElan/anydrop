@@ -1004,6 +1004,30 @@
         }
     }
 
+    /* ─── 移动端浮动输入面板 ─── */
+    .mobile-input-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 46;
+        background: rgba(25, 28, 29, 0.40);
+        animation: overlay-in 200ms ease both;
+    }
+
+    .mobile-input-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 47;
+        padding: 0.75rem 1rem 1.5rem;
+        animation: mobile-panel-slide-up 260ms var(--ease-bounce) both;
+    }
+
+    @keyframes mobile-panel-slide-up {
+        from { transform: translateY(100%); opacity: 0; }
+        to   { transform: translateY(0); opacity: 1; }
+    }
+
     /* ─── 骨架屏加载动画 ─── */
     @keyframes skeleton-shimmer {
         0%   { background-position: -400px 0; }
@@ -1244,6 +1268,11 @@ html.dark .modal-overlay {
 html.dark .modal-content {
     background: rgba(28, 30, 34, 0.96);
     border-color: rgba(60, 68, 80, 0.55);
+}
+
+/* ── 移动端浮动输入面板（暗色模式）── */
+html.dark .mobile-input-backdrop {
+    background: rgba(0, 0, 0, 0.60);
 }
 
 /* ── 侧边栏项目悬停 ── */

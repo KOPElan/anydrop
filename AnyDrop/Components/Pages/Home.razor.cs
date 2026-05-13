@@ -827,7 +827,7 @@ public partial class Home : IAsyncDisposable
 
     // ── 移动端 FAB 发送 Modal ──────────────────────────────────────────────────
 
-    /// <summary>打开移动端快速发送 Modal。</summary>
+    /// <summary>打开移动端快速发送浮动面板。</summary>
     private void OpenMobileSendModal()
     {
         if (!_selectedTopicId.HasValue)
@@ -840,7 +840,7 @@ public partial class Home : IAsyncDisposable
         _showMobileSendModal = true;
     }
 
-    /// <summary>关闭移动端发送 Modal 并清空输入。</summary>
+    /// <summary>关闭移动端浮动面板并清空输入。</summary>
     private void CloseMobileSendModal()
     {
         _showMobileSendModal = false;
@@ -848,7 +848,7 @@ public partial class Home : IAsyncDisposable
         _validationError = null;
     }
 
-    /// <summary>从移动端 Modal 发送消息：成功后自动关闭 Modal。</summary>
+    /// <summary>从移动端浮动面板发送文本消息：成功后自动关闭面板。</summary>
     private async Task SendFromMobileModalAsync()
     {
         _inputText = _mobileInputText;
@@ -861,9 +861,35 @@ public partial class Home : IAsyncDisposable
         }
         else
         {
-            // 发送失败（验证错误等），保留 Modal 显示错误
+            // 发送失败（验证错误等），保留面板显示错误
             _mobileInputText = _inputText;
             _inputText = string.Empty;
+        }
+    }
+
+    /// <summary>触发图片/视频文件选择器（桌面端按钮和移动端浮动面板共用）。</summary>
+    private async Task TriggerImageInputAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.triggerClick", _imageInputRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to trigger image file input.");
+        }
+    }
+
+    /// <summary>触发附件文件选择器（桌面端按钮和移动端浮动面板共用）。</summary>
+    private async Task TriggerAttachmentInputAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.triggerClick", _attachmentInputRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to trigger attachment file input.");
         }
     }
 

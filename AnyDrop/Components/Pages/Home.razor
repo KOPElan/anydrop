@@ -500,25 +500,27 @@
         <div class="input-wrapper chat-input-card px-4 py-3">
             @* 附件按钮（带右侧分割线）*@
             <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
-                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
-                       style="color: var(--color-on-surface-variant);"
-                      title="@L["Home_UploadImageOrVideo"]">
-                        <span class="material-symbols-outlined text-base">image</span>
-                    <input @ref="_imageInputRef" type="file" class="hidden" multiple accept="image/*,video/*" />
-                </label>
-                <label class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
-                       style="color: var(--color-on-surface-variant);"
-                      title="@L["Home_UploadAttachment"]">
-                        <span class="material-symbols-outlined text-base">attach_file</span>
-                    <input @ref="_attachmentInputRef" type="file" class="hidden" multiple />
-                </label>
+                <button type="button"
+                        class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                        style="color: var(--color-on-surface-variant);"
+                        title="@L["Home_UploadImageOrVideo"]"
+                        @onclick="TriggerImageInputAsync">
+                    <span class="material-symbols-outlined text-base">image</span>
+                </button>
+                <button type="button"
+                        class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                        style="color: var(--color-on-surface-variant);"
+                        title="@L["Home_UploadAttachment"]"
+                        @onclick="TriggerAttachmentInputAsync">
+                    <span class="material-symbols-outlined text-base">attach_file</span>
+                </button>
                 @* 阅后即焚切换按钮 *@
                 <button type="button"
                         class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
                         style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
-                    title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
+                        title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
                         @onclick="ToggleBurnAfterReading">
-                        <span class="material-symbols-outlined text-base"
+                    <span class="material-symbols-outlined text-base"
                           style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
                         timer
                     </span>
@@ -555,6 +557,12 @@
         </div>
         </div>
     </footer>
+
+    @* 文件输入（始终挂载到 DOM，供桌面端和移动端浮动面板共享触发）*@
+    <div style="position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0; pointer-events: none;">
+        <input @ref="_imageInputRef" type="file" multiple accept="image/*,video/*" tabindex="-1" aria-hidden="true" />
+        <input @ref="_attachmentInputRef" type="file" multiple tabindex="-1" aria-hidden="true" />
+    </div>
     }
 
     @* ─────────── 批量删除二次确认 Modal ─────────── *@
@@ -593,42 +601,70 @@
         </button>
     }
 
-    @* ─────────── 移动端发送 Modal ─────────── *@
+    @* ─────────── 移动端浮动输入面板 ─────────── *@
     @if (_showMobileSendModal)
     {
-        <div class="modal-overlay" @onclick="CloseMobileSendModal">
-            <div class="modal-content w-full max-w-sm" role="dialog" aria-modal="true" aria-labelledby="mobile-send-modal-title" @onclick:stopPropagation>
-                <div class="flex items-center justify-between mb-3">
-                    <h3 id="mobile-send-modal-title" class="modal-title mb-0">@L["Home_MobileSendTitle"]</h3>
+        @* 半透明背景遮罩，点击关闭面板 *@
+        <div class="mobile-input-backdrop" @onclick="CloseMobileSendModal" role="button" aria-label="@L["Common_Close"]"></div>
+        @* 浮动输入卡片，锚定在屏幕底部，布局与桌面端输入卡片一致 *@
+        <div class="mobile-input-panel" role="dialog" aria-modal="true" aria-label="@L["Home_MobileSend"]" @onclick:stopPropagation>
+            <div class="input-wrapper chat-input-card px-4 py-3">
+                @* 附件按钮区域（移动端响应式布局会自动移到第二行）*@
+                <div class="input-actions pr-3" style="border-right: 1px solid rgba(203,213,225,0.50);">
                     <button type="button"
-                            class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors"
-                            @onclick="CloseMobileSendModal">
-                        <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+                            class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                            style="color: var(--color-on-surface-variant);"
+                            title="@L["Home_UploadImageOrVideo"]"
+                            @onclick="TriggerImageInputAsync">
+                        <span class="material-symbols-outlined text-base">image</span>
+                    </button>
+                    <button type="button"
+                            class="flex cursor-pointer items-center justify-center rounded-xl p-2.5 transition-colors hover:bg-blue-50 active:scale-90"
+                            style="color: var(--color-on-surface-variant);"
+                            title="@L["Home_UploadAttachment"]"
+                            @onclick="TriggerAttachmentInputAsync">
+                        <span class="material-symbols-outlined text-base">attach_file</span>
+                    </button>
+                    @* 阅后即焚切换按钮 *@
+                    <button type="button"
+                            class="flex items-center justify-center rounded-xl p-2.5 transition-all active:scale-90 @(_burnAfterReading ? "text-error" : "hover:bg-blue-50")"
+                            style="color: @(_burnAfterReading ? "var(--color-error)" : "var(--color-on-surface-variant)"); @(_burnAfterReading ? "background: var(--color-error-container, #ffdad6);" : "")"
+                            title="@(_burnAfterReading ? L["Home_BurnOnHint"] : L["Home_BurnOffHint"])"
+                            @onclick="ToggleBurnAfterReading">
+                        <span class="material-symbols-outlined text-base"
+                              style="font-variation-settings: 'FILL' @(_burnAfterReading ? 1 : 0);">
+                            timer
+                        </span>
                     </button>
                 </div>
-                <textarea class="w-full resize-none rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-primary/30"
-                          style="border-color: var(--color-outline-variant); background: var(--color-surface); color: var(--color-on-surface); min-height: 100px; max-height: 200px; field-sizing: content;"
-                          placeholder="@L["Home_MobileSendPlaceholder"]"
-                          maxlength="10000"
-                          @bind="_mobileInputText"
-                          @bind:event="oninput"></textarea>
-                @if (!string.IsNullOrWhiteSpace(_validationError))
-                {
-                    <p class="mt-1 text-xs" style="color: var(--color-error);">@_validationError</p>
-                }
-                <div class="modal-actions mt-4">
-                    <button type="button" class="btn-secondary" @onclick="CloseMobileSendModal">@L["Common_Cancel"]</button>
+                @* 文本输入框 *@
+                <div class="input-textarea-wrap">
+                    <textarea class="w-full resize-none bg-transparent py-2 px-4 text-[15px] font-medium outline-none"
+                              style="border: none; max-height: 8rem; field-sizing: content; color: var(--color-on-surface);"
+                              placeholder="@L["Home_InputPlaceholder"]"
+                              maxlength="10000"
+                              rows="1"
+                              @bind="_mobileInputText"
+                              @bind:event="oninput"></textarea>
+                    @if (!string.IsNullOrWhiteSpace(_validationError))
+                    {
+                        <p class="px-4 text-xs text-error">@_validationError</p>
+                    }
+                </div>
+                @* 发送按钮（与输入框一体，方形渐变）*@
+                <div class="input-send-wrap ml-2">
                     <button type="button"
-                            class="btn-primary"
+                            class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                            style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);"
                             disabled="@_isSending"
                             @onclick="SendFromMobileModalAsync">
                         @if (_isSending)
                         {
-                            <span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span>
+                            <span class="material-symbols-outlined animate-spin" style="font-size: 20px;">progress_activity</span>
                         }
                         else
                         {
-                            <span>@L["Common_Send"]</span>
+                            <span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">arrow_upward</span>
                         }
                     </button>
                 </div>
