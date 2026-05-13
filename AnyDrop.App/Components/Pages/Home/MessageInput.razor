@@ -75,9 +75,10 @@
                 AppState.Messages.Add(item);
             AppState.NotifyMessageAdded();
         }
-        catch
+        catch (Exception ex)
         {
             // 发送失败时恢复输入内容，避免用户无感知地丢失消息
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 发送消息失败: {ex.Message}");
             _text = textToSend;
         }
     }
