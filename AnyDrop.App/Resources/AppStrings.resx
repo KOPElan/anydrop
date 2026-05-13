@@ -136,12 +136,16 @@
   <data name="MessageList_Cancel"><value>取消</value></data>
   <data name="MessageList_Selected"><value>已选 {0} 条</value></data>
   <data name="MessageList_NoMessages"><value>暂无消息，发送第一条吧 👋</value></data>
+  <data name="MessageList_BackToLatest"><value>回到新消息</value></data>
 
   <!-- 消息条目 / Message Item -->
   <data name="MessageItem_SelectText"><value>选择文本</value></data>
   <data name="MessageItem_SaveImage"><value>保存图片</value></data>
   <data name="MessageItem_DefaultImage"><value>图片</value></data>
   <data name="MessageItem_DefaultVideo"><value>视频</value></data>
+  <data name="MessageItem_ExpiringSoon"><value>即将删除</value></data>
+  <data name="MessageItem_DeleteAfterMinutes"><value>{0}分钟后删除</value></data>
+  <data name="MessageItem_DeleteAfterSeconds"><value>{0}秒后删除</value></data>
 
   <!-- 消息输入框 / Message Input -->
   <data name="MessageInput_Placeholder"><value>输入消息...</value></data>
@@ -151,6 +155,7 @@
   <!-- 首页 / Home Page -->
   <data name="Home_SelectTopic"><value>选择主题</value></data>
   <data name="Home_CreateTopicHint"><value>请从左侧选择或创建一个主题</value></data>
+  <data name="Home_LoadingData"><value>正在加载会话数据…</value></data>
   <data name="Home_SearchAriaLabel"><value>搜索</value></data>
   <data name="Home_MoreAriaLabel"><value>更多</value></data>
 

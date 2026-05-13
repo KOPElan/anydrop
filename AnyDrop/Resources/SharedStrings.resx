@@ -244,11 +244,14 @@
   <data name="Home_MobileSend"><value>发送消息</value></data>
   <data name="Home_MobileSendTitle"><value>发送消息</value></data>
   <data name="Home_MobileSendPlaceholder"><value>输入消息内容…</value></data>
+  <data name="Home_BackToLatest"><value>回到最新消息</value></data>
 
   <!-- 缩略图设置 / Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>缩略图与预览图</value></data>
   <data name="Settings_ThumbnailHour"><value>每日自动生成时间（0–23 时）</value></data>
   <data name="Settings_ThumbnailHourHint"><value>服务端将在每天指定时间对未处理的图片/视频生成预览图</value></data>
+  <data name="Settings_ThumbnailScheduleEnabled"><value>启用计划任务批量生成</value></data>
+  <data name="Settings_ThumbnailScheduleEnabledHint"><value>默认关闭：上传后即时生成预览图。资源紧张时可开启计划任务，开启后将停止即时生成。</value></data>
   <data name="Settings_RunThumbnailNow"><value>立即生成预览图</value></data>
   <data name="Settings_ThumbnailRunQueued"><value>预览图生成任务已触发，后台处理中。</value></data>
   <data name="Settings_ThumbnailRunFailed"><value>触发任务失败，请重试。</value></data>
@@ -270,8 +273,8 @@
   <data name="Search_NoResults"><value>未找到包含“{0}”的消息</value></data>
   <data name="Search_ResultCount"><value>共 {0} 条结果</value></data>
   <data name="Search_ResultSuffixPartial"><value>（显示最新部分）</value></data>
-  <data name="Search_DateBack7Days"><value>向前 7 天</value></data>
-  <data name="Search_DateForward7Days"><value>向后 7 天</value></data>
+  <data name="Search_DateBack7Days"><value>前一天</value></data>
+  <data name="Search_DateForward7Days"><value>后一天</value></data>
   <data name="Search_PickDate"><value>选择具体日期</value></data>
   <data name="Search_DateMessageCount"><value>{0} 条消息</value></data>
   <data name="Search_DateHint"><value>点击日期查看当天的所有消息</value></data>

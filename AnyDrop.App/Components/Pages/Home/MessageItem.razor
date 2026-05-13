@@ -103,8 +103,10 @@
                     <div class="cursor-pointer active:opacity-90 transition-opacity" @onclick:stopPropagation="true" @onclick="NavigateToImagePreview">
                         @if (!string.IsNullOrEmpty(_fileUrl))
                         {
-                            <img src="@_fileUrl" alt="image"
-                                 class="w-full object-cover aspect-video" />
+                            <img src="@_thumbnailUrl" alt="image"
+                                 onerror="this.onerror=null;this.src=this.getAttribute('data-fallback');"
+                                 data-fallback="@_fileUrl"
+                                 class="w-full h-52 object-cover" />
                         }
                         else
                         {
@@ -148,13 +150,33 @@
                     <div class="@(_selectionMode ? "" : "cursor-pointer")" @onclick:stopPropagation="true">
                         @if (!string.IsNullOrEmpty(_fileUrl))
                         {
-                            <video src="@_fileUrl"
-                                   controls
-                                   playsinline
-                                   preload="metadata"
-                                   class="w-full max-h-56"
-                                   @onclick:stopPropagation="true">
-                            </video>
+                            @if (_videoExpanded)
+                            {
+                                <video src="@_fileUrl"
+                                       controls
+                                       playsinline
+                                       preload="metadata"
+                                       class="w-full max-h-56"
+                                       @onclick:stopPropagation="true">
+                                </video>
+                            }
+                            else
+                            {
+                                <div class="relative cursor-pointer" @onclick="ExpandVideoPreview">
+                                    <img src="@_thumbnailUrl"
+                                         alt="video-preview"
+                                         onerror="this.onerror=null;this.src=this.getAttribute('data-fallback');"
+                                         data-fallback="@VideoThumbnailFallbackDataUrl"
+                                         class="w-full h-52 object-cover" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <div class="w-12 h-12 rounded-full bg-black/45 flex items-center justify-center text-white">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M8 5v14l11-7z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         }
                         else
                         {
@@ -243,6 +265,13 @@
     <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-1 flex items-center gap-1">
         <span class="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
         <span>@Item.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</span>
+        @if (Item.ExpiresAt.HasValue)
+        {
+            <div class="ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-300 bg-red-50/80 dark:bg-red-900/30">
+                <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
+                @FormatExpiry(Item.ExpiresAt.Value)
+            </div>
+        }
     </p>
 </div>
 
@@ -255,12 +284,15 @@
     [Parameter] public EventCallback<Guid> OnDelete { get; set; }
 
     private string _fileUrl = string.Empty;
+    private string _thumbnailUrl = string.Empty;
     private bool _saving;
     private bool _showContextMenu;
     private bool _showTextModal;
+    private bool _videoExpanded;
     private bool _selectionMode => SelectionMode;
     private System.Threading.Timer? _longPressTimer;
     private const int LongPressMs = 600;
+    private static readonly string VideoThumbnailFallbackDataUrl = $"data:image/svg+xml,{Uri.EscapeDataString("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 270'><rect width='480' height='270' fill='%231d2430'/><circle cx='240' cy='135' r='34' fill='rgba(255,255,255,0.16)'/><polygon points='228,115 228,155 262,135' fill='white'/></svg>")}";
 
     private void CancelLongPress()
     {
@@ -273,7 +305,15 @@
         if (Item.ContentType is ShareContentType.Image or ShareContentType.Video)
         {
             _fileUrl = await BuildFileUrlAsync(download: false);
+            _thumbnailUrl = await BuildThumbnailUrlAsync();
+            _videoExpanded = false;
             StateHasChanged();
+        }
+        else
+        {
+            _fileUrl = string.Empty;
+            _thumbnailUrl = string.Empty;
+            _videoExpanded = false;
         }
     }
 
@@ -312,6 +352,24 @@
 
         var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : string.Empty;
         return $"{baseUrl}/api/v1/share-items/{Item.Id}/file{query}";
+    }
+
+    private async Task<string> BuildThumbnailUrlAsync()
+    {
+        var baseUrl = ServerConfig.GetBaseUrl();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            return string.Empty;
+
+        var token = await TokenStorage.GetTokenAsync().ConfigureAwait(false);
+        var query = string.IsNullOrWhiteSpace(token)
+            ? string.Empty
+            : $"?access_token={Uri.EscapeDataString(token)}";
+        return $"{baseUrl}/api/v1/share-items/{Item.Id}/thumbnail{query}";
+    }
+
+    private void ExpandVideoPreview(MouseEventArgs _)
+    {
+        _videoExpanded = true;
     }
 
     private async Task SaveFileAsync()
@@ -436,4 +494,17 @@
         < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
         _ => $"{bytes / (1024.0 * 1024):F1} MB"
     };
+
+    private string FormatExpiry(DateTimeOffset expiresAt)
+    {
+        var remaining = expiresAt - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return L["MessageItem_ExpiringSoon"];
+        }
+
+        return remaining.TotalMinutes >= 1
+            ? string.Format(L["MessageItem_DeleteAfterMinutes"], (int)remaining.TotalMinutes)
+            : string.Format(L["MessageItem_DeleteAfterSeconds"], Math.Max(1, (int)remaining.TotalSeconds));
+    }
 }

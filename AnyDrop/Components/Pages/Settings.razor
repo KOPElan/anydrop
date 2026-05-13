@@ -161,6 +161,19 @@
                     <p class="mt-1 text-xs text-on-surface-variant/70">@L["Settings_ThumbnailHourHint"]</p>
                 </div>
 
+                <div class="settings-row">
+                    <div>
+                        <p class="text-sm font-medium text-on-surface">@L["Settings_ThumbnailScheduleEnabled"]</p>
+                        <p class="text-xs text-on-surface-variant/70">@L["Settings_ThumbnailScheduleEnabledHint"]</p>
+                    </div>
+                    <button type="button"
+                            class="topic-menu-toggle @(_scheduledThumbnailGenerationEnabled ? "topic-menu-toggle--on" : "")"
+                            @onclick="() => _scheduledThumbnailGenerationEnabled = !_scheduledThumbnailGenerationEnabled"
+                            aria-pressed="@_scheduledThumbnailGenerationEnabled">
+                        <span class="topic-menu-toggle__knob"></span>
+                    </button>
+                </div>
+
                 <div class="flex gap-3 flex-wrap">
                     <button type="button" class="btn-primary w-fit" @onclick="SaveSecurityAsync">@L["Settings_SaveSecurity"]</button>
                     <button type="button"

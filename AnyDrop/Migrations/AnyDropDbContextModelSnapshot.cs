@@ -105,6 +105,11 @@ namespace AnyDrop.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("zh-CN");
 
+                    b.Property<bool>("ScheduledThumbnailGenerationEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("ThumbnailGenerationHour")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
@@ -133,6 +138,7 @@ namespace AnyDrop.Migrations
                             AutoFetchLinkPreview = true,
                             BurnAfterReadingMinutes = 10,
                             Language = "zh-CN",
+                            ScheduledThumbnailGenerationEnabled = false,
                             ThumbnailGenerationHour = 2,
                             TimeZoneId = "UTC",
                             UpdatedAt = new DateTime(2026, 4, 19, 0, 0, 0, 0, DateTimeKind.Utc)

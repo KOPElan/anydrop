@@ -23,5 +23,8 @@ public sealed class SystemSettings
     /// <summary>每天自动生成缩略图的 UTC 小时（0–23），默认凌晨 2 点。</summary>
     public int ThumbnailGenerationHour { get; set; } = 2;
 
+    /// <summary>是否启用计划任务批量生成预览图。默认关闭（关闭时上传后即时生成）。</summary>
+    public bool ScheduledThumbnailGenerationEnabled { get; set; } = false;
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

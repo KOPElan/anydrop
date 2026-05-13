@@ -18,6 +18,13 @@ public sealed class ThumbnailGenerationBackgroundService(
         {
             try
             {
+                var enabled = await IsScheduledGenerationEnabledAsync(stoppingToken);
+                if (!enabled)
+                {
+                    await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+                    continue;
+                }
+
                 var targetHour = await GetTargetHourAsync(stoppingToken);
                 var now = DateTime.UtcNow;
                 var nextRun = new DateTime(now.Year, now.Month, now.Day, targetHour, 0, 0, DateTimeKind.Utc);
@@ -84,6 +91,13 @@ public sealed class ThumbnailGenerationBackgroundService(
         using var scope = serviceProvider.CreateScope();
         var settingsService = scope.ServiceProvider.GetRequiredService<ISystemSettingsService>();
         return await settingsService.GetThumbnailGenerationHourAsync(ct);
+    }
+
+    private async Task<bool> IsScheduledGenerationEnabledAsync(CancellationToken ct)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ISystemSettingsService>();
+        return await settingsService.IsScheduledThumbnailGenerationEnabledAsync(ct);
     }
 
     public override void Dispose()

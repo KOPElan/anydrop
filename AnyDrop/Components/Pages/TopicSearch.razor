@@ -150,82 +150,89 @@
         @* ═══════════════════ 日期查找 ═══════════════════ *@
         else if (_activeTab == "date")
         {
-            @* ─── 7 天日历条（最大宽度限制，宽屏不拉伸）─── *@
+            @* ─── 日期导航条（前/后一天 + 当前日期按钮）─── *@
             <div class="px-3 pt-4 pb-2">
                 <div class="mx-auto max-w-lg flex items-center gap-1">
-                    @* 向前导航（更早日期） *@
+                    @* 向前一天 *@
                     <button type="button"
-                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container"
                             title="@L["Search_DateBack7Days"]"
-                            @onclick="() => ShiftCalendarAsync(-7)">
+                            @onclick="() => ShiftSelectedDateAsync(-1)">
                         <span class="material-symbols-outlined" style="font-size: 18px;">chevron_left</span>
                     </button>
 
-                    @* 7 天格子 *@
-                    <div class="flex flex-1 gap-1">
-                        @foreach (var day in CalendarDays)
-                        {
-                            var isSelected = day == _selectedDate;
-                            var hasMessages = _activeDates.Contains(day);
-                            var isFuture = day > Today;
-
-                            <button type="button"
-                                    disabled="@isFuture"
-                                    class="flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 transition-all disabled:opacity-30 disabled:pointer-events-none"
-                                    style="color: @(isSelected ? "var(--color-primary)" : "var(--color-on-surface-variant);")"
-                                    @onclick="() => SelectCalendarDateAsync(day)">
-                                <span class="text-[10px] font-medium leading-none">
-                                    @day.ToString("ddd", System.Globalization.CultureInfo.CurrentCulture)
-                                </span>
-                                @* 日期数字：选中时显示实心圆形背景，否则透明 *@
-                                <span class="flex h-8 w-8 items-center justify-center text-sm font-bold rounded-full transition-all"
-                                      style="@(isSelected
-                                          ? "background: var(--color-primary); color: #fff;"
-                                          : "")">
-                                    @day.Day
-                                </span>
-                                @* 有消息指示点：仅点，不改背景色 *@
-                                <span class="w-1.5 h-1.5 rounded-full mt-0.5 transition-opacity @(hasMessages && !isSelected ? "opacity-100" : "opacity-0")"
-                                      style="background: var(--color-primary);"></span>
-                            </button>
-                        }
-                    </div>
-
-                    @* 向后导航（更近日期） *@
+                    @* 当前日期（点击打开日历） *@
                     <button type="button"
-                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
-                            title="@L["Search_DateForward7Days"]"
-                            disabled="@(!CanGoForward)"
-                            @onclick="() => ShiftCalendarAsync(7)">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                            class="flex flex-1 h-9 items-center justify-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container-lowest px-3 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+                            title="@L["Search_PickDate"]"
+                            @onclick="ToggleDatePickerPanel">
+                        <span class="material-symbols-outlined text-on-surface-variant" style="font-size: 16px;">calendar_month</span>
+                        <span>@FormatDateLabel(_selectedDate)</span>
                     </button>
 
-                    @* 日历选择器按钮 *@
-                    <div class="relative shrink-0">
-                        @if (_isLoadingActiveDates)
-                        {
-                            <span class="flex h-8 w-8 items-center justify-center">
-                                <span class="material-symbols-outlined animate-spin text-on-surface-variant/50" style="font-size: 18px;">progress_activity</span>
-                            </span>
-                        }
-                        else
-                        {
-                            <button type="button"
-                                    class="flex h-8 w-8 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container"
-                                    title="@L["Search_PickDate"]"
-                                    @onclick="OpenDatePickerAsync">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">calendar_month</span>
-                            </button>
-                        }
-                        @* 隐藏的原生 date input，由上方按钮触发 *@
-                        <input type="date"
-                               id="datepicker-hidden"
-                               class="absolute opacity-0 pointer-events-none w-0 h-0"
-                               max="@Today.ToString("yyyy-MM-dd")"
-                               value="@_selectedDate.ToString("yyyy-MM-dd")"
-                               @onchange="HandleDatePickerChanged" />
-                    </div>
+                    @* 向后一天（不超过今天） *@
+                    <button type="button"
+                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                            title="@L["Search_DateForward7Days"]"
+                            disabled="@(!CanGoForward)"
+                            @onclick="() => ShiftSelectedDateAsync(1)">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                    </button>
                 </div>
+
+                @if (_showDatePickerPanel)
+                {
+                    <div class="mx-auto mt-3 w-full max-w-lg rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-3">
+                        <div class="mb-2 flex items-center justify-between px-1">
+                            <button type="button"
+                                    class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container"
+                                    @onclick="PrevPickerMonthAsync">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">chevron_left</span>
+                            </button>
+                            <p class="text-sm font-semibold text-on-surface">@_pickerMonthTitle</p>
+                            <button type="button"
+                                    class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container disabled:opacity-30"
+                                    disabled="@(!CanGoNextPickerMonth)"
+                                    @onclick="NextPickerMonthAsync">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-7 gap-1 px-1 pb-1">
+                            @foreach (var weekName in PickerWeekDays)
+                            {
+                                <div class="text-center text-[10px] font-medium text-on-surface-variant/70">@weekName</div>
+                            }
+                        </div>
+
+                        <div class="grid grid-cols-7 gap-1">
+                            @foreach (var day in _pickerCalendarDays)
+                            {
+                                if (day is null)
+                                {
+                                    <div class="h-9"></div>
+                                }
+                                else
+                                {
+                                    var d = day.Value;
+                                    var isSelected = d == _selectedDate;
+                                    var isFuture = d > Today;
+                                    var hasMessages = _pickerActiveDates.Contains(d);
+
+                                    <button type="button"
+                                            disabled="@isFuture"
+                                            class="flex h-9 flex-col items-center justify-center rounded-xl text-xs transition-colors disabled:opacity-30"
+                                            style="@(isSelected ? "background: var(--color-primary); color: #fff;" : "color: var(--color-on-surface-variant);")"
+                                            @onclick="() => SelectPickerDateAsync(d)">
+                                        <span class="leading-none">@d.Day</span>
+                                        <span class="mt-0.5 h-1 w-1 rounded-full @(hasMessages ? "opacity-100" : "opacity-0")"
+                                              style="background: @(isSelected ? "rgba(255,255,255,0.85)" : "var(--color-primary)");"></span>
+                                    </button>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
 
                 @* 已选日期标签 *@
                 @if (_dateSearchPerformed || _isLoadingDate)
@@ -270,7 +277,8 @@
                                  @key="msg.Id"
                                  @onclick="() => NavigateToMessage(msg.Id)">
                                 <img class="w-full max-h-48 object-cover"
-                                     src="@GetFileUrl(msg.Id)"
+                                     src="@GetThumbnailUrl(msg.Id)"
+                                     onerror="this.onerror=null;this.src='@GetFileUrl(msg.Id)'"
                                       alt="@(msg.FileName ?? L["Search_Tab_Image"] )" />
                                 <div class="flex items-center justify-between px-3 py-2">
                                     <p class="text-[11px] text-on-surface-variant">@FormatMessageTime(msg.CreatedAt)</p>
@@ -283,10 +291,18 @@
                         {
                             <div class="group rounded-2xl bg-surface-container-lowest shadow-sm overflow-hidden"
                                  @key="msg.Id">
-                                <video class="w-full max-h-48 bg-on-surface/10"
-                                       controls
-                                       preload="metadata"
-                                       src="@GetFileUrl(msg.Id)"></video>
+                                <div class="relative cursor-pointer" @onclick="() => OpenVideoPreview(GetFileUrl(msg.Id))">
+                                    <img class="w-full max-h-48 object-cover bg-on-surface/10"
+                                         src="@GetThumbnailUrl(msg.Id)"
+                                         onerror="this.onerror=null;this.src=this.getAttribute('data-fallback')"
+                                         data-fallback="@VideoThumbnailFallbackDataUrl"
+                                         alt="@(msg.FileName ?? L["Search_Tab_Video"])" />
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">
+                                            <span class="material-symbols-outlined" style="font-size: 28px; font-variation-settings: 'FILL' 1;">play_circle</span>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="flex items-center justify-between px-3 py-2 cursor-pointer"
                                      @onclick="() => NavigateToMessage(msg.Id)">
                                     <p class="text-[11px] text-on-surface-variant">@(msg.FileName ?? L["Search_Tab_Video"]) · @FormatMessageTime(msg.CreatedAt)</p>
@@ -358,7 +374,8 @@
                                      @key="msg.Id"
                                      @onclick="() => OpenImagePreview(GetFileUrl(msg.Id))">
                                     <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                         src="@GetFileUrl(msg.Id)"
+                                         src="@GetThumbnailUrl(msg.Id)"
+                                         onerror="this.onerror=null;this.src='@GetFileUrl(msg.Id)'"
                                          alt="@(msg.FileName ?? L["Search_Tab_Image"])" />
                                     @* 悬浮操作条：两个按钮均靠右 *@
                                     <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
@@ -433,10 +450,18 @@
                             @foreach (var msg in group)
                             {
                                 <div class="rounded-2xl overflow-hidden bg-surface-container-lowest shadow-sm" @key="msg.Id">
-                                    <video class="w-full max-h-52 bg-on-surface/10"
-                                           controls
-                                           preload="metadata"
-                                           src="@GetFileUrl(msg.Id)"></video>
+                                    <div class="relative cursor-pointer" @onclick="() => OpenVideoPreview(GetFileUrl(msg.Id))">
+                                        <img class="w-full max-h-52 object-cover bg-on-surface/10"
+                                             src="@GetThumbnailUrl(msg.Id)"
+                                             onerror="this.onerror=null;this.src=this.getAttribute('data-fallback')"
+                                             data-fallback="@VideoThumbnailFallbackDataUrl"
+                                             alt="@(msg.FileName ?? L["Search_Tab_Video"])" />
+                                        <div class="absolute inset-0 flex items-center justify-center">
+                                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">
+                                                <span class="material-symbols-outlined" style="font-size: 28px; font-variation-settings: 'FILL' 1;">play_circle</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="flex items-center justify-between p-3">
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? L["Search_Tab_Video"])</p>
@@ -652,6 +677,24 @@
                  src="@_previewImageUrl"
                   alt="@L["Search_ImagePreview"]"
                  @onclick:stopPropagation />
+        </div>
+    }
+
+    @if (_previewVideoUrl is not null)
+    {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+             @onclick="CloseVideoPreview">
+            <button type="button"
+                    class="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                    @onclick:stopPropagation
+                    @onclick="CloseVideoPreview">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <video class="max-h-[90vh] max-w-[90vw] rounded-xl bg-black"
+                   controls
+                   autoplay
+                   src="@_previewVideoUrl"
+                   @onclick:stopPropagation></video>
         </div>
     }
 

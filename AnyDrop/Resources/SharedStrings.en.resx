@@ -242,11 +242,14 @@
   <data name="Home_MobileSend"><value>Send message</value></data>
   <data name="Home_MobileSendTitle"><value>Send Message</value></data>
   <data name="Home_MobileSendPlaceholder"><value>Type your message...</value></data>
+  <data name="Home_BackToLatest"><value>Back to latest</value></data>
 
   <!-- Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>Thumbnails &amp; Previews</value></data>
   <data name="Settings_ThumbnailHour"><value>Daily generation time (hour 0–23)</value></data>
   <data name="Settings_ThumbnailHourHint"><value>The server will generate thumbnails for unprocessed images/videos at the specified hour each day</value></data>
+  <data name="Settings_ThumbnailScheduleEnabled"><value>Enable scheduled batch generation</value></data>
+  <data name="Settings_ThumbnailScheduleEnabledHint"><value>Default off: generate previews immediately after upload. Turn this on under constrained resources to use scheduled background batches and stop immediate generation.</value></data>
   <data name="Settings_RunThumbnailNow"><value>Generate thumbnails now</value></data>
   <data name="Settings_ThumbnailRunQueued"><value>Thumbnail generation task triggered, processing in background.</value></data>
   <data name="Settings_ThumbnailRunFailed"><value>Failed to trigger task. Please try again.</value></data>
@@ -268,8 +271,8 @@
   <data name="Search_NoResults"><value>No messages found containing "{0}"</value></data>
   <data name="Search_ResultCount"><value>{0} results</value></data>
   <data name="Search_ResultSuffixPartial"><value> (showing latest part)</value></data>
-  <data name="Search_DateBack7Days"><value>Back 7 days</value></data>
-  <data name="Search_DateForward7Days"><value>Forward 7 days</value></data>
+  <data name="Search_DateBack7Days"><value>Previous day</value></data>
+  <data name="Search_DateForward7Days"><value>Next day</value></data>
   <data name="Search_PickDate"><value>Select date</value></data>
   <data name="Search_DateMessageCount"><value>{0} messages</value></data>
   <data name="Search_DateHint"><value>Click a date to view all messages on that day</value></data>

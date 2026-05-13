@@ -136,12 +136,16 @@
   <data name="MessageList_Cancel"><value>取消</value></data>
   <data name="MessageList_Selected"><value>已選 {0} 則</value></data>
   <data name="MessageList_NoMessages"><value>尚無訊息，傳送第一則吧 👋</value></data>
+  <data name="MessageList_BackToLatest"><value>回到新訊息</value></data>
 
   <!-- 訊息條目 / Message Item -->
   <data name="MessageItem_SelectText"><value>選取文字</value></data>
   <data name="MessageItem_SaveImage"><value>儲存圖片</value></data>
   <data name="MessageItem_DefaultImage"><value>圖片</value></data>
   <data name="MessageItem_DefaultVideo"><value>影片</value></data>
+  <data name="MessageItem_ExpiringSoon"><value>即將刪除</value></data>
+  <data name="MessageItem_DeleteAfterMinutes"><value>{0} 分鐘後刪除</value></data>
+  <data name="MessageItem_DeleteAfterSeconds"><value>{0} 秒後刪除</value></data>
 
   <!-- 訊息輸入框 / Message Input -->
   <data name="MessageInput_Placeholder"><value>輸入訊息...</value></data>
@@ -151,6 +155,7 @@
   <!-- 首頁 / Home Page -->
   <data name="Home_SelectTopic"><value>選擇主題</value></data>
   <data name="Home_CreateTopicHint"><value>請從左側選擇或建立一個主題</value></data>
+  <data name="Home_LoadingData"><value>正在載入會話資料…</value></data>
   <data name="Home_SearchAriaLabel"><value>搜尋</value></data>
   <data name="Home_MoreAriaLabel"><value>更多</value></data>
 

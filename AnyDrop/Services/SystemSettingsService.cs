@@ -48,6 +48,7 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         settings.AutoCleanupEnabled = request.AutoCleanupEnabled;
         settings.AutoCleanupMonths = request.AutoCleanupMonths;
         settings.ThumbnailGenerationHour = request.ThumbnailGenerationHour;
+        settings.ScheduledThumbnailGenerationEnabled = request.ScheduledThumbnailGenerationEnabled;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync(ct);
         return AuthResult<SecuritySettingsDto>.Success(MapToDto(settings));
@@ -113,8 +114,30 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         return settings.ThumbnailGenerationHour;
     }
 
+    public async Task<bool> IsScheduledThumbnailGenerationEnabledAsync(CancellationToken ct = default)
+    {
+        var projection = await dbContext.SystemSettings
+            .AsNoTracking()
+            .Select(x => new { x.ScheduledThumbnailGenerationEnabled })
+            .FirstOrDefaultAsync(ct);
+        if (projection is not null)
+        {
+            return projection.ScheduledThumbnailGenerationEnabled;
+        }
+
+        var settings = await EnsureSettingsAsync(ct);
+        return settings.ScheduledThumbnailGenerationEnabled;
+    }
+
     private static SecuritySettingsDto MapToDto(SystemSettings s)
-        => new(s.AutoFetchLinkPreview, s.BurnAfterReadingMinutes, s.Language, s.AutoCleanupEnabled, s.AutoCleanupMonths, s.ThumbnailGenerationHour);
+        => new(
+            s.AutoFetchLinkPreview,
+            s.BurnAfterReadingMinutes,
+            s.Language,
+            s.AutoCleanupEnabled,
+            s.AutoCleanupMonths,
+            s.ThumbnailGenerationHour,
+            s.ScheduledThumbnailGenerationEnabled);
 
     private async Task<SystemSettings> EnsureSettingsAsync(CancellationToken ct)
     {
