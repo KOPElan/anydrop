@@ -21,7 +21,7 @@
 
     <div class="bg-white/80 dark:bg-gray-800/80 glass border-b border-gray-100 dark:border-gray-800 px-4 pt-3 pb-3 space-y-3 flex-shrink-0">
         <div class="segmented-control">
-            @foreach (var mode in Modes)
+            @foreach (var mode in _modes)
             {
                 <button @onclick="() => SetModeAsync(mode.Key)"
                         class="segmented-btn @(_mode == mode.Key ? "segmented-btn-active" : "segmented-btn-inactive")">
@@ -110,7 +110,7 @@
         else
         {
             <div class="flex gap-1.5 px-4 py-3 flex-wrap">
-                @foreach (var type in ContentTypes)
+                @foreach (var type in _contentTypes)
                 {
                     <button @onclick="() => SetContentTypeAsync(type.Key)"
                             class="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 active:scale-95 @(_contentType == type.Key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300")">
@@ -170,22 +170,26 @@
 
     private const int PageSize = 20;
 
-    // 使用计算属性而非静态字典，以便每次渲染时读取最新的本地化字符串
-    private Dictionary<string, string> Modes => new()
-    {
-        ["keyword"] = L["Search_Keyword"],
-        ["date"] = L["Search_Date"],
-        ["type"] = L["Search_Type"],
-    };
+    private Dictionary<string, string> _modes = [];
+    private Dictionary<ShareContentType, string> _contentTypes = [];
 
-    private Dictionary<ShareContentType, string> ContentTypes => new()
+    protected override void OnInitialized()
     {
-        [ShareContentType.Text] = L["Search_Text"],
-        [ShareContentType.Image] = L["Search_Image"],
-        [ShareContentType.Video] = L["Search_Video"],
-        [ShareContentType.File] = L["Search_File"],
-        [ShareContentType.Link] = L["Search_Link"],
-    };
+        _modes = new()
+        {
+            ["keyword"] = L["Search_Keyword"],
+            ["date"] = L["Search_Date"],
+            ["type"] = L["Search_Type"],
+        };
+        _contentTypes = new()
+        {
+            [ShareContentType.Text] = L["Search_Text"],
+            [ShareContentType.Image] = L["Search_Image"],
+            [ShareContentType.Video] = L["Search_Video"],
+            [ShareContentType.File] = L["Search_File"],
+            [ShareContentType.Link] = L["Search_Link"],
+        };
+    }
 
     private async Task SetModeAsync(string mode)
     {

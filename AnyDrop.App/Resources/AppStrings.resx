@@ -170,7 +170,7 @@
   <data name="Share_SelectTopicPlaceholder"><value>-- 请选择主题 --</value></data>
   <data name="Share_Send"><value>发送</value></data>
   <data name="Share_Sending"><value>发送中...</value></data>
-  <data name="Share_SendFailed"><value>发送失败：</value></data>
+  <data name="Share_SendFailed"><value>发送失败：{0}</value></data>
 
   <!-- 搜索页 / Search Page -->
   <data name="Search_Title"><value>搜索</value></data>

@@ -170,7 +170,7 @@
   <data name="Share_SelectTopicPlaceholder"><value>-- 請選擇主題 --</value></data>
   <data name="Share_Send"><value>傳送</value></data>
   <data name="Share_Sending"><value>傳送中...</value></data>
-  <data name="Share_SendFailed"><value>傳送失敗：</value></data>
+  <data name="Share_SendFailed"><value>傳送失敗：{0}</value></data>
 
   <!-- 搜尋頁 / Search Page -->
   <data name="Search_Title"><value>搜尋</value></data>

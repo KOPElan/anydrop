@@ -109,7 +109,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"{L["Share_SendFailed"]}{ex.Message}";
+            _error = string.Format(L["Share_SendFailed"], ex.Message);
             _sending = false;
         }
     }

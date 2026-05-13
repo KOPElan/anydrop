@@ -9,7 +9,7 @@ namespace AnyDrop.App.Services;
 /// </summary>
 public sealed class LocalizationService : ILocalizationService
 {
-    private const string PrefKey = "anydrop_language";
+    internal const string PrefKey = "anydrop_language";
 
     /// <inheritdoc />
     public string CurrentLanguage { get; private set; }

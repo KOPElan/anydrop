@@ -23,10 +23,14 @@ namespace AnyDrop.App
             builder.Services.AddLocalization();
 
             // 在构建 App 之前应用存储的语言偏好，确保首次渲染使用正确语言
+            string? storedLang = null;
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+            var stored = Microsoft.Maui.Storage.Preferences.Get(LocalizationService.PrefKey, string.Empty);
+            if (!string.IsNullOrEmpty(stored))
+                storedLang = stored;
+#endif
             var initialLang = LocalizationService.NormalizeToSupported(
-                Microsoft.Maui.Storage.Preferences.Get("anydrop_language", string.Empty) is { Length: > 0 } stored
-                    ? stored
-                    : CultureInfo.CurrentUICulture.Name);
+                storedLang ?? CultureInfo.CurrentUICulture.Name);
             var initialCulture = new CultureInfo(initialLang);
             CultureInfo.DefaultThreadCurrentCulture = initialCulture;
             CultureInfo.DefaultThreadCurrentUICulture = initialCulture;

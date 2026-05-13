@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace AnyDrop.App.Services;
 
 /// <summary>语言选项。</summary>

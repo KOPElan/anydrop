@@ -170,7 +170,7 @@
   <data name="Share_SelectTopicPlaceholder"><value>-- Select a topic --</value></data>
   <data name="Share_Send"><value>Send</value></data>
   <data name="Share_Sending"><value>Sending...</value></data>
-  <data name="Share_SendFailed"><value>Send failed: </value></data>
+  <data name="Share_SendFailed"><value>Send failed: {0}</value></data>
 
   <!-- Search Page -->
   <data name="Search_Title"><value>Search</value></data>
