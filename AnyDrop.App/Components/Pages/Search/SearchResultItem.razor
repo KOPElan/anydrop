@@ -7,10 +7,8 @@
         <span class="text-xs text-indigo-500 dark:text-indigo-400 font-medium">
             @(AppState.Topics.FirstOrDefault(t => t.Id == Item.TopicId)?.Name ?? "未知主题")
         </span>
-        <span class="text-gray-300 dark:text-gray-600">·</span>
-        <span class="text-xs text-gray-400 dark:text-gray-500">@Item.CreatedAt.ToLocalTime().ToString("MM/dd HH:mm")</span>
     </div>
-    <MessageItem Item="Item" HideTimestamp="true" />
+    <MessageItem Item="Item" />
 </div>
 
 @code {
