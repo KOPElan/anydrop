@@ -1,5 +1,7 @@
 # AnyDrop
 
+[中文](/README.md) | [English](/docs/README_en.md)
+
 > 私有、自托管的跨设备内容共享应用，基于 .NET 10 + Blazor 构建。
 
 通过浏览器即可在任意设备间安全地保存与获取文字、图片、文件和链接，实时同步，无需依赖任何第三方云服务。
@@ -15,6 +17,11 @@
 - **阅后即焚** — 消息可设为"阅后即焚"，阅读后自动销毁
 - **单用户私有部署** — 首次访问完成初始化设置，密码保存在本地数据库，不外发
 - **容器化就绪** — 提供 Dockerfile 与 docker-compose.yml，一命令启动
+
+---
+
+![AnyDrop 首页截图](docs/assets/screenshot-web.png)
+![跨设备共享演示](docs/assets/screenshot-mobile.jpg)
 
 ---
 
