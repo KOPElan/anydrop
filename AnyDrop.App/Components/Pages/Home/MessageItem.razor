@@ -8,15 +8,15 @@
 <!-- 长按操作菜单遮罩 -->
 @if (_showContextMenu)
 {
-    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/30"
          @onclick="CloseContextMenu">
-        <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-t-2xl pb-6 pt-3 shadow-2xl"
+        <div class="w-full max-w-sm backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 rounded-t-2xl pb-6 pt-3 shadow-2xl border-t border-white/50 dark:border-white/10"
              @onclick:stopPropagation="true">
             <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4"></div>
             @if (Item.ContentType is ShareContentType.Text or ShareContentType.Link)
             {
                 <button @onclick="ShowTextSelectModal"
-                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-black/5 dark:active:bg-white/10 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
                     </svg>
@@ -26,7 +26,7 @@
             @if (Item.ContentType == ShareContentType.Image)
             {
                 <button @onclick="SaveImageAsync"
-                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                        class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-gray-700 dark:text-gray-200 active:bg-black/5 dark:active:bg-white/10 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
@@ -34,14 +34,14 @@
                 </button>
             }
             <button @onclick="OnDeleteItem"
-                    class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-red-600 dark:text-red-400 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                    class="flex items-center gap-3 w-full px-5 py-3.5 text-left text-red-600 dark:text-red-400 active:bg-black/5 dark:active:bg-white/10 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                 </svg>
                 <span>@L["Common_Delete"]</span>
             </button>
             <button @onclick="CloseContextMenu"
-                    class="flex items-center justify-center w-full px-5 py-3 mt-1 text-gray-500 dark:text-gray-400 font-medium active:bg-gray-50 dark:active:bg-gray-700 transition-colors border-t border-gray-100 dark:border-gray-700">
+                    class="flex items-center justify-center w-full px-5 py-3 mt-1 text-gray-500 dark:text-gray-400 font-medium active:bg-black/5 dark:active:bg-white/10 transition-colors border-t border-black/5 dark:border-white/10">
                 @L["Common_Cancel"]
             </button>
         </div>
@@ -51,20 +51,19 @@
 <!-- 选择文本 Modal -->
 @if (_showTextModal)
 {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6"
          @onclick="CloseTextModal">
-        <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden"
+        <div class="w-full max-w-sm backdrop-blur-xl bg-white/85 dark:bg-gray-900/85 rounded-2xl shadow-2xl overflow-hidden border border-white/50 dark:border-white/10"
              @onclick:stopPropagation="true">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">@L["MessageItem_SelectText"]</span>
+            <div class="flex justify-end px-3 pt-3">
                 <button @onclick="CloseTextModal"
-                        class="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 dark:active:bg-gray-700">
+                        class="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 active:bg-black/10 dark:active:bg-white/10">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
-            <div class="px-4 py-4 max-h-64 overflow-y-auto">
+            <div class="px-5 pb-6 min-h-24 max-h-72 overflow-y-auto">
                 <p class="text-sm text-gray-800 dark:text-gray-100 leading-relaxed select-text whitespace-pre-wrap break-words">@Item.Content</p>
             </div>
         </div>
@@ -262,23 +261,30 @@
             }
         </div>
     </div>
-    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-1 flex items-center gap-1">
-        <span class="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-        <span>@Item.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</span>
-        @if (Item.ExpiresAt.HasValue)
-        {
-            <div class="ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-300 bg-red-50/80 dark:bg-red-900/30">
-                <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
-                @FormatExpiry(Item.ExpiresAt.Value)
-            </div>
-        }
-    </p>
+    @if (!HideTimestamp || Item.ExpiresAt.HasValue)
+    {
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-1 flex items-center gap-1">
+            @if (!HideTimestamp)
+            {
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                <span>@Item.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</span>
+            }
+            @if (Item.ExpiresAt.HasValue)
+            {
+                <div class="ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-300 bg-red-50/80 dark:bg-red-900/30">
+                    <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
+                    @FormatExpiry(Item.ExpiresAt.Value)
+                </div>
+            }
+        </p>
+    }
 </div>
 
 @code {
     [Parameter, EditorRequired] public ShareItemDto Item { get; set; } = null!;
     [Parameter] public bool SelectionMode { get; set; }
     [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public bool HideTimestamp { get; set; }
     [Parameter] public EventCallback<Guid> OnToggleSelect { get; set; }
     [Parameter] public EventCallback<Guid> OnEnterSelectionMode { get; set; }
     [Parameter] public EventCallback<Guid> OnDelete { get; set; }
@@ -294,6 +300,53 @@
     private const int LongPressMs = 600;
     private static readonly string VideoThumbnailFallbackDataUrl = $"data:image/svg+xml,{Uri.EscapeDataString("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 270'><rect width='480' height='270' fill='%231d2430'/><circle cx='240' cy='135' r='34' fill='rgba(255,255,255,0.16)'/><polygon points='228,115 228,155 262,135' fill='white'/></svg>")}";
 
+    // 记录上次构建 URL 时的 Item.Id，避免父组件每次 re-render 都重复触发 SecureStorage 读取
+    private Guid _lastUrlItemId = Guid.Empty;
+
+    // ShouldRender 优化：父组件 re-render 时参数未变则跳过本组件的 vDOM diff
+    private bool _forceRender = true; // 首次渲染强制执行
+    private Guid _renderedItemId;
+    private bool _renderedSelectionMode;
+    private bool _renderedIsSelected;
+    private bool _renderedShowContextMenu;
+    private bool _renderedShowTextModal;
+    private bool _renderedSaving;
+    private bool _renderedVideoExpanded;
+
+    protected override bool ShouldRender()
+    {
+        if (_forceRender) return true;
+        return Item.Id != _renderedItemId
+            || SelectionMode != _renderedSelectionMode
+            || IsSelected != _renderedIsSelected
+            || _showContextMenu != _renderedShowContextMenu
+            || _showTextModal != _renderedShowTextModal
+            || _saving != _renderedSaving
+            || _videoExpanded != _renderedVideoExpanded;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _forceRender = false;
+        _renderedItemId = Item.Id;
+        _renderedSelectionMode = SelectionMode;
+        _renderedIsSelected = IsSelected;
+        _renderedShowContextMenu = _showContextMenu;
+        _renderedShowTextModal = _showTextModal;
+        _renderedSaving = _saving;
+        _renderedVideoExpanded = _videoExpanded;
+    }
+
+    /// <summary>
+    /// 异步操作（URL 构建、文件保存等）完成后调用，强制触发一次重绘，
+    /// 确保 ShouldRender 不会跳过该次更新。
+    /// </summary>
+    private void RequestRender()
+    {
+        _forceRender = true;
+        StateHasChanged();
+    }
+
     private void CancelLongPress()
     {
         _longPressTimer?.Dispose();
@@ -304,16 +357,25 @@
     {
         if (Item.ContentType is ShareContentType.Image or ShareContentType.Video)
         {
-            _fileUrl = await BuildFileUrlAsync(download: false);
-            _thumbnailUrl = await BuildThumbnailUrlAsync();
-            _videoExpanded = false;
-            StateHasChanged();
+            // 只在 Item.Id 发生变化时重新构建 URL，避免父组件每次 re-render 都触发 SecureStorage 读取
+            if (Item.Id != _lastUrlItemId)
+            {
+                _lastUrlItemId = Item.Id;
+                _fileUrl = await BuildFileUrlAsync(download: false);
+                _thumbnailUrl = await BuildThumbnailUrlAsync();
+                _videoExpanded = false;
+                RequestRender();
+            }
         }
         else
         {
-            _fileUrl = string.Empty;
-            _thumbnailUrl = string.Empty;
-            _videoExpanded = false;
+            if (_lastUrlItemId != Guid.Empty)
+            {
+                _fileUrl = string.Empty;
+                _thumbnailUrl = string.Empty;
+                _videoExpanded = false;
+                _lastUrlItemId = Guid.Empty;
+            }
         }
     }
 
@@ -376,7 +438,7 @@
     {
         if (_saving) return;
         _saving = true;
-        StateHasChanged();
+        RequestRender();
         try
         {
             var stream = await ShareService.DownloadFileAsync(Item.Id);
@@ -401,7 +463,7 @@
         finally
         {
             _saving = false;
-            StateHasChanged();
+            RequestRender();
         }
     }
 
@@ -440,7 +502,7 @@
         try
         {
             _showContextMenu = true;
-            StateHasChanged();
+            RequestRender();
         }
         catch (Exception ex)
         {

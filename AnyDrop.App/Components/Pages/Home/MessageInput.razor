@@ -15,23 +15,23 @@
         </div>
     }
 
-    <!-- 输入行：文本框 + 发送按钮 -->
-    <div class="flex items-end gap-2 mb-2">
-        <textarea @bind="_text" @bind:event="oninput" @onkeydown="OnKeyDown"
+    <!-- 第1行：文本框 + 发送按钮 -->
+    <div class="flex items-end gap-2 mb-1">
+        <textarea value="@_text" @oninput="OnTextInput" @onkeydown="OnKeyDown"
                   placeholder="@L["MessageInput_Placeholder"]"
                   rows="1"
-                  class="flex-1 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:border-blue-400/50 transition-shadow duration-150 max-h-32 overflow-y-auto"></textarea>
+                  class="flex-1 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/15 transition-all duration-150 max-h-32 overflow-y-auto"></textarea>
 
         <button @onclick="SendTextAsync"
                 disabled="@(string.IsNullOrWhiteSpace(_text) || _uploading)"
-                class="btn-send">
+                class="btn-send flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
             </svg>
         </button>
     </div>
 
-    <!-- 操作图标行 -->
+    <!-- 第2行：操作图标 -->
     <div class="flex items-center gap-1 px-1 pb-1">
         <button @onclick="PickPhotoAndUploadAsync" disabled="@_uploading"
                 class="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-40 transition-colors">
@@ -61,15 +61,30 @@
     private bool _uploading;
     private double _uploadProgress;
     private bool _burnAfterReading;
+    // 每次用户修改 _text 都递增，用于判断发送期间是否有新的用户输入
+    private int _textGeneration;
 
     private async Task SendTextAsync()
     {
         if (string.IsNullOrWhiteSpace(_text)) return;
         var textToSend = _text;
+        var sendGeneration = _textGeneration;
         _text = string.Empty;
-        var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
-        AppState.Messages.Add(item);
-        AppState.NotifyMessageAdded();
+        try
+        {
+            var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
+            // 防止竞态：SignalR 推送可能在 HTTP 响应返回前已将该条消息加入列表
+            if (!AppState.Messages.Any(m => m.Id == item.Id))
+                AppState.Messages.Add(item);
+            AppState.NotifyMessageAdded();
+        }
+        catch (Exception ex)
+        {
+            // 发送失败时恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 发送消息失败: {ex.Message}");
+            if (_textGeneration == sendGeneration)
+                _text = textToSend;
+        }
     }
 
     private async Task PickFileAndUploadAsync()
@@ -94,7 +109,9 @@
         try
         {
             var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
-            AppState.Messages.Add(item);
+            // 防止竞态：SignalR 推送可能已先于 HTTP 响应将文件消息加入列表
+            if (!AppState.Messages.Any(m => m.Id == item.Id))
+                AppState.Messages.Add(item);
             AppState.NotifyMessageAdded();
         }
         finally
@@ -102,6 +119,12 @@
             _uploading = false;
             _uploadProgress = 0;
         }
+    }
+
+    private void OnTextInput(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString() ?? string.Empty;
+        _textGeneration++;
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)

@@ -39,14 +39,13 @@
     <script>
         window.scrollUtils = {
             _nearBottomObservers: {},
+            _pullToLoadObservers: {},
             scrollToBottom: function(elementId) {
                 var el = document.getElementById(elementId);
                 if (!el) return;
-                el.scrollTop = el.scrollHeight;
+                el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
                 setTimeout(function () {
-                    if (el) {
-                        el.scrollTop = el.scrollHeight;
-                    }
+                    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
                 }, 250);
             },
             isNearBottom: function(elementId, threshold) {
@@ -97,6 +96,73 @@
                 if (!cleanup) return;
                 cleanup();
                 delete window.scrollUtils._nearBottomObservers[elementId];
+            },
+            /**
+             * 为滚动容器开启下拉加载更多：当列表已滚到顶部并继续下拉超过 triggerDistance 时触发回调。
+             * 使用 touch 事件实现，不影响正常滚动。
+             */
+            setupPullToLoad: function (elementId, dotNetRef, triggerDistance) {
+                var el = document.getElementById(elementId);
+                if (!el || !dotNetRef) return;
+                triggerDistance = triggerDistance || 60;
+                window.scrollUtils.cleanupPullToLoad(elementId);
+
+                var SCROLL_TOP_THRESHOLD = 5;   // px — treat as "at top" when scrollTop <= this
+                var PULL_MULTIPLIER = 0.4;       // visual drag ratio (fraction of actual pull distance)
+                var MAX_PULL_DISTANCE = 24;      // px — cap on visual translateY of indicator
+
+                var startY = 0;
+                var pulling = false;
+                var indicator = el.querySelector('.pull-to-load-indicator');
+
+                var onTouchStart = function (e) {
+                    if (el.scrollTop > SCROLL_TOP_THRESHOLD) return; // 未滚到顶部，忽略
+                    if (e.touches.length !== 1) return;
+                    startY = e.touches[0].clientY;
+                    pulling = true;
+                };
+
+                var onTouchMove = function (e) {
+                    if (!pulling) return;
+                    var dy = e.touches[0].clientY - startY;
+                    if (dy <= 0) { pulling = false; return; }
+                    if (el.scrollTop > SCROLL_TOP_THRESHOLD) { pulling = false; return; }
+                    if (indicator) {
+                        var pct = Math.min(dy / triggerDistance, 1);
+                        indicator.style.opacity = pct;
+                        indicator.style.transform = 'translateY(' + Math.min(dy * PULL_MULTIPLIER, MAX_PULL_DISTANCE) + 'px)';
+                    }
+                };
+
+                var onTouchEnd = function (e) {
+                    if (!pulling) return;
+                    pulling = false;
+                    var endY = e.changedTouches[0].clientY;
+                    var dy = endY - startY;
+                    if (indicator) {
+                        indicator.style.opacity = 0;
+                        indicator.style.transform = '';
+                    }
+                    if (dy >= triggerDistance) {
+                        dotNetRef.invokeMethodAsync('OnPullToLoad').catch(function () { });
+                    }
+                };
+
+                el.addEventListener('touchstart', onTouchStart, { passive: true });
+                el.addEventListener('touchmove', onTouchMove, { passive: true });
+                el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+                window.scrollUtils._pullToLoadObservers[elementId] = function () {
+                    el.removeEventListener('touchstart', onTouchStart);
+                    el.removeEventListener('touchmove', onTouchMove);
+                    el.removeEventListener('touchend', onTouchEnd);
+                };
+            },
+            cleanupPullToLoad: function (elementId) {
+                var cleanup = window.scrollUtils._pullToLoadObservers[elementId];
+                if (!cleanup) return;
+                cleanup();
+                delete window.scrollUtils._pullToLoadObservers[elementId];
             }
         };
         window.blazorCulture = {
