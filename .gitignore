@@ -2,6 +2,8 @@
 .vs/
 .vscode/
 .idea/
+.claude/
+.specify/
 
 # Build outputs
 bin/
