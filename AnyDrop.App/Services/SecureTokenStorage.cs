@@ -58,9 +58,13 @@ public sealed class SecureTokenStorage : ISecureTokenStorage
                     var expiresStr = await SecureStorage.GetAsync(ExpiresKey).ConfigureAwait(false);
                     _cachedToken = token;
                     _cachedExpires = DateTimeOffset.TryParse(expiresStr, out var e) ? e : DateTimeOffset.MinValue;
+                    // 仅在成功读取时标记缓存已加载；异常时保持 false，允许下次重试
+                    _cacheLoaded = true;
                 }
                 catch
                 {
+                    // Keychain/Keystore 瞬时故障：不设 _cacheLoaded，下次调用时仍会重试
+                    System.Diagnostics.Debug.WriteLine("[SecureTokenStorage] SecureStorage 读取失败，将在下次调用时重试。");
                     _cachedToken = null;
                     _cachedExpires = DateTimeOffset.MinValue;
                 }
@@ -69,8 +73,8 @@ public sealed class SecureTokenStorage : ISecureTokenStorage
                 _fallback.TryGetValue(ExpiresKey, out var fallbackExpires);
                 _cachedToken = fallbackToken;
                 _cachedExpires = DateTimeOffset.TryParse(fallbackExpires, out var fe) ? fe : DateTimeOffset.MinValue;
-#endif
                 _cacheLoaded = true;
+#endif
             }
 
             if (_cachedToken is null) return null;

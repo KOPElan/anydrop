@@ -131,7 +131,15 @@ else
             _lastTopicId = TopicId;
             _selectionMode = false;
             _selectedIds.Clear();
+
+            // 主题切换时清理旧的 pull-to-load touch 监听，防止遗留事件处理器
+            if (_pullToLoadInitialized)
+            {
+                try { await JS.InvokeVoidAsync("scrollUtils.cleanupPullToLoad", "message-list-container"); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[MessageList] cleanupPullToLoad 失败: {ex.Message}"); }
+            }
             _pullToLoadInitialized = false;
+
             await LoadMessagesAsync();
         }
     }

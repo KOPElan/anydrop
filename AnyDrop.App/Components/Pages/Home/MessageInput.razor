@@ -17,7 +17,7 @@
 
     <!-- 第1行：文本框 + 发送按钮 -->
     <div class="flex items-end gap-2 mb-1">
-        <textarea @bind="_text" @bind:event="oninput" @onkeydown="OnKeyDown"
+        <textarea value="@_text" @oninput="OnTextInput" @onkeydown="OnKeyDown"
                   placeholder="@L["MessageInput_Placeholder"]"
                   rows="1"
                   class="flex-1 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/15 transition-all duration-150 max-h-32 overflow-y-auto"></textarea>
@@ -61,11 +61,14 @@
     private bool _uploading;
     private double _uploadProgress;
     private bool _burnAfterReading;
+    // 每次用户修改 _text 都递增，用于判断发送期间是否有新的用户输入
+    private int _textGeneration;
 
     private async Task SendTextAsync()
     {
         if (string.IsNullOrWhiteSpace(_text)) return;
         var textToSend = _text;
+        var sendGeneration = _textGeneration;
         _text = string.Empty;
         try
         {
@@ -77,9 +80,10 @@
         }
         catch (Exception ex)
         {
-            // 发送失败时恢复输入内容，避免用户无感知地丢失消息
+            // 发送失败时恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
             System.Diagnostics.Debug.WriteLine($"[MessageInput] 发送消息失败: {ex.Message}");
-            _text = textToSend;
+            if (_textGeneration == sendGeneration)
+                _text = textToSend;
         }
     }
 
@@ -115,6 +119,12 @@
             _uploading = false;
             _uploadProgress = 0;
         }
+    }
+
+    private void OnTextInput(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString() ?? string.Empty;
+        _textGeneration++;
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
