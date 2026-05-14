@@ -20,8 +20,8 @@ Use a browser to securely save and retrieve text, images, files, and links acros
 
 ---
 
-![AnyDrop home screenshot](assets/screenshot-web.png)
-![Cross-device sharing demo](assets/screenshot-mobile.jpg)
+![AnyDrop home screenshot](assets/screenshot-web-en.png)
+![Cross-device sharing demo](assets/screenshot-mobile-en.jpg)
 
 ---
 
