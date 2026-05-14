@@ -33,6 +33,8 @@
 
 ## 快速开始
 
+### 服务端
+
 ### 方式一：Docker Compose（推荐）
 
 **1. 克隆仓库**
@@ -107,21 +109,57 @@ dotnet run --project AnyDrop
 
 ---
 
-## 目录结构
+## 目录结构（详解）
 
-```
-AnyDrop/
-├── Api/                  # Minimal API 端点（/api/v1/）
-├── Components/
-│   ├── Pages/            # 路由页面（Home、TopicSearch、Login、Setup 等）
-│   ├── Layout/           # 布局组件（MainLayout、TopicSidebar 等）
-│   └── _Imports.razor    # 全局 using
-├── Data/                 # EF Core DbContext 与迁移
-├── Hubs/                 # SignalR Hub
-├── Models/               # 实体与 DTO
-├── Services/             # 业务逻辑服务（接口 + 实现）
-├── wwwroot/              # 静态资源（CSS、JS）
-└── Program.cs            # 依赖注入与中间件管道
+- **AnyDrop/**: 服务端主项目，包含 Minimal API、SignalR Hub、EF Core 上下文与前端静态资源。
+  - **Api/**: Minimal API 扩展方法与请求 DTO（按资源分文件组织，路由前缀 `/api/v1/`）。
+  - **Components/**: Blazor 组件与页面（Interactive Server 模式）。Razor 组件应尽量使用 code-behind `.razor.cs` 分离复杂逻辑。
+  - **Data/**: 包含 `AnyDropDbContext.cs` 与数据库迁移文件（SQLite）。
+  - **Hubs/**: SignalR Hub（`ShareHub`）用于实时推送消息到已连接的客户端。
+  - **Services/**: 核心业务实现（接口 + 实现），禁止直接依赖 Razor 组件。
+  - **wwwroot/**: Tailwind 编译后样式、JS 及其它静态资源。
+
+- **AnyDrop.App/**: 跨平台移动/桌面客户端（MAUI），用于在手机/桌面上接入 AnyDrop 服务并同步内容。
+  - MAUI 项目使用 `net10` 目标框架，平台代码放在 `Platforms/`，UI 放在 `UI/` 与 `Components/`。
+
+- **AnyDrop.Shared/**: 跨项目共享 DTO 与类型定义。
+
+- **Tests.Unit/** 与 **Tests.E2E/**: 单元与端到端测试代码。
+
+---
+
+## 服务端简介
+
+- **框架与角色**: 服务端为 `AnyDrop` 项目，基于 .NET 10、Minimal API 与 Kestrel。API 路由以 `/api/v1/` 命名空间暴露，认证采用 JWT + Cookie 混合方案。
+- **持久化**: 使用 SQLite（文件存储），默认数据目录为 `data/`，包含数据库文件与上传的文件目录。
+- **实时同步**: 通过 SignalR Hub（`Hubs/ShareHub.cs`）实现消息广播与客户端订阅。Hub 只负责转发与鉴权，业务逻辑放在 `Services/` 中处理。
+- **配置**: 推荐通过环境变量或 `dotnet user-secrets` 设置敏感配置（如 `Auth__JwtSecret`）。容器部署时通过 `.env` 或容器环境变量注入。
+
+## 移动端（MAUI）简介
+
+- **项目**: `AnyDrop.App` 为 MAUI 应用，支持 Android、iOS、Windows 等（按平台包含在 `Platforms/`）。
+- **目的**: 提供原生体验的接入端，可在移动端快速浏览、上传与接收任意类型内容，并通过 SignalR 保持实时连接。
+- **开发**: 在本机开发时，可在 IDE（Visual Studio）中启动 `AnyDrop.App`，或使用 `dotnet build` / `dotnet run` 针对特定平台进行调试。移动端通过配置的 API 地址与服务端通信，开发时请确保服务端可访问（`ASPNETCORE_URLS` 设置为可被设备/模拟器访问的地址）。
+
+---
+
+## Tailwind 开发监听
+
+项目包含两个 Tailwind 输入源：
+
+- 服务端（Blazor）: `AnyDrop/wwwroot/app.css` → 输出 `AnyDrop/wwwroot/tailwind.css`。
+- 移动端/静态（MAUI/SPA）: `AnyDrop.App/wwwroot/css/input.css` → 输出 `AnyDrop.App/wwwroot/css/tailwind.css`。
+
+分别构建或监听方式如下：
+
+```bash
+# 服务端：构建 / 监听
+npm run css:build:server
+npm run css:watch:server
+
+# 移动端：构建 / 监听
+npm run css:build:app
+npm run css:watch:app
 ```
 
 ---
@@ -192,4 +230,4 @@ docker run -p 8080:8080 -e Auth__JwtSecret=your-secret anydrop
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)

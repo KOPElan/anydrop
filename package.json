@@ -4,8 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "css:build": "npx @tailwindcss/cli -i ./AnyDrop.App/wwwroot/css/input.css -o ./AnyDrop.App/wwwroot/css/tailwind.css",
-    "css:watch": "npx @tailwindcss/cli -i ./AnyDrop.App/wwwroot/css/input.css -o ./AnyDrop.App/wwwroot/css/tailwind.css --watch"
+    "css:build:app": "npx @tailwindcss/cli -i ./AnyDrop.App/wwwroot/css/input.css -o ./AnyDrop.App/wwwroot/css/tailwind.css",
+    "css:watch:app": "npx @tailwindcss/cli -i ./AnyDrop.App/wwwroot/css/input.css -o ./AnyDrop.App/wwwroot/css/tailwind.css --watch",
+    "css:build:server": "npx @tailwindcss/cli -i ./AnyDrop/wwwroot/app.css -o ./AnyDrop/wwwroot/tailwind.css",
+    "css:watch:server": "npx @tailwindcss/cli -i ./AnyDrop/wwwroot/app.css -o ./AnyDrop/wwwroot/tailwind.css --watch",
+    "dev:tailwind": "npm run css:watch:app"
   },
   "repository": {
     "type": "git",
