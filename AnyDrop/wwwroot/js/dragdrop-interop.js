@@ -269,10 +269,10 @@ AnyDropInterop.cleanupMessageScrollObserver = function (element) {
  */
 AnyDropInterop.scrollToBottom = function (element) {
   if (!element) return;
-  element.scrollTop = element.scrollHeight;
+  element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
   // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底
   const SCROLL_DELAY_MS = 300;
-  setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, SCROLL_DELAY_MS);
+  setTimeout(() => { if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' }); }, SCROLL_DELAY_MS);
 };
 
 /**
@@ -285,9 +285,9 @@ AnyDropInterop.scrollToBottomIfNearBottom = function (element, threshold = 150) 
   if (!element) return;
   const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
   if (distanceFromBottom > threshold) return;
-  element.scrollTop = element.scrollHeight;
+  element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
   // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底（同 scrollToBottom 的处理逻辑）
-  setTimeout(() => { if (element) element.scrollTop = element.scrollHeight; }, 300);
+  setTimeout(() => { if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' }); }, 300);
 };
 
 /**
