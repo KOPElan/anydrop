@@ -109,12 +109,21 @@
         if (TopicId is not null && Guid.TryParse(TopicId, out var id))
             AppState.CurrentTopicId = id;
 
+        // 立即结束加载状态，让消息列表尽快渲染；SignalR 在后台建立连接
+        _isLoadingHome = false;
+
+        // SignalR 连接仅用于实时推送，不需要在显示消息列表前等待它完成
         if (SignalR.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected)
         {
-            try { await SignalR.StartAsync(); } catch { /* ignore */ }
+            _ = InvokeAsync(async () =>
+            {
+                try { await SignalR.StartAsync(); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[HomePage] SignalR 启动失败: {ex.Message}");
+                }
+            });
         }
-
-        _isLoadingHome = false;
     }
 
     private async Task LoadTopicsAsync()

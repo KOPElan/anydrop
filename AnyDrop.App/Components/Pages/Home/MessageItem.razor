@@ -297,6 +297,50 @@
     // 记录上次构建 URL 时的 Item.Id，避免父组件每次 re-render 都重复触发 SecureStorage 读取
     private Guid _lastUrlItemId = Guid.Empty;
 
+    // ShouldRender 优化：父组件 re-render 时参数未变则跳过本组件的 vDOM diff
+    private bool _forceRender = true; // 首次渲染强制执行
+    private Guid _renderedItemId;
+    private bool _renderedSelectionMode;
+    private bool _renderedIsSelected;
+    private bool _renderedShowContextMenu;
+    private bool _renderedShowTextModal;
+    private bool _renderedSaving;
+    private bool _renderedVideoExpanded;
+
+    protected override bool ShouldRender()
+    {
+        if (_forceRender) return true;
+        return Item.Id != _renderedItemId
+            || SelectionMode != _renderedSelectionMode
+            || IsSelected != _renderedIsSelected
+            || _showContextMenu != _renderedShowContextMenu
+            || _showTextModal != _renderedShowTextModal
+            || _saving != _renderedSaving
+            || _videoExpanded != _renderedVideoExpanded;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _forceRender = false;
+        _renderedItemId = Item.Id;
+        _renderedSelectionMode = SelectionMode;
+        _renderedIsSelected = IsSelected;
+        _renderedShowContextMenu = _showContextMenu;
+        _renderedShowTextModal = _showTextModal;
+        _renderedSaving = _saving;
+        _renderedVideoExpanded = _videoExpanded;
+    }
+
+    /// <summary>
+    /// 异步操作（URL 构建、文件保存等）完成后调用，强制触发一次重绘，
+    /// 确保 ShouldRender 不会跳过该次更新。
+    /// </summary>
+    private void RequestRender()
+    {
+        _forceRender = true;
+        StateHasChanged();
+    }
+
     private void CancelLongPress()
     {
         _longPressTimer?.Dispose();
@@ -314,7 +358,7 @@
                 _fileUrl = await BuildFileUrlAsync(download: false);
                 _thumbnailUrl = await BuildThumbnailUrlAsync();
                 _videoExpanded = false;
-                StateHasChanged();
+                RequestRender();
             }
         }
         else
@@ -388,7 +432,7 @@
     {
         if (_saving) return;
         _saving = true;
-        StateHasChanged();
+        RequestRender();
         try
         {
             var stream = await ShareService.DownloadFileAsync(Item.Id);
@@ -413,7 +457,7 @@
         finally
         {
             _saving = false;
-            StateHasChanged();
+            RequestRender();
         }
     }
 
@@ -452,7 +496,7 @@
         try
         {
             _showContextMenu = true;
-            StateHasChanged();
+            RequestRender();
         }
         catch (Exception ex)
         {
