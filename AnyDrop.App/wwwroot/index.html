@@ -107,12 +107,16 @@
                 triggerDistance = triggerDistance || 60;
                 window.scrollUtils.cleanupPullToLoad(elementId);
 
+                var SCROLL_TOP_THRESHOLD = 5;   // px — treat as "at top" when scrollTop <= this
+                var PULL_MULTIPLIER = 0.4;       // visual drag ratio (fraction of actual pull distance)
+                var MAX_PULL_DISTANCE = 24;      // px — cap on visual translateY of indicator
+
                 var startY = 0;
                 var pulling = false;
                 var indicator = el.querySelector('.pull-to-load-indicator');
 
                 var onTouchStart = function (e) {
-                    if (el.scrollTop > 5) return; // 未滚到顶部，忽略
+                    if (el.scrollTop > SCROLL_TOP_THRESHOLD) return; // 未滚到顶部，忽略
                     if (e.touches.length !== 1) return;
                     startY = e.touches[0].clientY;
                     pulling = true;
@@ -122,11 +126,11 @@
                     if (!pulling) return;
                     var dy = e.touches[0].clientY - startY;
                     if (dy <= 0) { pulling = false; return; }
-                    if (el.scrollTop > 5) { pulling = false; return; }
+                    if (el.scrollTop > SCROLL_TOP_THRESHOLD) { pulling = false; return; }
                     if (indicator) {
                         var pct = Math.min(dy / triggerDistance, 1);
                         indicator.style.opacity = pct;
-                        indicator.style.transform = 'translateY(' + Math.min(dy * 0.4, 24) + 'px)';
+                        indicator.style.transform = 'translateY(' + Math.min(dy * PULL_MULTIPLIER, MAX_PULL_DISTANCE) + 'px)';
                     }
                 };
 

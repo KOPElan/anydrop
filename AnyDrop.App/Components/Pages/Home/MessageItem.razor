@@ -261,20 +261,23 @@
             }
         </div>
     </div>
-    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-1 flex items-center gap-1">
-        @if (!HideTimestamp)
-        {
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-            <span>@Item.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</span>
-        }
-        @if (Item.ExpiresAt.HasValue)
-        {
-            <div class="ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-300 bg-red-50/80 dark:bg-red-900/30">
-                <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
-                @FormatExpiry(Item.ExpiresAt.Value)
-            </div>
-        }
-    </p>
+    @if (!HideTimestamp || Item.ExpiresAt.HasValue)
+    {
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-1 flex items-center gap-1">
+            @if (!HideTimestamp)
+            {
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                <span>@Item.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</span>
+            }
+            @if (Item.ExpiresAt.HasValue)
+            {
+                <div class="ml-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-300 bg-red-50/80 dark:bg-red-900/30">
+                    <span class="material-symbols-outlined" style="font-size: 10px; font-variation-settings: 'FILL' 1;">timer</span>
+                    @FormatExpiry(Item.ExpiresAt.Value)
+                </div>
+            }
+        </p>
+    }
 </div>
 
 @code {

@@ -286,7 +286,7 @@ else
     [JSInvokable]
     public Task OnPullToLoad()
     {
-        if (_loadingMore || !AppState.HasMoreMessages) return Task.CompletedTask;
+        if (_loadingMore || !AppState.HasMoreMessages || _selectionMode) return Task.CompletedTask;
         return InvokeAsync(LoadMoreAsync);
     }
 
