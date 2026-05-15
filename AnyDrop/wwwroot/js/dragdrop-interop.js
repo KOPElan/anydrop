@@ -5,6 +5,7 @@ window.AnyDropInterop = window.AnyDropInterop || {
 // 保存每个元素的清理函数，避免重复注册
 const _dropZoneCleanups = new WeakMap();
 const _messageScrollCleanups = new WeakMap();
+const _uploadFileCache = new Map();
 
 /**
  * 通过 XMLHttpRequest 上传文件列表到 /api/v1/files，支持进度报告。
@@ -14,86 +15,111 @@ const _messageScrollCleanups = new WeakMap();
  * @param {DotNetObjectReference} dotNetRef - Blazor 组件的 .NET 引用
  */
 AnyDropInterop._uploadFiles = async function (files, dotNetRef) {
-  // 从 Blazor 获取当前上传上下文（主题 ID + 阅后即焚状态）
   const context = await dotNetRef.invokeMethodAsync('GetUploadContext');
   if (!context || !context.topicId) {
-    // 未选择主题，通知 Blazor 显示错误提示
     await dotNetRef.invokeMethodAsync('OnNoTopicSelected');
     return;
   }
 
   for (const file of files) {
-    // crypto.randomUUID 在所有现代浏览器中可用；为极少数老旧环境提供简单回退
-    const tempId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    // 通知 Blazor 创建占位气泡
-    await dotNetRef.invokeMethodAsync(
-      'OnFileUploadStarted',
-      tempId,
-      file.name,
-      file.type || 'application/octet-stream',
-      file.size
-    );
-
-    // 通过 XHR 上传，以获得 upload.onprogress 事件（fetch API 目前不支持上传进度）
-    await new Promise((resolve) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/v1/files');
-
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          dotNetRef.invokeMethodAsync('OnFileUploadProgress', tempId, percent).catch((err) => {
-            console.warn('[AnyDrop] Failed to report upload progress:', err);
-          });
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          dotNetRef.invokeMethodAsync('OnFileUploadCompleted', tempId, xhr.responseText).catch((err) => {
-            console.warn('[AnyDrop] Failed to notify upload completion:', err);
-          });
-        } else {
-          let msg = `HTTP ${xhr.status}`;
-          try {
-            const body = JSON.parse(xhr.responseText);
-            if (body && body.error) msg = body.error;
-          } catch {}
-          console.warn('[AnyDrop] Upload failed:', msg);
-          dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, msg).catch((err) => {
-            console.warn('[AnyDrop] Failed to notify upload failure:', err);
-          });
-        }
-        resolve();
-      };
-
-      xhr.onerror = () => {
-        console.warn('[AnyDrop] XHR network error during upload of', file.name);
-        dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Network error').catch((err) => {
-          console.warn('[AnyDrop] Failed to notify upload error:', err);
-        });
-        resolve();
-      };
-
-      xhr.onabort = () => {
-        console.warn('[AnyDrop] Upload aborted for', file.name);
-        dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Upload aborted').catch((err) => {
-          console.warn('[AnyDrop] Failed to notify upload abort:', err);
-        });
-        resolve();
-      };
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('topicId', context.topicId);
-      formData.append('burnAfterReading', context.burnAfterReading ? 'true' : 'false');
-
-      xhr.send(formData);
-    });
+    await AnyDropInterop._uploadSingleFile(file, dotNetRef, context);
   }
+};
+
+AnyDropInterop._createTempId = function () {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
+  const tempId = AnyDropInterop._createTempId();
+  const mimeType = file.type || 'application/octet-stream';
+
+  _uploadFileCache.set(tempId, { file, context });
+
+  await dotNetRef.invokeMethodAsync(
+    'OnFileUploadStarted',
+    tempId,
+    file.name,
+    mimeType,
+    file.size
+  );
+
+  if (context.maxFileSizeBytes > 0 && file.size > context.maxFileSizeBytes) {
+    await dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, `FILE_TOO_LARGE:${context.maxFileSizeBytes}`);
+    return tempId;
+  }
+
+  await new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/v1/files');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        dotNetRef.invokeMethodAsync('OnFileUploadProgress', tempId, percent).catch((err) => {
+          console.warn('[AnyDrop] Failed to report upload progress:', err);
+        });
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        _uploadFileCache.delete(tempId);
+        dotNetRef.invokeMethodAsync('OnFileUploadCompleted', tempId, xhr.responseText).catch((err) => {
+          console.warn('[AnyDrop] Failed to notify upload completion:', err);
+        });
+      } else {
+        let msg = `HTTP ${xhr.status}`;
+        try {
+          const body = JSON.parse(xhr.responseText);
+          if (body && body.error) msg = body.error;
+        } catch {}
+        console.warn('[AnyDrop] Upload failed:', msg);
+        dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, msg).catch((err) => {
+          console.warn('[AnyDrop] Failed to notify upload failure:', err);
+        });
+      }
+      resolve();
+    };
+
+    xhr.onerror = () => {
+      console.warn('[AnyDrop] XHR network error during upload of', file.name);
+      dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Network error').catch((err) => {
+        console.warn('[AnyDrop] Failed to notify upload error:', err);
+      });
+      resolve();
+    };
+
+    xhr.onabort = () => {
+      console.warn('[AnyDrop] Upload aborted for', file.name);
+      dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Upload aborted').catch((err) => {
+        console.warn('[AnyDrop] Failed to notify upload abort:', err);
+      });
+      resolve();
+    };
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('topicId', context.topicId);
+    formData.append('burnAfterReading', context.burnAfterReading ? 'true' : 'false');
+
+    xhr.send(formData);
+  });
+
+  return tempId;
+};
+
+AnyDropInterop.retryUpload = async function (tempId, dotNetRef) {
+  const cached = _uploadFileCache.get(tempId);
+  if (!cached || !cached.file || !cached.context || !cached.context.topicId) {
+    return false;
+  }
+
+  _uploadFileCache.delete(tempId);
+  await AnyDropInterop._uploadSingleFile(cached.file, dotNetRef, cached.context);
+  return true;
 };
 
 /**

@@ -112,9 +112,12 @@ public partial class Home : IAsyncDisposable
     // 视频"点击展开播放"集合（thumbnail-first 交互）
     private readonly HashSet<Guid> _expandedVideoIds = [];
     private bool _isNearMessageListBottom = true;
+    private long _maxUploadFileSizeBytes = DefaultMaxFileSizeBytes;
 
     protected override async Task OnInitializedAsync()
     {
+        _maxUploadFileSizeBytes = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
+
         // 读取 highlight 查询参数（从搜索页跳转过来时定位消息）
         var uri = new Uri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
@@ -298,6 +301,12 @@ public partial class Home : IAsyncDisposable
                     // 仅当用户处于底部附近时才触发自动滚动（避免打断用户翻阅历史记录）
                     if (_messageIds.Add(dto.Id))
                     {
+                        var matchedPending = _pendingUploads.FirstOrDefault(p => p.IsRemote && p.Matches(dto));
+                        if (matchedPending is not null)
+                        {
+                            _pendingUploads.Remove(matchedPending);
+                        }
+
                         _messages.Add(dto);
                         _shouldScrollIfNearBottom = true;
                         StateHasChanged();
@@ -325,6 +334,47 @@ public partial class Home : IAsyncDisposable
                     {
                         StateHasChanged();
                     }
+                });
+            });
+
+            _hubConnection.On<UploadPendingSignal>("ReceiveUploadPending", signal =>
+            {
+                return InvokeAsync(() =>
+                {
+                    if (!_selectedTopicId.HasValue || signal.TopicId != _selectedTopicId.Value)
+                    {
+                        return;
+                    }
+
+                    if (_pendingUploads.Any(p => p.TempId == signal.TempId))
+                    {
+                        return;
+                    }
+
+                    var pending = PendingUpload.FromRemoteSignal(signal);
+                    _pendingUploads.Add(pending);
+                    _shouldScrollIfNearBottom = true;
+                    StateHasChanged();
+                });
+            });
+
+            _hubConnection.On<string, Guid>("RemoveUploadPending", (tempId, topicId) =>
+            {
+                return InvokeAsync(() =>
+                {
+                    if (!_selectedTopicId.HasValue || topicId != _selectedTopicId.Value)
+                    {
+                        return;
+                    }
+
+                    var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && p.TopicId == topicId);
+                    if (pending is null)
+                    {
+                        return;
+                    }
+
+                    _pendingUploads.Remove(pending);
+                    StateHasChanged();
                 });
             });
 
@@ -611,7 +661,7 @@ public partial class Home : IAsyncDisposable
     [JSInvokable]
     public UploadContext? GetUploadContext()
         => _selectedTopicId.HasValue
-            ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading)
+            ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading, _maxUploadFileSizeBytes)
             : null;
 
     /// <summary>由 JS 调用：用户未选择主题时显示提示。</summary>
@@ -628,11 +678,23 @@ public partial class Home : IAsyncDisposable
     [JSInvokable]
     public Task OnFileUploadStarted(string tempId, string fileName, string mimeType, long fileSize)
     {
+        if (!_selectedTopicId.HasValue)
+        {
+            return Task.CompletedTask;
+        }
+
         _validationError = null;
         var contentType = PendingUpload.ResolveContentType(mimeType);
-        var pending = new PendingUpload(tempId, fileName, mimeType, fileSize, contentType);
+        var pending = new PendingUpload(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, contentType, DateTimeOffset.UtcNow);
         _pendingUploads.Add(pending);
         _shouldScrollToBottom = true;
+
+        if (_hubConnection is not null)
+        {
+            _ = _hubConnection.SendAsync("NotifyUploadStarted",
+                new UploadPendingSignal(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, pending.CreatedAt));
+        }
+
         return InvokeAsync(StateHasChanged);
     }
 
@@ -675,6 +737,11 @@ public partial class Home : IAsyncDisposable
                     _messages.Add(dto);
                 }
 
+                if (_selectedTopicId.HasValue && _hubConnection is not null)
+                {
+                    _ = _hubConnection.SendAsync("NotifyUploadSettled", tempId, _selectedTopicId.Value);
+                }
+
                 _shouldScrollIfNearBottom = true;
             }
             catch (Exception ex)
@@ -700,12 +767,53 @@ public partial class Home : IAsyncDisposable
             if (pending is not null)
             {
                 pending.IsFailed = true;
+                pending.ErrorMessage = NormalizeUploadError(errorMessage);
             }
 
-            _validationError = (string?)L["Home_FileUploadFailed", pending?.FileName ?? string.Empty];
+            _validationError = pending is null
+                ? (string?)L["Home_DropFileUploadFailed"]
+                : (string?)L["Home_FileUploadFailedWithReason", pending.FileName, pending.ErrorMessage ?? L["Home_UploadFailed"]];
+
+            if (_selectedTopicId.HasValue && _hubConnection is not null)
+            {
+                _ = _hubConnection.SendAsync("NotifyUploadSettled", tempId, _selectedTopicId.Value);
+            }
 
             StateHasChanged();
         });
+    }
+
+    private async Task RetryPendingUploadAsync(string tempId)
+    {
+        var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && p.IsFailed && !p.IsRemote);
+        if (pending is null)
+        {
+            return;
+        }
+
+        _pendingUploads.Remove(pending);
+        _validationError = null;
+        StateHasChanged();
+
+        try
+        {
+            if (_dotNetRef is null)
+            {
+                _validationError = L["Home_DropFileUploadFailed"];
+                return;
+            }
+
+            var retried = await JS.InvokeAsync<bool>("AnyDropInterop.retryUpload", tempId, _dotNetRef);
+            if (!retried)
+            {
+                _validationError = (string?)L["Home_FileUploadFailed", pending.FileName];
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Retry upload failed for pending item {TempId}", tempId);
+            _validationError = (string?)L["Home_FileUploadFailed", pending.FileName];
+        }
     }
 
     // ── 拖放覆盖层 ──────────────────────────────────────────────────────────────
@@ -1141,20 +1249,104 @@ public partial class Home : IAsyncDisposable
         _ => "attach_file"
     };
 
+    private string NormalizeUploadError(string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return L["Home_UploadFailed"];
+        }
+
+        if (errorMessage.StartsWith("FILE_TOO_LARGE:", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadFileTooLarge", FormatFileSize(_maxUploadFileSizeBytes)];
+        }
+
+        if (errorMessage.Contains("413", StringComparison.OrdinalIgnoreCase)
+            || errorMessage.Contains("Payload Too Large", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadFileTooLarge", FormatFileSize(_maxUploadFileSizeBytes)];
+        }
+
+        return errorMessage;
+    }
+
+    private IReadOnlyList<ChatTimelineEntry> BuildTimelineEntries()
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            return [];
+        }
+
+        var topicId = _selectedTopicId.Value;
+
+        var timeline = new List<ChatTimelineEntry>(_messages.Count + _pendingUploads.Count);
+        timeline.AddRange(_messages.Select(ChatTimelineEntry.FromMessage));
+        timeline.AddRange(_pendingUploads
+            .Where(p => p.TopicId == topicId)
+            .Select(ChatTimelineEntry.FromPending));
+
+        timeline.Sort(static (left, right) =>
+        {
+            var createdAtComparison = left.CreatedAt.CompareTo(right.CreatedAt);
+            if (createdAtComparison != 0)
+            {
+                return createdAtComparison;
+            }
+
+            return left.SortOrder.CompareTo(right.SortOrder);
+        });
+
+        return timeline;
+    }
+
     /// <summary>JS 上传时传递给 HTTP 端点的上下文信息。</summary>
-    public sealed record UploadContext(string TopicId, bool BurnAfterReading);
+    public sealed record UploadContext(string TopicId, bool BurnAfterReading, long MaxFileSizeBytes);
+
+    private sealed record ChatTimelineEntry(DateTimeOffset CreatedAt, int SortOrder, ShareItemDto? Message, PendingUpload? Pending)
+    {
+        public static ChatTimelineEntry FromMessage(ShareItemDto message) => new(message.CreatedAt, 1, message, null);
+        public static ChatTimelineEntry FromPending(PendingUpload pending) => new(pending.CreatedAt, 0, null, pending);
+    }
 
     /// <summary>待上传占位条目，跟踪单个文件的上传进度与状态。</summary>
-    private sealed class PendingUpload(string tempId, string fileName, string mimeType, long fileSize, ShareContentType contentType)
+    private sealed class PendingUpload(
+        string tempId,
+        Guid topicId,
+        string fileName,
+        string mimeType,
+        long fileSize,
+        ShareContentType contentType,
+        DateTimeOffset createdAt,
+        bool isRemote = false)
     {
         /// <summary>与 JS 端约定的临时 ID（crypto.randomUUID() 生成），用于关联进度回调。</summary>
         public string TempId { get; } = tempId;
+        public Guid TopicId { get; } = topicId;
         public string FileName { get; } = fileName;
         public string MimeType { get; } = mimeType;
         public long FileSize { get; } = fileSize;
         public ShareContentType ContentType { get; } = contentType;
+        public DateTimeOffset CreatedAt { get; } = createdAt;
+        public bool IsRemote { get; } = isRemote;
         public int ProgressPercent { get; set; }
         public bool IsFailed { get; set; }
+        public string? ErrorMessage { get; set; }
+
+        public bool Matches(ShareItemDto dto)
+            => dto.TopicId == TopicId
+               && dto.ContentType == ContentType
+               && string.Equals(dto.FileName, FileName, StringComparison.Ordinal)
+               && (!dto.FileSize.HasValue || dto.FileSize.Value == FileSize);
+
+        public static PendingUpload FromRemoteSignal(UploadPendingSignal signal)
+            => new(signal.TempId,
+                signal.TopicId,
+                signal.FileName,
+                signal.MimeType,
+                signal.FileSize,
+                ResolveContentType(signal.MimeType),
+                signal.CreatedAt,
+                isRemote: true);
 
         public static ShareContentType ResolveContentType(string mime)
         {

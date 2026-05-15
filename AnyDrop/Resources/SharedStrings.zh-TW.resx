@@ -213,6 +213,8 @@
   <data name="Home_DeleteFailed"><value>刪除失敗，請重試。</value></data>
   <data name="Home_FileTooLargeSkipped"><value>檔案「{0}」超過最大允許大小，已略過。</value></data>
   <data name="Home_FileUploadFailed"><value>檔案「{0}」上傳失敗，請重試。</value></data>
+  <data name="Home_FileUploadFailedWithReason"><value>檔案「{0}」上傳失敗：{1}</value></data>
+  <data name="Home_UploadFileTooLarge"><value>檔案大小超出伺服器限制（最大 {0}）。</value></data>
   <data name="Home_DropFileUploadFailed"><value>檔案上傳失敗，請重試。</value></data>
   <data name="Home_ExpiringSoon"><value>即將刪除</value></data>
   <data name="Home_DeleteAfterMinutes"><value>{0} 分鐘後刪除</value></data>
