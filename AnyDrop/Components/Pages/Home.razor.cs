@@ -685,14 +685,15 @@ public partial class Home : IAsyncDisposable
 
         _validationError = null;
         var contentType = PendingUpload.ResolveContentType(mimeType);
-        var pending = new PendingUpload(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, contentType, DateTimeOffset.UtcNow);
+        var createdAt = DateTimeOffset.UtcNow;
+        var pending = new PendingUpload(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, contentType, createdAt);
         _pendingUploads.Add(pending);
         _shouldScrollToBottom = true;
 
         if (_hubConnection is not null)
         {
             _ = _hubConnection.SendAsync("NotifyUploadStarted",
-                new UploadPendingSignal(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, pending.CreatedAt));
+                new UploadPendingSignal(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, createdAt));
         }
 
         return InvokeAsync(StateHasChanged);
@@ -1336,7 +1337,8 @@ public partial class Home : IAsyncDisposable
             => dto.TopicId == TopicId
                && dto.ContentType == ContentType
                && string.Equals(dto.FileName, FileName, StringComparison.Ordinal)
-               && (!dto.FileSize.HasValue || dto.FileSize.Value == FileSize);
+               && dto.FileSize.HasValue
+               && dto.FileSize.Value == FileSize;
 
         public static PendingUpload FromRemoteSignal(UploadPendingSignal signal)
             => new(signal.TempId,

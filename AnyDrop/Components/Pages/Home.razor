@@ -378,6 +378,7 @@
                                         {
                                             <button type="button"
                                                     class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                                                    aria-label="@($"{L["Common_Retry"]}: {pending.FileName}")"
                                                     @onclick="() => RetryPendingUploadAsync(pending.TempId)">
                                                 @L["Common_Retry"]
                                             </button>
