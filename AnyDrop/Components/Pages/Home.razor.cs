@@ -1279,12 +1279,23 @@ public partial class Home : IAsyncDisposable
         }
 
         var topicId = _selectedTopicId.Value;
+        var topicPending = _pendingUploads.Where(p => p.TopicId == topicId).ToList();
 
-        var timeline = new List<ChatTimelineEntry>(_messages.Count + _pendingUploads.Count);
+        // 热路径优化：绝大多数渲染（纯文本/无上传占位）不需要排序，避免每次重绘都做 O(n log n) 排序。
+        if (topicPending.Count == 0)
+        {
+            var messageOnly = new List<ChatTimelineEntry>(_messages.Count);
+            for (var i = 0; i < _messages.Count; i++)
+            {
+                messageOnly.Add(ChatTimelineEntry.FromMessage(_messages[i]));
+            }
+
+            return messageOnly;
+        }
+
+        var timeline = new List<ChatTimelineEntry>(_messages.Count + topicPending.Count);
         timeline.AddRange(_messages.Select(ChatTimelineEntry.FromMessage));
-        timeline.AddRange(_pendingUploads
-            .Where(p => p.TopicId == topicId)
-            .Select(ChatTimelineEntry.FromPending));
+        timeline.AddRange(topicPending.Select(ChatTimelineEntry.FromPending));
 
         timeline.Sort(static (left, right) =>
         {
