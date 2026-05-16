@@ -100,6 +100,7 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
   await dotNetRef.invokeMethodAsync(
     'OnFileUploadStarted',
     tempId,
+    context.topicId,
     file.name,
     mimeType,
     file.size

@@ -1,10 +1,12 @@
 using AnyDrop.Api;
+using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
@@ -36,6 +38,7 @@ public partial class Home : IAsyncDisposable
     [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
     [Inject] public required IUserService UserService { get; set; }
     [Inject] public required ITokenService TokenService { get; set; }
+    [Inject] public required IHubContext<ShareHub> ShareHubContext { get; set; }
     [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
     [CascadingParameter(Name = "ToggleMobileSidebar")] public Action? ToggleMobileSidebar { get; set; }
@@ -715,28 +718,28 @@ public partial class Home : IAsyncDisposable
     /// 由 JS 调用：文件上传开始，立即在 UI 中插入占位气泡。
     /// </summary>
     [JSInvokable]
-    public Task OnFileUploadStarted(string tempId, string fileName, string mimeType, long fileSize)
+    public Task OnFileUploadStarted(string tempId, string topicId, string fileName, string mimeType, long fileSize)
     {
-        if (!_selectedTopicId.HasValue)
+        if (!Guid.TryParse(topicId, out var uploadTopicId))
         {
+            Logger.LogDebug("Ignoring upload start with invalid topicId: {TopicId}", topicId);
             return Task.CompletedTask;
         }
 
         _validationError = null;
         var contentType = PendingUpload.ResolveContentType(mimeType);
         var createdAt = DateTimeOffset.UtcNow;
-        var pending = new PendingUpload(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, contentType, createdAt);
+        var pending = new PendingUpload(tempId, uploadTopicId, fileName, mimeType, fileSize, contentType, createdAt);
         _pendingUploads.Add(pending);
         if (_isAtBottom)
         {
             RequestScrollToBottom();
         }
 
-        if (_hubConnection is not null)
-        {
-            _ = _hubConnection.SendAsync("NotifyUploadStarted",
-                new UploadPendingSignal(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, createdAt));
-        }
+        _ = BroadcastHubEventAsync(
+            () => ShareHubContext.Clients.All.SendAsync("ReceiveUploadPending",
+                new UploadPendingSignal(tempId, uploadTopicId, fileName, mimeType, fileSize, createdAt)),
+            "ReceiveUploadPending");
 
         RequestRender();
         return Task.CompletedTask;
@@ -801,10 +804,10 @@ public partial class Home : IAsyncDisposable
                     }
                 }
 
-                if (_selectedTopicId.HasValue && _hubConnection is not null)
-                {
-                    _ = _hubConnection.SendAsync("NotifyUploadSettled", tempId, _selectedTopicId.Value);
-                }
+                var settledTopicId = pending?.TopicId ?? dto.TopicId;
+                _ = BroadcastHubEventAsync(
+                    () => ShareHubContext.Clients.All.SendAsync("RemoveUploadPending", tempId, settledTopicId),
+                    "RemoveUploadPending");
 
             }
             catch (Exception ex)
@@ -837,9 +840,11 @@ public partial class Home : IAsyncDisposable
                 ? (string?)L["Home_DropFileUploadFailed"]
                 : (string?)L["Home_FileUploadFailedWithReason", pending.FileName, pending.ErrorMessage ?? L["Home_UploadFailed"]];
 
-            if (_selectedTopicId.HasValue && _hubConnection is not null)
+            if (pending is not null)
             {
-                _ = _hubConnection.SendAsync("NotifyUploadSettled", tempId, _selectedTopicId.Value);
+                _ = BroadcastHubEventAsync(
+                    () => ShareHubContext.Clients.All.SendAsync("RemoveUploadPending", tempId, pending.TopicId),
+                    "RemoveUploadPending");
             }
 
             RequestRender();
@@ -876,6 +881,18 @@ public partial class Home : IAsyncDisposable
         {
             Logger.LogWarning(ex, "Retry upload failed for pending item {TempId}", tempId);
             _validationError = (string?)L["Home_FileUploadFailed", pending.FileName];
+        }
+    }
+
+    private async Task BroadcastHubEventAsync(Func<Task> broadcastAsync, string eventName)
+    {
+        try
+        {
+            await broadcastAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to broadcast hub event {EventName}.", eventName);
         }
     }
 

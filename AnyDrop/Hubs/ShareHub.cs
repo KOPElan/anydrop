@@ -9,14 +9,4 @@ public sealed class ShareHub : Hub
     {
         await Clients.All.SendAsync("TopicsUpdated", topics);
     }
-
-    public async Task NotifyUploadStarted(UploadPendingSignal signal)
-    {
-        await Clients.Others.SendAsync("ReceiveUploadPending", signal);
-    }
-
-    public async Task NotifyUploadSettled(string tempId, Guid topicId)
-    {
-        await Clients.Others.SendAsync("RemoveUploadPending", tempId, topicId);
-    }
 }
