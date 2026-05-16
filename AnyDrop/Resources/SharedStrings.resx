@@ -223,6 +223,8 @@
   <data name="Home_DeleteFailed"><value>删除失败，请重试。</value></data>
   <data name="Home_FileTooLargeSkipped"><value>文件“{0}”超过最大允许大小，已跳过。</value></data>
   <data name="Home_FileUploadFailed"><value>文件“{0}”上传失败，请重试。</value></data>
+  <data name="Home_FileUploadFailedWithReason"><value>文件“{0}”上传失败：{1}</value></data>
+  <data name="Home_UploadFileTooLarge"><value>文件大小超出服务器限制（最大 {0}）。</value></data>
   <data name="Home_DropFileUploadFailed"><value>文件上传失败，请重试。</value></data>
   <data name="Home_ExpiringSoon"><value>即将删除</value></data>
   <data name="Home_DeleteAfterMinutes"><value>{0}分钟后删除</value></data>
@@ -245,6 +247,7 @@
   <data name="Home_MobileSendTitle"><value>发送消息</value></data>
   <data name="Home_MobileSendPlaceholder"><value>输入消息内容…</value></data>
   <data name="Home_BackToLatest"><value>回到最新消息</value></data>
+  <data name="Home_NewMessages"><value>{0} 条新消息</value></data>
 
   <!-- 缩略图设置 / Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>缩略图与预览图</value></data>

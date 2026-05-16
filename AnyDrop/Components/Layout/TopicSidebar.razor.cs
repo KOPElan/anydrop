@@ -17,6 +17,8 @@ public partial class TopicSidebar : IAsyncDisposable
     [Inject] public required ILogger<TopicSidebar> Logger { get; set; }
     [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
+    [Inject] public required IUserService UserService { get; set; }
+    [Inject] public required ITokenService TokenService { get; set; }
     [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
 
     // 由 MainLayout 通过 CascadingValue 提供，触发布局层 Modal（避免 backdrop-filter 限制）
@@ -179,7 +181,10 @@ public partial class TopicSidebar : IAsyncDisposable
     private async Task InitializeHubAsync()
     {
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"))
+            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"), options =>
+            {
+                options.AccessTokenProvider = ResolveHubAccessTokenAsync;
+            })
             .WithAutomaticReconnect()
             .Build();
 
@@ -275,6 +280,43 @@ public partial class TopicSidebar : IAsyncDisposable
         }
 
         NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
+    /// <summary>
+    /// 为服务器端 HubConnection 提供 JWT，避免协商阶段因无浏览器 Cookie 身份导致连接失败。
+    /// </summary>
+    private async Task<string?> ResolveHubAccessTokenAsync()
+    {
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var principal = state.User;
+            if (principal.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            var subject = principal.FindFirst("sub")?.Value
+                          ?? principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(subject, out var userId))
+            {
+                return null;
+            }
+
+            var user = await UserService.GetByIdAsync(userId);
+            if (user is null)
+            {
+                return null;
+            }
+
+            var (accessToken, _) = TokenService.GenerateToken(user);
+            return accessToken;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to resolve ShareHub access token in TopicSidebar.");
+            return null;
+        }
     }
 
     public async ValueTask DisposeAsync()

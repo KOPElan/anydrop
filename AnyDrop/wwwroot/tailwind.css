@@ -48,7 +48,6 @@
     --font-weight-extrabold: 800;
     --tracking-tight: -0.025em;
     --tracking-wide: 0.025em;
-    --tracking-wider: 0.05em;
     --tracking-widest: 0.1em;
     --leading-tight: 1.25;
     --leading-snug: 1.375;
@@ -60,6 +59,7 @@
     --radius-3xl: 1.5rem;
     --animate-spin: spin 1s linear infinite;
     --blur-sm: 8px;
+    --blur-md: 12px;
     --default-transition-duration: 150ms;
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     --default-font-family: var(--font-sans);
@@ -254,9 +254,6 @@
   .inset-x-0 {
     inset-inline: calc(var(--spacing) * 0);
   }
-  .end {
-    inset-inline-end: var(--spacing);
-  }
   .top-0 {
     top: calc(var(--spacing) * 0);
   }
@@ -275,14 +272,14 @@
   .right-4 {
     right: calc(var(--spacing) * 4);
   }
-  .right-6 {
-    right: calc(var(--spacing) * 6);
-  }
   .bottom-0 {
     bottom: calc(var(--spacing) * 0);
   }
   .bottom-35 {
     bottom: calc(var(--spacing) * 35);
+  }
+  .left-1\/2 {
+    left: calc(1 / 2 * 100%);
   }
   .left-4 {
     left: calc(var(--spacing) * 4);
@@ -440,6 +437,9 @@
   .h-14 {
     height: calc(var(--spacing) * 14);
   }
+  .h-15 {
+    height: calc(var(--spacing) * 15);
+  }
   .h-16 {
     height: calc(var(--spacing) * 16);
   }
@@ -562,6 +562,10 @@
   }
   .shrink-0 {
     flex-shrink: 0;
+  }
+  .-translate-x-1\/2 {
+    --tw-translate-x: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
   }
   .-translate-y-1\/2 {
     --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
@@ -729,6 +733,12 @@
       border-color: color-mix(in oklab, var(--color-outline-variant) 40%, transparent);
     }
   }
+  .border-white\/30 {
+    border-color: color-mix(in srgb, #fff 30%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 30%, transparent);
+    }
+  }
   .bg-black {
     background-color: var(--color-black);
   }
@@ -748,6 +758,12 @@
     background-color: color-mix(in srgb, #000 50%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-black) 50%, transparent);
+    }
+  }
+  .bg-black\/70 {
+    background-color: color-mix(in srgb, #000 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 70%, transparent);
     }
   }
   .bg-black\/80 {
@@ -812,6 +828,9 @@
   }
   .px-2 {
     padding-inline: calc(var(--spacing) * 2);
+  }
+  .px-2\.5 {
+    padding-inline: calc(var(--spacing) * 2.5);
   }
   .px-3 {
     padding-inline: calc(var(--spacing) * 3);
@@ -995,10 +1014,6 @@
     --tw-tracking: var(--tracking-wide);
     letter-spacing: var(--tracking-wide);
   }
-  .tracking-wider {
-    --tw-tracking: var(--tracking-wider);
-    letter-spacing: var(--tracking-wider);
-  }
   .tracking-widest {
     --tw-tracking: var(--tracking-widest);
     letter-spacing: var(--tracking-widest);
@@ -1129,6 +1144,11 @@
     @supports (color: color-mix(in lab, red, red)) {
       --tw-ring-color: color-mix(in oklab, var(--color-primary) 60%, transparent);
     }
+  }
+  .backdrop-blur-md {
+    --tw-backdrop-blur: blur(var(--blur-md));
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
   }
   .backdrop-blur-sm {
     --tw-backdrop-blur: blur(var(--blur-sm));
@@ -1847,7 +1867,7 @@
     -webkit-backdrop-filter: blur(12px) saturate(150%);
   }
   .chat-input-card {
-    background: rgba(255, 255, 255, 0.80);
+    background: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(28px) saturate(200%);
     -webkit-backdrop-filter: blur(28px) saturate(200%);
     border-radius: 1rem;
@@ -2286,7 +2306,7 @@
     position: fixed;
     inset: 0;
     z-index: 46;
-    background: rgba(25, 28, 29, 0.40);
+    background: rgba(25, 28, 29, 0.60);
     animation: overlay-in 200ms ease both;
   }
   .mobile-input-panel {
@@ -2402,7 +2422,7 @@ html.dark .chat-footer-glass {
   background: linear-gradient(to top, rgba(22, 24, 26, 0.85) 0%, rgba(22, 24, 26, 0.40) 60%, transparent 100%);
 }
 html.dark .chat-input-card {
-  background: rgba(32, 34, 37, 0.88);
+  background: rgba(32, 34, 37, 0.6);
   border-color: rgba(60, 68, 80, 0.50);
   box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(60, 68, 80, 0.35);
 }

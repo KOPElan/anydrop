@@ -24,11 +24,15 @@ RUN dotnet publish "./AnyDrop.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p
 
 # 此阶段在生产中使用，或在常规模式下从 VS 运行时使用(在不使用调试配置时为默认值)
 FROM base AS final
-# 安装 ffmpeg 用于视频缩略图生成（需要切换到 root 用户执行 apt-get）
+# 重新声明 APP_UID，确保 RUN 中可用（默认 1654，与基础镜像一致）
+ARG APP_UID=1654
+# 安装 ffmpeg 并预建 /data 目录（同时设置所有权，解决命名卷/绑定挂载权限问题）
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data \
+    && chown -R $APP_UID:$APP_UID /data
 USER $APP_UID
 WORKDIR /app
 COPY --from=publish /app/publish .

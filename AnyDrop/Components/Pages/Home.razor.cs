@@ -1,22 +1,32 @@
 using AnyDrop.Api;
+using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Security.Claims;
 using System.Text.Json;
+using System.Threading;
 
 namespace AnyDrop.Components.Pages;
 
 public partial class Home : IAsyncDisposable
 {
     private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
-    private const int HubInitialDelayMs = 300;
-    private const int HubRetryDelayMs = 500;
+    // 缩短降级等待：降低连接失败到轮询兜底的感知延迟；仍保留一次短重试避免瞬时抖动。
+    private const int HubInitialDelayMs = 100;
+    private const int HubRetryDelayMs = 200;
     private const int MaxHubConnectionAttempts = 2;
+    private const int PollingDelayMs = 1_000;
+    private const int PollingHubReconnectIntervalMs = 3_000;
+    private const int MessageTimeCacheMaxEntries = 2_000;
+    private const int UploadProgressRenderGranularityPercent = 5;
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
@@ -25,6 +35,10 @@ public partial class Home : IAsyncDisposable
     [Inject] public required ILogger<Home> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
+    [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+    [Inject] public required IUserService UserService { get; set; }
+    [Inject] public required ITokenService TokenService { get; set; }
+    [Inject] public required IHubContext<ShareHub> ShareHubContext { get; set; }
     [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
     [CascadingParameter(Name = "ToggleMobileSidebar")] public Action? ToggleMobileSidebar { get; set; }
@@ -52,6 +66,9 @@ public partial class Home : IAsyncDisposable
     // 浏览器时区（IANA），在首次渲染后从 JS 获取；初始值用服务器本地时区减少首帧 UTC 闪烁
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
+    private readonly Dictionary<long, string> _messageTimeTextCache = [];
+    private int _renderScheduled;
+    private long _lastPollingHubReconnectAttemptTicks = DateTimeOffset.MinValue.UtcTicks;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -97,10 +114,7 @@ public partial class Home : IAsyncDisposable
     private ElementReference _imageInputRef;
     private ElementReference _attachmentInputRef;
     private DotNetObjectReference<Home>? _dotNetRef;
-    // 强制滚到底（初次加载、主题切换、手动发消息）
-    private bool _shouldScrollToBottom;
-    // 条件滚到底（收到新消息时，仅当用户处于底部附近才滚动）
-    private bool _shouldScrollIfNearBottom;
+    private PendingScrollAction _pendingScrollAction;
 
     // 消息加载中状态（切换主题/初次加载时显示骨架屏；发送消息后刷新不触发骨架屏）
     private bool _isLoadingMessages;
@@ -111,10 +125,28 @@ public partial class Home : IAsyncDisposable
 
     // 视频"点击展开播放"集合（thumbnail-first 交互）
     private readonly HashSet<Guid> _expandedVideoIds = [];
-    private bool _isNearMessageListBottom = true;
+    private bool _isAtBottom = true;
+    private int _unreadMessageCount;
+    private Guid? _firstUnreadMessageId;
+    private long _maxUploadFileSizeBytes = DefaultMaxFileSizeBytes;
+
+    /// <summary>
+    /// 表示下一次渲染时需要执行的滚动动作。
+    /// </summary>
+    private enum PendingScrollAction
+    {
+        /// <summary>无待执行滚动动作。</summary>
+        None = 0,
+        /// <summary>下一次渲染后无条件滚动到底部。</summary>
+        ToBottom = 1,
+        /// <summary>下一次渲染后仅在用户仍位于底部时滚动到底部。</summary>
+        ToBottomIfAtBottom = 2
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        _maxUploadFileSizeBytes = Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
+
         // 读取 highlight 查询参数（从搜索页跳转过来时定位消息）
         var uri = new Uri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
@@ -125,11 +157,13 @@ public partial class Home : IAsyncDisposable
 
         await LoadSelectedTopicMessagesAsync();
 
-        // 若有待高亮消息，不滚到底部，改为滚到目标消息
         if (_pendingHighlightId.HasValue)
         {
-            _shouldScrollToBottom = false;
             _shouldHighlight = true;
+        }
+        else
+        {
+            RequestScrollToBottom();
         }
     }
 
@@ -147,7 +181,11 @@ public partial class Home : IAsyncDisposable
             // 若有待高亮消息（从搜索页跳转而来），撤销自动滚到底的请求，保留高亮定位
             if (_shouldHighlight)
             {
-                _shouldScrollToBottom = false;
+                _pendingScrollAction = PendingScrollAction.None;
+            }
+            else
+            {
+                RequestScrollToBottom();
             }
         }
     }
@@ -156,53 +194,36 @@ public partial class Home : IAsyncDisposable
     {
         // ── 优先处理滚动/高亮（在 hub 初始化前执行，消除初次打开时先显示顶部再跳底的闪烁）──
 
-        if (_shouldScrollToBottom)
+        if (_pendingScrollAction is not PendingScrollAction.None)
         {
-            _shouldScrollToBottom = false;
+            var action = _pendingScrollAction;
+            _pendingScrollAction = PendingScrollAction.None;
             try
             {
-                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
+                if (action is PendingScrollAction.ToBottom)
+                {
+                    await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
+                }
+                else if (_isAtBottom)
+                {
+                    await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottomIfNearBottom", _messageListRef);
+                }
             }
             catch (JSDisconnectedException)
             {
-                Logger.LogDebug("JS interop disconnected during scrollToBottom — component is being disposed.");
+                Logger.LogDebug("JS interop disconnected during pending scroll action — component is being disposed.");
             }
             catch (TaskCanceledException)
             {
-                Logger.LogDebug("scrollToBottom was cancelled — component is being disposed.");
+                Logger.LogDebug("pending scroll action was cancelled — component is being disposed.");
             }
             catch (ObjectDisposedException ex)
             {
-                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottom.");
+                Logger.LogDebug(ex, "JS runtime disposed during pending scroll action.");
             }
             catch (InvalidOperationException ex)
             {
-                Logger.LogDebug(ex, "JS interop not available during scrollToBottom.");
-            }
-        }
-
-        if (_shouldScrollIfNearBottom)
-        {
-            _shouldScrollIfNearBottom = false;
-            try
-            {
-                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottomIfNearBottom", _messageListRef);
-            }
-            catch (JSDisconnectedException)
-            {
-                Logger.LogDebug("JS interop disconnected during scrollToBottomIfNearBottom — component is being disposed.");
-            }
-            catch (TaskCanceledException)
-            {
-                Logger.LogDebug("scrollToBottomIfNearBottom was cancelled — component is being disposed.");
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottomIfNearBottom.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger.LogDebug(ex, "JS interop not available during scrollToBottomIfNearBottom.");
+                Logger.LogDebug(ex, "JS interop not available during pending scroll action.");
             }
         }
 
@@ -242,6 +263,7 @@ public partial class Home : IAsyncDisposable
                 _browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
                 try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZoneId); }
                 catch { _displayTimeZone = TimeZoneInfo.Local; }
+                _messageTimeTextCache.Clear();
             }
             catch (Exception ex)
             {
@@ -273,7 +295,10 @@ public partial class Home : IAsyncDisposable
 
             // 启动 SignalR 连接
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"))
+                .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"), options =>
+                {
+                    options.AccessTokenProvider = ResolveHubAccessTokenAsync;
+                })
                 .WithAutomaticReconnect()
                 .Build();
 
@@ -290,7 +315,7 @@ public partial class Home : IAsyncDisposable
                     if (existingIndex >= 0)
                     {
                         _messages[existingIndex] = dto;
-                        StateHasChanged();
+                        RequestRender();
                         return;
                     }
 
@@ -298,9 +323,22 @@ public partial class Home : IAsyncDisposable
                     // 仅当用户处于底部附近时才触发自动滚动（避免打断用户翻阅历史记录）
                     if (_messageIds.Add(dto.Id))
                     {
+                        var matchedPending = _pendingUploads.FirstOrDefault(p => p.IsRemote && p.Matches(dto));
+                        if (matchedPending is not null)
+                        {
+                            _pendingUploads.Remove(matchedPending);
+                        }
+
                         _messages.Add(dto);
-                        _shouldScrollIfNearBottom = true;
-                        StateHasChanged();
+                        if (_isAtBottom)
+                        {
+                            RequestScrollToBottomIfAtBottom();
+                        }
+                        else
+                        {
+                            TrackUnreadMessage(dto.Id);
+                        }
+                        RequestRender();
                     }
                 });
             });
@@ -310,21 +348,73 @@ public partial class Home : IAsyncDisposable
             {
                 return InvokeAsync(() =>
                 {
-                    var changed = false;
-                    foreach (var id in deletedIds)
+                    if (deletedIds.Count == 0)
                     {
-                        if (_messageIds.Remove(id))
-                        {
-                            _messages.RemoveAll(m => m.Id == id);
-                            _selectedMessageIds.Remove(id);
-                            changed = true;
-                        }
+                        return;
+                    }
+
+                    var changed = false;
+                    // deletedIds 可能包含重复项（网络重放/多源合并），先转 HashSet 避免重复扫描与重复移除。
+                    var deletedIdSet = new HashSet<Guid>(deletedIds);
+                    foreach (var id in deletedIdSet)
+                    {
+                        changed |= _messageIds.Remove(id);
+                        _selectedMessageIds.Remove(id);
                     }
 
                     if (changed)
                     {
-                        StateHasChanged();
+                        _messages.RemoveAll(m => deletedIdSet.Contains(m.Id));
                     }
+
+                    if (changed)
+                    {
+                        RequestRender();
+                    }
+                });
+            });
+
+            _hubConnection.On<UploadPendingSignal>("ReceiveUploadPending", signal =>
+            {
+                return InvokeAsync(() =>
+                {
+                    if (!_selectedTopicId.HasValue || signal.TopicId != _selectedTopicId.Value)
+                    {
+                        return;
+                    }
+
+                    if (_pendingUploads.Any(p => p.TempId == signal.TempId))
+                    {
+                        return;
+                    }
+
+                    var pending = PendingUpload.FromRemoteSignal(signal);
+                    _pendingUploads.Add(pending);
+                    if (_isAtBottom)
+                    {
+                        RequestScrollToBottomIfAtBottom();
+                    }
+                    RequestRender();
+                });
+            });
+
+            _hubConnection.On<string, Guid>("RemoveUploadPending", (tempId, topicId) =>
+            {
+                return InvokeAsync(() =>
+                {
+                    if (!_selectedTopicId.HasValue || topicId != _selectedTopicId.Value)
+                    {
+                        return;
+                    }
+
+                    var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && p.TopicId == topicId);
+                    if (pending is null)
+                    {
+                        return;
+                    }
+
+                    _pendingUploads.Remove(pending);
+                    RequestRender();
                 });
             });
 
@@ -388,6 +478,7 @@ public partial class Home : IAsyncDisposable
             // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示；
             // showSkeleton=false 避免清空现有列表并显示骨架屏
             await LoadSelectedTopicMessagesAsync(showSkeleton: false);
+            RequestScrollToBottom();
         }
         finally
         {
@@ -611,7 +702,7 @@ public partial class Home : IAsyncDisposable
     [JSInvokable]
     public UploadContext? GetUploadContext()
         => _selectedTopicId.HasValue
-            ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading)
+            ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading, _maxUploadFileSizeBytes)
             : null;
 
     /// <summary>由 JS 调用：用户未选择主题时显示提示。</summary>
@@ -619,21 +710,39 @@ public partial class Home : IAsyncDisposable
     public Task OnNoTopicSelected()
     {
         _validationError = L["Home_SelectTopicFirst"];
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// 由 JS 调用：文件上传开始，立即在 UI 中插入占位气泡。
     /// </summary>
     [JSInvokable]
-    public Task OnFileUploadStarted(string tempId, string fileName, string mimeType, long fileSize)
+    public Task OnFileUploadStarted(string tempId, string topicId, string fileName, string mimeType, long fileSize)
     {
+        if (!Guid.TryParse(topicId, out var uploadTopicId))
+        {
+            Logger.LogDebug("Ignoring upload start with invalid topicId: {TopicId}", topicId);
+            return Task.CompletedTask;
+        }
+
         _validationError = null;
         var contentType = PendingUpload.ResolveContentType(mimeType);
-        var pending = new PendingUpload(tempId, fileName, mimeType, fileSize, contentType);
+        var createdAt = DateTimeOffset.UtcNow;
+        var pending = new PendingUpload(tempId, uploadTopicId, fileName, mimeType, fileSize, contentType, createdAt);
         _pendingUploads.Add(pending);
-        _shouldScrollToBottom = true;
-        return InvokeAsync(StateHasChanged);
+        if (_isAtBottom)
+        {
+            RequestScrollToBottom();
+        }
+
+        _ = BroadcastHubEventAsync(
+            () => ShareHubContext.Clients.All.SendAsync("ReceiveUploadPending",
+                new UploadPendingSignal(tempId, uploadTopicId, fileName, mimeType, fileSize, createdAt)),
+            "ReceiveUploadPending");
+
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -645,10 +754,22 @@ public partial class Home : IAsyncDisposable
         var pending = _pendingUploads.Find(p => p.TempId == tempId);
         if (pending is not null)
         {
+            if (pending.ProgressPercent == percent)
+            {
+                return Task.CompletedTask;
+            }
+
             pending.ProgressPercent = percent;
+
+            // 上传进度回调频率很高，按 5% 粒度触发重绘，降低整页重渲染成本。
+            if (percent < 95 && percent % UploadProgressRenderGranularityPercent != 0)
+            {
+                return Task.CompletedTask;
+            }
         }
 
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -673,9 +794,21 @@ public partial class Home : IAsyncDisposable
                 if (_messageIds.Add(dto.Id))
                 {
                     _messages.Add(dto);
+                    if (_isAtBottom)
+                    {
+                        RequestScrollToBottomIfAtBottom();
+                    }
+                    else
+                    {
+                        TrackUnreadMessage(dto.Id);
+                    }
                 }
 
-                _shouldScrollIfNearBottom = true;
+                var settledTopicId = pending?.TopicId ?? dto.TopicId;
+                _ = BroadcastHubEventAsync(
+                    () => ShareHubContext.Clients.All.SendAsync("RemoveUploadPending", tempId, settledTopicId),
+                    "RemoveUploadPending");
+
             }
             catch (Exception ex)
             {
@@ -684,7 +817,7 @@ public partial class Home : IAsyncDisposable
                 if (pending is not null) pending.IsFailed = true;
             }
 
-            StateHasChanged();
+            RequestRender();
         });
     }
 
@@ -700,12 +833,67 @@ public partial class Home : IAsyncDisposable
             if (pending is not null)
             {
                 pending.IsFailed = true;
+                pending.ErrorMessage = NormalizeUploadError(errorMessage);
             }
 
-            _validationError = (string?)L["Home_FileUploadFailed", pending?.FileName ?? string.Empty];
+            _validationError = pending is null
+                ? (string?)L["Home_DropFileUploadFailed"]
+                : (string?)L["Home_FileUploadFailedWithReason", pending.FileName, pending.ErrorMessage ?? L["Home_UploadFailed"]];
 
-            StateHasChanged();
+            if (pending is not null)
+            {
+                _ = BroadcastHubEventAsync(
+                    () => ShareHubContext.Clients.All.SendAsync("RemoveUploadPending", tempId, pending.TopicId),
+                    "RemoveUploadPending");
+            }
+
+            RequestRender();
         });
+    }
+
+    private async Task RetryPendingUploadAsync(string tempId)
+    {
+        var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && p.IsFailed && !p.IsRemote);
+        if (pending is null)
+        {
+            return;
+        }
+
+        _pendingUploads.Remove(pending);
+        _validationError = null;
+        RequestRender();
+
+        try
+        {
+            if (_dotNetRef is null)
+            {
+                _validationError = L["Home_DropFileUploadFailed"];
+                return;
+            }
+
+            var retried = await JS.InvokeAsync<bool>("AnyDropInterop.retryUpload", tempId, _dotNetRef);
+            if (!retried)
+            {
+                _validationError = (string?)L["Home_FileUploadFailed", pending.FileName];
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Retry upload failed for pending item {TempId}", tempId);
+            _validationError = (string?)L["Home_FileUploadFailed", pending.FileName];
+        }
+    }
+
+    private async Task BroadcastHubEventAsync(Func<Task> broadcastAsync, string eventName)
+    {
+        try
+        {
+            await broadcastAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to broadcast hub event {EventName}.", eventName);
+        }
     }
 
     // ── 拖放覆盖层 ──────────────────────────────────────────────────────────────
@@ -717,19 +905,27 @@ public partial class Home : IAsyncDisposable
     public Task SetDragging(bool isDragging)
     {
         _isDragging = isDragging;
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
     public Task OnMessageListScrollPositionChanged(bool isNearBottom)
     {
-        if (_isNearMessageListBottom == isNearBottom)
+        if (_isAtBottom == isNearBottom)
         {
             return Task.CompletedTask;
         }
 
-        _isNearMessageListBottom = isNearBottom;
-        return InvokeAsync(StateHasChanged);
+        var wasAtBottom = _isAtBottom;
+        _isAtBottom = isNearBottom;
+        if (!wasAtBottom && _isAtBottom)
+        {
+            ResetUnreadMessages();
+        }
+
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>切换阅后即焚模式。</summary>
@@ -814,7 +1010,10 @@ public partial class Home : IAsyncDisposable
             }
 
             ExitSelectMode();
-            _shouldScrollIfNearBottom = true;
+            if (_isAtBottom)
+            {
+                RequestScrollToBottomIfAtBottom();
+            }
         }
         catch (Exception ex)
         {
@@ -914,11 +1113,35 @@ public partial class Home : IAsyncDisposable
         _expandedVideoIds.Add(messageId);
     }
 
-    private async Task ScrollToLatestAsync()
+    private async Task ScrollToFirstUnreadAsync()
     {
-        _shouldScrollToBottom = true;
-        _isNearMessageListBottom = true;
-        await InvokeAsync(StateHasChanged);
+        if (!_firstUnreadMessageId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.scrollToMessage", _firstUnreadMessageId.Value.ToString());
+            ResetUnreadMessages();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogDebug("JS interop disconnected during scrollToFirstUnread.");
+        }
+        catch (TaskCanceledException)
+        {
+            Logger.LogDebug("scrollToFirstUnread was cancelled.");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Logger.LogDebug(ex, "JS runtime disposed during scrollToFirstUnread.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop not available during scrollToFirstUnread.");
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -928,6 +1151,7 @@ public partial class Home : IAsyncDisposable
         {
             await JS.InvokeVoidAsync("AnyDropInterop.cleanupDropZone", _chatSectionRef);
             await JS.InvokeVoidAsync("AnyDropInterop.cleanupMessageScrollObserver", _messageListRef);
+            await JS.InvokeVoidAsync("AnyDropInterop.cleanupUploadCache");
         }
         catch (JSDisconnectedException)
         {
@@ -972,14 +1196,35 @@ public partial class Home : IAsyncDisposable
 
     private async Task StartPollingAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        if (await StopPollingIfRealtimeRestoredAsync(ct))
+        {
+            return;
+        }
+
+        var changed = await PollNewMessagesAsync(ct);
+        if (changed)
+        {
+            RequestRender();
+        }
+
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(PollingDelayMs));
         while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
-            if (_selectedTopicId.HasValue)
+            if (await StopPollingIfRealtimeRestoredAsync(ct))
             {
-                // 使用增量轮询：仅追加新消息，不清空列表，避免强制滚动到底部打断用户翻阅
-                await PollNewMessagesAsync(ct);
-                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (!_selectedTopicId.HasValue)
+            {
+                continue;
+            }
+
+            // 使用增量轮询：仅追加新消息，不清空列表，避免强制滚动到底部打断用户翻阅
+            changed = await PollNewMessagesAsync(ct);
+            if (changed)
+            {
+                RequestRender();
             }
         }
     }
@@ -988,33 +1233,146 @@ public partial class Home : IAsyncDisposable
     /// 增量轮询：查询最新一批消息，仅追加尚未显示的新条目，并在用户处于底部附近时
     /// 触发条件滚动。不清空已有消息列表，不强制滚到底部，避免打断用户翻阅历史。
     /// </summary>
-    private async Task PollNewMessagesAsync(CancellationToken ct = default)
+    private async Task<bool> PollNewMessagesAsync(CancellationToken ct = default)
     {
-        if (!_selectedTopicId.HasValue) return;
+        if (!_selectedTopicId.HasValue) return false;
 
         var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
-        if (response is null) return;
+        if (response is null) return false;
 
         var hasNew = false;
+        var hasUpdated = false;
         foreach (var msg in response.Messages.Reverse())
         {
             if (_messageIds.Add(msg.Id))
             {
                 _messages.Add(msg);
                 hasNew = true;
+                if (!_isAtBottom)
+                {
+                    TrackUnreadMessage(msg.Id);
+                }
             }
             else
             {
                 // 就地更新已有消息（例如链接元数据后台刷新）
                 var idx = _messages.FindIndex(m => m.Id == msg.Id);
-                if (idx >= 0) _messages[idx] = msg;
+                if (idx >= 0)
+                {
+                    _messages[idx] = msg;
+                    hasUpdated = true;
+                }
             }
         }
 
         if (hasNew)
         {
-            // 仅当用户处于底部附近时才滚动，不强制跳转
-            _shouldScrollIfNearBottom = true;
+            if (_isAtBottom)
+            {
+                RequestScrollToBottomIfAtBottom();
+            }
+        }
+
+        return hasNew || hasUpdated;
+    }
+
+    /// <summary>
+    /// 若轮询期间已恢复 Hub 实时连接，则先补拉一次增量消息并结束轮询。
+    /// </summary>
+    private async Task<bool> StopPollingIfRealtimeRestoredAsync(CancellationToken ct)
+    {
+        if (!await TryRestoreHubRealtimeFromPollingAsync(ct))
+        {
+            return false;
+        }
+
+        var changedAfterReconnect = await PollNewMessagesAsync(ct);
+        if (changedAfterReconnect)
+        {
+            RequestRender();
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 轮询兜底期间周期性尝试恢复 Hub 实时连接，恢复成功后停止轮询，避免长期停留在轮询模式。
+    /// </summary>
+    private async Task<bool> TryRestoreHubRealtimeFromPollingAsync(CancellationToken ct)
+    {
+        if (_hubConnection is null || ct.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        if (_hubConnection.State == HubConnectionState.Connected)
+        {
+            return true;
+        }
+
+        if (_hubConnection.State != HubConnectionState.Disconnected)
+        {
+            return false;
+        }
+
+        var nowTicks = DateTimeOffset.UtcNow.UtcTicks;
+        var lastAttemptTicks = Interlocked.Read(ref _lastPollingHubReconnectAttemptTicks);
+        if ((nowTicks - lastAttemptTicks) < TimeSpan.FromMilliseconds(PollingHubReconnectIntervalMs).Ticks)
+        {
+            return false;
+        }
+
+        if (Interlocked.CompareExchange(ref _lastPollingHubReconnectAttemptTicks, nowTicks, lastAttemptTicks) != lastAttemptTicks)
+        {
+            return false;
+        }
+
+        try
+        {
+            await _hubConnection.StartAsync(ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Polling fallback failed to restore ShareHub realtime connection.");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 为服务器端 HubConnection 提供 JWT，避免仅依赖浏览器 Cookie 导致协商失败。
+    /// </summary>
+    private async Task<string?> ResolveHubAccessTokenAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var principal = authState.User;
+            if (principal.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            var subject = principal.FindFirst("sub")?.Value
+                          ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(subject, out var userId))
+            {
+                return null;
+            }
+
+            var user = await UserService.GetByIdAsync(userId);
+            if (user is null)
+            {
+                return null;
+            }
+
+            var (accessToken, _) = TokenService.GenerateToken(user);
+            return accessToken;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to resolve ShareHub access token in Home.");
+            return null;
         }
     }
 
@@ -1026,6 +1384,7 @@ public partial class Home : IAsyncDisposable
             _messages.Clear();
             _messageIds.Clear();
             _expandedVideoIds.Clear();
+            _messageTimeTextCache.Clear();
         }
 
         if (!_selectedTopicId.HasValue)
@@ -1058,7 +1417,8 @@ public partial class Home : IAsyncDisposable
                 }
             }
 
-            _shouldScrollToBottom = true;
+            ResetUnreadMessages();
+            _isAtBottom = true;
         }
         finally
         {
@@ -1098,6 +1458,67 @@ public partial class Home : IAsyncDisposable
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
 
+    /// <summary>
+    /// 请求在下一次渲染后无条件滚动到底部。
+    /// </summary>
+    private void RequestScrollToBottom()
+    {
+        _pendingScrollAction = PendingScrollAction.ToBottom;
+    }
+
+    /// <summary>
+    /// 请求在下一次渲染后执行“仅在底部时滚动”。
+    /// 若已存在无条件滚动请求，则保持原请求优先级不被降级。
+    /// </summary>
+    private void RequestScrollToBottomIfAtBottom()
+    {
+        if (_pendingScrollAction is PendingScrollAction.ToBottom)
+        {
+            return;
+        }
+
+        _pendingScrollAction = PendingScrollAction.ToBottomIfAtBottom;
+    }
+
+    /// <summary>
+    /// 累积未读消息计数，并在首次累积时记录首条未读消息 ID。
+    /// </summary>
+    private void TrackUnreadMessage(Guid messageId)
+    {
+        _unreadMessageCount++;
+        _firstUnreadMessageId ??= messageId;
+    }
+
+    /// <summary>
+    /// 清空未读计数与首条未读消息锚点。
+    /// </summary>
+    private void ResetUnreadMessages()
+    {
+        _unreadMessageCount = 0;
+        _firstUnreadMessageId = null;
+    }
+
+    /// <summary>
+    /// 合并同一批次内的重复渲染请求，降低高频回调触发的整页重渲染次数。
+    /// </summary>
+    private void RequestRender()
+    {
+        if (Interlocked.CompareExchange(ref _renderScheduled, 1, 0) == 1)
+        {
+            return;
+        }
+
+        var renderTask = InvokeAsync(() =>
+        {
+            Interlocked.Exchange(ref _renderScheduled, 0);
+            StateHasChanged();
+        });
+        _ = renderTask.ContinueWith(t =>
+        {
+            Logger.LogDebug(t.Exception, "RequestRender invoke failed.");
+        }, TaskContinuationOptions.OnlyOnFaulted);
+    }
+
     private static string GetThumbnailUrl(Guid itemId) => $"/api/v1/share-items/{itemId}/thumbnail";
 
     /// <summary>将字节数格式化为人类可读的大小字符串。</summary>
@@ -1115,8 +1536,20 @@ public partial class Home : IAsyncDisposable
     /// <summary>将消息时间格式化为「日期 + 时间」字符串（使用浏览器时区）。</summary>
     private string FormatMessageTime(DateTimeOffset time)
     {
+        var key = time.UtcTicks;
+        if (_messageTimeTextCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
         var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
-        return local.ToString("yyyy/MM/dd HH:mm");
+        var text = local.ToString("yyyy/MM/dd HH:mm");
+        if (_messageTimeTextCache.Count >= MessageTimeCacheMaxEntries)
+        {
+            _messageTimeTextCache.Clear();
+        }
+        _messageTimeTextCache[key] = text;
+        return text;
     }
 
     /// <summary>将阅后即焚到期时间格式化为倒计时或已到期标记。</summary>
@@ -1141,20 +1574,116 @@ public partial class Home : IAsyncDisposable
         _ => "attach_file"
     };
 
+    private string NormalizeUploadError(string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return L["Home_UploadFailed"];
+        }
+
+        if (errorMessage.StartsWith("FILE_TOO_LARGE:", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadFileTooLarge", FormatFileSize(_maxUploadFileSizeBytes)];
+        }
+
+        if (errorMessage.Contains("413", StringComparison.OrdinalIgnoreCase)
+            || errorMessage.Contains("Payload Too Large", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadFileTooLarge", FormatFileSize(_maxUploadFileSizeBytes)];
+        }
+
+        return errorMessage;
+    }
+
+    private IReadOnlyList<ChatTimelineEntry> BuildTimelineEntries()
+    {
+        if (!_selectedTopicId.HasValue)
+        {
+            return [];
+        }
+
+        var topicId = _selectedTopicId.Value;
+        var topicPending = _pendingUploads.Where(p => p.TopicId == topicId).ToList();
+
+        // 热路径优化：绝大多数渲染（纯文本/无上传占位）不需要排序，避免每次重绘都做 O(n log n) 排序。
+        if (topicPending.Count == 0)
+        {
+            var messageOnly = new List<ChatTimelineEntry>(_messages.Count);
+            for (var i = 0; i < _messages.Count; i++)
+            {
+                messageOnly.Add(ChatTimelineEntry.FromMessage(_messages[i]));
+            }
+
+            return messageOnly;
+        }
+
+        var timeline = new List<ChatTimelineEntry>(_messages.Count + topicPending.Count);
+        timeline.AddRange(_messages.Select(ChatTimelineEntry.FromMessage));
+        timeline.AddRange(topicPending.Select(ChatTimelineEntry.FromPending));
+
+        timeline.Sort(static (left, right) =>
+        {
+            var createdAtComparison = left.CreatedAt.CompareTo(right.CreatedAt);
+            if (createdAtComparison != 0)
+            {
+                return createdAtComparison;
+            }
+
+            return left.SortOrder.CompareTo(right.SortOrder);
+        });
+
+        return timeline;
+    }
+
     /// <summary>JS 上传时传递给 HTTP 端点的上下文信息。</summary>
-    public sealed record UploadContext(string TopicId, bool BurnAfterReading);
+    public sealed record UploadContext(string TopicId, bool BurnAfterReading, long MaxFileSizeBytes);
+
+    private sealed record ChatTimelineEntry(DateTimeOffset CreatedAt, int SortOrder, ShareItemDto? Message, PendingUpload? Pending)
+    {
+        public static ChatTimelineEntry FromMessage(ShareItemDto message) => new(message.CreatedAt, 1, message, null);
+        public static ChatTimelineEntry FromPending(PendingUpload pending) => new(pending.CreatedAt, 0, null, pending);
+    }
 
     /// <summary>待上传占位条目，跟踪单个文件的上传进度与状态。</summary>
-    private sealed class PendingUpload(string tempId, string fileName, string mimeType, long fileSize, ShareContentType contentType)
+    private sealed class PendingUpload(
+        string tempId,
+        Guid topicId,
+        string fileName,
+        string mimeType,
+        long fileSize,
+        ShareContentType contentType,
+        DateTimeOffset createdAt,
+        bool isRemote = false)
     {
         /// <summary>与 JS 端约定的临时 ID（crypto.randomUUID() 生成），用于关联进度回调。</summary>
         public string TempId { get; } = tempId;
+        public Guid TopicId { get; } = topicId;
         public string FileName { get; } = fileName;
         public string MimeType { get; } = mimeType;
         public long FileSize { get; } = fileSize;
         public ShareContentType ContentType { get; } = contentType;
+        public DateTimeOffset CreatedAt { get; } = createdAt;
+        public bool IsRemote { get; } = isRemote;
         public int ProgressPercent { get; set; }
         public bool IsFailed { get; set; }
+        public string? ErrorMessage { get; set; }
+
+        public bool Matches(ShareItemDto dto)
+            => dto.TopicId == TopicId
+               && dto.ContentType == ContentType
+               && string.Equals(dto.FileName, FileName, StringComparison.Ordinal)
+               && dto.FileSize.HasValue
+               && dto.FileSize.Value == FileSize;
+
+        public static PendingUpload FromRemoteSignal(UploadPendingSignal signal)
+            => new(signal.TempId,
+                signal.TopicId,
+                signal.FileName,
+                signal.MimeType,
+                signal.FileSize,
+                ResolveContentType(signal.MimeType),
+                signal.CreatedAt,
+                isRemote: true);
 
         public static ShareContentType ResolveContentType(string mime)
         {
