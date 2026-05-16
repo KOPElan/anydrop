@@ -18,6 +18,8 @@ public partial class Home : IAsyncDisposable
     private const int HubInitialDelayMs = 100;
     private const int HubRetryDelayMs = 200;
     private const int MaxHubConnectionAttempts = 2;
+    private const int PollingIntervalMs = 1_000;
+    private const int PollingHubReconnectIntervalMs = 3_000;
     private const int MessageTimeCacheMaxEntries = 2_000;
 
     [Inject] public required IShareService ShareService { get; set; }
@@ -55,6 +57,8 @@ public partial class Home : IAsyncDisposable
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
     private readonly Dictionary<long, string> _messageTimeTextCache = [];
+    private bool _renderScheduled;
+    private DateTimeOffset _lastPollingHubReconnectAttempt = DateTimeOffset.MinValue;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -298,7 +302,7 @@ public partial class Home : IAsyncDisposable
                     if (existingIndex >= 0)
                     {
                         _messages[existingIndex] = dto;
-                        StateHasChanged();
+                        RequestRender();
                         return;
                     }
 
@@ -321,7 +325,7 @@ public partial class Home : IAsyncDisposable
                         {
                             TrackUnreadMessage(dto.Id);
                         }
-                        StateHasChanged();
+                        RequestRender();
                     }
                 });
             });
@@ -352,7 +356,7 @@ public partial class Home : IAsyncDisposable
 
                     if (changed)
                     {
-                        StateHasChanged();
+                        RequestRender();
                     }
                 });
             });
@@ -377,7 +381,7 @@ public partial class Home : IAsyncDisposable
                     {
                         RequestScrollToBottomIfAtBottom();
                     }
-                    StateHasChanged();
+                    RequestRender();
                 });
             });
 
@@ -397,7 +401,7 @@ public partial class Home : IAsyncDisposable
                     }
 
                     _pendingUploads.Remove(pending);
-                    StateHasChanged();
+                    RequestRender();
                 });
             });
 
@@ -693,7 +697,8 @@ public partial class Home : IAsyncDisposable
     public Task OnNoTopicSelected()
     {
         _validationError = L["Home_SelectTopicFirst"];
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -723,7 +728,8 @@ public partial class Home : IAsyncDisposable
                 new UploadPendingSignal(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, createdAt));
         }
 
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -735,10 +741,22 @@ public partial class Home : IAsyncDisposable
         var pending = _pendingUploads.Find(p => p.TempId == tempId);
         if (pending is not null)
         {
+            if (pending.ProgressPercent == percent)
+            {
+                return Task.CompletedTask;
+            }
+
             pending.ProgressPercent = percent;
+
+            // 上传进度回调频率很高，按 5% 粒度触发重绘，降低整页重渲染成本。
+            if (percent < 100 && percent % 5 != 0)
+            {
+                return Task.CompletedTask;
+            }
         }
 
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -786,7 +804,7 @@ public partial class Home : IAsyncDisposable
                 if (pending is not null) pending.IsFailed = true;
             }
 
-            StateHasChanged();
+            RequestRender();
         });
     }
 
@@ -814,7 +832,7 @@ public partial class Home : IAsyncDisposable
                 _ = _hubConnection.SendAsync("NotifyUploadSettled", tempId, _selectedTopicId.Value);
             }
 
-            StateHasChanged();
+            RequestRender();
         });
     }
 
@@ -828,7 +846,7 @@ public partial class Home : IAsyncDisposable
 
         _pendingUploads.Remove(pending);
         _validationError = null;
-        StateHasChanged();
+        RequestRender();
 
         try
         {
@@ -860,7 +878,8 @@ public partial class Home : IAsyncDisposable
     public Task SetDragging(bool isDragging)
     {
         _isDragging = isDragging;
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
@@ -878,7 +897,8 @@ public partial class Home : IAsyncDisposable
             ResetUnreadMessages();
         }
 
-        return InvokeAsync(StateHasChanged);
+        RequestRender();
+        return Task.CompletedTask;
     }
 
     /// <summary>切换阅后即焚模式。</summary>
@@ -1149,14 +1169,35 @@ public partial class Home : IAsyncDisposable
 
     private async Task StartPollingAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        if (await TryRestoreHubRealtimeFromPollingAsync(ct))
+        {
+            return;
+        }
+
+        var changed = await PollNewMessagesAsync(ct);
+        if (changed)
+        {
+            RequestRender();
+        }
+
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(PollingIntervalMs));
         while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
-            if (_selectedTopicId.HasValue)
+            if (await TryRestoreHubRealtimeFromPollingAsync(ct))
             {
-                // 使用增量轮询：仅追加新消息，不清空列表，避免强制滚动到底部打断用户翻阅
-                await PollNewMessagesAsync(ct);
-                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            if (!_selectedTopicId.HasValue)
+            {
+                continue;
+            }
+
+            // 使用增量轮询：仅追加新消息，不清空列表，避免强制滚动到底部打断用户翻阅
+            changed = await PollNewMessagesAsync(ct);
+            if (changed)
+            {
+                RequestRender();
             }
         }
     }
@@ -1165,14 +1206,15 @@ public partial class Home : IAsyncDisposable
     /// 增量轮询：查询最新一批消息，仅追加尚未显示的新条目，并在用户处于底部附近时
     /// 触发条件滚动。不清空已有消息列表，不强制滚到底部，避免打断用户翻阅历史。
     /// </summary>
-    private async Task PollNewMessagesAsync(CancellationToken ct = default)
+    private async Task<bool> PollNewMessagesAsync(CancellationToken ct = default)
     {
-        if (!_selectedTopicId.HasValue) return;
+        if (!_selectedTopicId.HasValue) return false;
 
         var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
-        if (response is null) return;
+        if (response is null) return false;
 
         var hasNew = false;
+        var hasUpdated = false;
         foreach (var msg in response.Messages.Reverse())
         {
             if (_messageIds.Add(msg.Id))
@@ -1188,7 +1230,11 @@ public partial class Home : IAsyncDisposable
             {
                 // 就地更新已有消息（例如链接元数据后台刷新）
                 var idx = _messages.FindIndex(m => m.Id == msg.Id);
-                if (idx >= 0) _messages[idx] = msg;
+                if (idx >= 0)
+                {
+                    _messages[idx] = msg;
+                    hasUpdated = true;
+                }
             }
         }
 
@@ -1198,6 +1244,48 @@ public partial class Home : IAsyncDisposable
             {
                 RequestScrollToBottomIfAtBottom();
             }
+        }
+
+        return hasNew || hasUpdated;
+    }
+
+    /// <summary>
+    /// 轮询兜底期间周期性尝试恢复 Hub 实时连接，恢复成功后停止轮询，避免长期停留在轮询模式。
+    /// </summary>
+    private async Task<bool> TryRestoreHubRealtimeFromPollingAsync(CancellationToken ct)
+    {
+        if (_hubConnection is null || ct.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        if (_hubConnection.State == HubConnectionState.Connected)
+        {
+            return true;
+        }
+
+        if (_hubConnection.State != HubConnectionState.Disconnected)
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if ((now - _lastPollingHubReconnectAttempt).TotalMilliseconds < PollingHubReconnectIntervalMs)
+        {
+            return false;
+        }
+
+        _lastPollingHubReconnectAttempt = now;
+
+        try
+        {
+            await _hubConnection.StartAsync(ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Polling fallback failed to restore ShareHub realtime connection.");
+            return false;
         }
     }
 
@@ -1321,6 +1409,24 @@ public partial class Home : IAsyncDisposable
     {
         _unreadMessageCount = 0;
         _firstUnreadMessageId = null;
+    }
+
+    /// <summary>
+    /// 合并同一批次内的重复渲染请求，降低高频回调触发的整页重渲染次数。
+    /// </summary>
+    private void RequestRender()
+    {
+        if (_renderScheduled)
+        {
+            return;
+        }
+
+        _renderScheduled = true;
+        _ = InvokeAsync(() =>
+        {
+            _renderScheduled = false;
+            StateHasChanged();
+        });
     }
 
     private static string GetThumbnailUrl(Guid itemId) => $"/api/v1/share-items/{itemId}/thumbnail";
