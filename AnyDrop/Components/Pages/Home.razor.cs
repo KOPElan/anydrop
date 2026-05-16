@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
 using System.Text.Json;
+using System.Threading;
 
 namespace AnyDrop.Components.Pages;
 
@@ -18,9 +19,10 @@ public partial class Home : IAsyncDisposable
     private const int HubInitialDelayMs = 100;
     private const int HubRetryDelayMs = 200;
     private const int MaxHubConnectionAttempts = 2;
-    private const int PollingIntervalMs = 1_000;
+    private const int PollingDelayMs = 1_000;
     private const int PollingHubReconnectIntervalMs = 3_000;
     private const int MessageTimeCacheMaxEntries = 2_000;
+    private const int UploadProgressRenderGranularityPercent = 5;
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
@@ -57,8 +59,8 @@ public partial class Home : IAsyncDisposable
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
     private readonly Dictionary<long, string> _messageTimeTextCache = [];
-    private bool _renderScheduled;
-    private DateTimeOffset _lastPollingHubReconnectAttempt = DateTimeOffset.MinValue;
+    private int _renderScheduled;
+    private long _lastPollingHubReconnectAttemptTicks = DateTimeOffset.MinValue.UtcTicks;
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -749,7 +751,7 @@ public partial class Home : IAsyncDisposable
             pending.ProgressPercent = percent;
 
             // 上传进度回调频率很高，按 5% 粒度触发重绘，降低整页重渲染成本。
-            if (percent < 100 && percent % 5 != 0)
+            if (percent < 95 && percent % UploadProgressRenderGranularityPercent != 0)
             {
                 return Task.CompletedTask;
             }
@@ -1169,7 +1171,7 @@ public partial class Home : IAsyncDisposable
 
     private async Task StartPollingAsync(CancellationToken ct)
     {
-        if (await TryRestoreHubRealtimeFromPollingAsync(ct))
+        if (await StopPollingIfRealtimeRestoredAsync(ct))
         {
             return;
         }
@@ -1180,10 +1182,10 @@ public partial class Home : IAsyncDisposable
             RequestRender();
         }
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(PollingIntervalMs));
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(PollingDelayMs));
         while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
         {
-            if (await TryRestoreHubRealtimeFromPollingAsync(ct))
+            if (await StopPollingIfRealtimeRestoredAsync(ct))
             {
                 return;
             }
@@ -1250,6 +1252,25 @@ public partial class Home : IAsyncDisposable
     }
 
     /// <summary>
+    /// 若轮询期间已恢复 Hub 实时连接，则先补拉一次增量消息并结束轮询。
+    /// </summary>
+    private async Task<bool> StopPollingIfRealtimeRestoredAsync(CancellationToken ct)
+    {
+        if (!await TryRestoreHubRealtimeFromPollingAsync(ct))
+        {
+            return false;
+        }
+
+        var changedAfterReconnect = await PollNewMessagesAsync(ct);
+        if (changedAfterReconnect)
+        {
+            RequestRender();
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// 轮询兜底期间周期性尝试恢复 Hub 实时连接，恢复成功后停止轮询，避免长期停留在轮询模式。
     /// </summary>
     private async Task<bool> TryRestoreHubRealtimeFromPollingAsync(CancellationToken ct)
@@ -1269,13 +1290,17 @@ public partial class Home : IAsyncDisposable
             return false;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        if ((now - _lastPollingHubReconnectAttempt).TotalMilliseconds < PollingHubReconnectIntervalMs)
+        var nowTicks = DateTimeOffset.UtcNow.UtcTicks;
+        var lastAttemptTicks = Interlocked.Read(ref _lastPollingHubReconnectAttemptTicks);
+        if ((nowTicks - lastAttemptTicks) < TimeSpan.FromMilliseconds(PollingHubReconnectIntervalMs).Ticks)
         {
             return false;
         }
 
-        _lastPollingHubReconnectAttempt = now;
+        if (Interlocked.CompareExchange(ref _lastPollingHubReconnectAttemptTicks, nowTicks, lastAttemptTicks) != lastAttemptTicks)
+        {
+            return false;
+        }
 
         try
         {
@@ -1416,17 +1441,20 @@ public partial class Home : IAsyncDisposable
     /// </summary>
     private void RequestRender()
     {
-        if (_renderScheduled)
+        if (Interlocked.CompareExchange(ref _renderScheduled, 1, 0) == 1)
         {
             return;
         }
 
-        _renderScheduled = true;
-        _ = InvokeAsync(() =>
+        var renderTask = InvokeAsync(() =>
         {
-            _renderScheduled = false;
+            Interlocked.Exchange(ref _renderScheduled, 0);
             StateHasChanged();
         });
+        _ = renderTask.ContinueWith(t =>
+        {
+            Logger.LogDebug(t.Exception, "RequestRender invoke failed.");
+        }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private static string GetThumbnailUrl(Guid itemId) => $"/api/v1/share-items/{itemId}/thumbnail";
