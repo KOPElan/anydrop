@@ -3,10 +3,12 @@ using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Localization;
 using Microsoft.JSInterop;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 
@@ -31,6 +33,9 @@ public partial class Home : IAsyncDisposable
     [Inject] public required ILogger<Home> Logger { get; set; }
     [Inject] public required IJSRuntime JS { get; set; }
     [Inject] public required ITopicStateService TopicStateService { get; set; }
+    [Inject] public required AuthenticationStateProvider AuthenticationStateProvider { get; set; }
+    [Inject] public required IUserService UserService { get; set; }
+    [Inject] public required ITokenService TokenService { get; set; }
     [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
     [CascadingParameter] public Guid? SelectedTopicId { get; set; }
     [CascadingParameter(Name = "ToggleMobileSidebar")] public Action? ToggleMobileSidebar { get; set; }
@@ -287,7 +292,10 @@ public partial class Home : IAsyncDisposable
 
             // 启动 SignalR 连接
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"))
+                .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/share"), options =>
+                {
+                    options.AccessTokenProvider = ResolveHubAccessTokenAsync;
+                })
                 .WithAutomaticReconnect()
                 .Build();
 
@@ -1311,6 +1319,43 @@ public partial class Home : IAsyncDisposable
         {
             Logger.LogDebug(ex, "Polling fallback failed to restore ShareHub realtime connection.");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// 为服务器端 HubConnection 提供 JWT，避免仅依赖浏览器 Cookie 导致协商失败。
+    /// </summary>
+    private async Task<string?> ResolveHubAccessTokenAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var principal = authState.User;
+            if (principal.Identity?.IsAuthenticated != true)
+            {
+                return null;
+            }
+
+            var subject = principal.FindFirst("sub")?.Value
+                          ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(subject, out var userId))
+            {
+                return null;
+            }
+
+            var user = await UserService.GetByIdAsync(userId);
+            if (user is null)
+            {
+                return null;
+            }
+
+            var (accessToken, _) = TokenService.GenerateToken(user);
+            return accessToken;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to resolve ShareHub access token in Home.");
+            return null;
         }
     }
 
