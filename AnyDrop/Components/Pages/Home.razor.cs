@@ -14,8 +14,8 @@ namespace AnyDrop.Components.Pages;
 public partial class Home : IAsyncDisposable
 {
     private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
-    private const int HubInitialDelayMs = 300;
-    private const int HubRetryDelayMs = 500;
+    private const int HubInitialDelayMs = 100;
+    private const int HubRetryDelayMs = 200;
     private const int MaxHubConnectionAttempts = 2;
 
     [Inject] public required IShareService ShareService { get; set; }
@@ -52,6 +52,7 @@ public partial class Home : IAsyncDisposable
     // 浏览器时区（IANA），在首次渲染后从 JS 获取；初始值用服务器本地时区减少首帧 UTC 闪烁
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
+    private readonly Dictionary<long, string> _messageTimeTextCache = [];
 
     // 删除确认 Modal 状态
     private bool _showDeleteConfirmModal;
@@ -246,6 +247,7 @@ public partial class Home : IAsyncDisposable
                 _browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
                 try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(_browserTimeZoneId); }
                 catch { _displayTimeZone = TimeZoneInfo.Local; }
+                _messageTimeTextCache.Clear();
             }
             catch (Exception ex)
             {
@@ -327,15 +329,22 @@ public partial class Home : IAsyncDisposable
             {
                 return InvokeAsync(() =>
                 {
-                    var changed = false;
-                    foreach (var id in deletedIds)
+                    if (deletedIds.Count == 0)
                     {
-                        if (_messageIds.Remove(id))
-                        {
-                            _messages.RemoveAll(m => m.Id == id);
-                            _selectedMessageIds.Remove(id);
-                            changed = true;
-                        }
+                        return;
+                    }
+
+                    var changed = false;
+                    var deletedIdSet = new HashSet<Guid>(deletedIds);
+                    foreach (var id in deletedIdSet)
+                    {
+                        changed |= _messageIds.Remove(id);
+                        _selectedMessageIds.Remove(id);
+                    }
+
+                    if (changed)
+                    {
+                        _messages.RemoveAll(m => deletedIdSet.Contains(m.Id));
                     }
 
                     if (changed)
@@ -1196,6 +1205,7 @@ public partial class Home : IAsyncDisposable
             _messages.Clear();
             _messageIds.Clear();
             _expandedVideoIds.Clear();
+            _messageTimeTextCache.Clear();
         }
 
         if (!_selectedTopicId.HasValue)
@@ -1326,8 +1336,16 @@ public partial class Home : IAsyncDisposable
     /// <summary>将消息时间格式化为「日期 + 时间」字符串（使用浏览器时区）。</summary>
     private string FormatMessageTime(DateTimeOffset time)
     {
+        var key = time.UtcTicks;
+        if (_messageTimeTextCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
         var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
-        return local.ToString("yyyy/MM/dd HH:mm");
+        var text = local.ToString("yyyy/MM/dd HH:mm");
+        _messageTimeTextCache[key] = text;
+        return text;
     }
 
     /// <summary>将阅后即焚到期时间格式化为倒计时或已到期标记。</summary>

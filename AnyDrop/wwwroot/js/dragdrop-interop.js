@@ -6,6 +6,22 @@ window.AnyDropInterop = window.AnyDropInterop || {
 const _dropZoneCleanups = new WeakMap();
 const _messageScrollCleanups = new WeakMap();
 const _uploadFileCache = new Map();
+const _uploadFileCacheTtlMs = 10 * 60 * 1000;
+const _uploadFileCacheCleanupIntervalMs = 60 * 1000;
+
+setInterval(() => {
+  if (_uploadFileCache.size === 0) return;
+  const now = Date.now();
+  for (const [tempId, cached] of _uploadFileCache.entries()) {
+    if (!cached || typeof cached.cachedAt !== 'number') {
+      _uploadFileCache.delete(tempId);
+      continue;
+    }
+    if (now - cached.cachedAt > _uploadFileCacheTtlMs) {
+      _uploadFileCache.delete(tempId);
+    }
+  }
+}, _uploadFileCacheCleanupIntervalMs);
 
 /**
  * 通过 XMLHttpRequest 上传文件列表到 /api/v1/files，支持进度报告。
@@ -36,7 +52,7 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
   const tempId = AnyDropInterop._createTempId();
   const mimeType = file.type || 'application/octet-stream';
 
-  _uploadFileCache.set(tempId, { file, context });
+  _uploadFileCache.set(tempId, { file, context, cachedAt: Date.now() });
 
   await dotNetRef.invokeMethodAsync(
     'OnFileUploadStarted',
@@ -293,12 +309,40 @@ AnyDropInterop.cleanupMessageScrollObserver = function (element) {
  * 300ms 是实践中覆盖大多数网络图片首次渲染延迟的经验值（< 100ms 通常不够，> 500ms 用户感知明显）。
  * @param {HTMLElement} element - 需要滚动到底的容器
  */
-AnyDropInterop.scrollToBottom = function (element) {
+AnyDropInterop._scrollElementToBottom = function (element) {
   if (!element) return;
   element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-  // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底
-  const SCROLL_DELAY_MS = 300;
-  setTimeout(() => { if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' }); }, SCROLL_DELAY_MS);
+};
+
+/**
+ * 自适应底部滚动补偿：优先监听图片/视频加载事件进行补偿，避免固定延迟在快慢网络场景下失配。
+ */
+AnyDropInterop._scheduleBottomStabilization = function (element) {
+  if (!element) return;
+  AnyDropInterop._scrollElementToBottom(element);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => AnyDropInterop._scrollElementToBottom(element));
+  });
+
+  const stabilizeScroll = () => AnyDropInterop._scrollElementToBottom(element);
+  const mediaNodes = element.querySelectorAll('img,video');
+  for (const media of mediaNodes) {
+    const tag = media.tagName;
+    const isLoaded = (tag === 'IMG' && media.complete) || (tag === 'VIDEO' && media.readyState >= 2);
+    if (isLoaded) continue;
+
+    media.addEventListener('load', stabilizeScroll, { once: true });
+    media.addEventListener('error', stabilizeScroll, { once: true });
+    media.addEventListener('loadeddata', stabilizeScroll, { once: true });
+  }
+
+  setTimeout(stabilizeScroll, 180);
+  setTimeout(stabilizeScroll, 600);
+};
+
+AnyDropInterop.scrollToBottom = function (element) {
+  AnyDropInterop._scheduleBottomStabilization(element);
 };
 
 /**
@@ -311,9 +355,7 @@ AnyDropInterop.scrollToBottomIfNearBottom = function (element, threshold = 150) 
   if (!element) return;
   const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
   if (distanceFromBottom > threshold) return;
-  element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-  // 延迟补偿：图片等资源加载完成后会撑高容器，需要再次滚到底（同 scrollToBottom 的处理逻辑）
-  setTimeout(() => { if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' }); }, 300);
+  AnyDropInterop._scheduleBottomStabilization(element);
 };
 
 /**
