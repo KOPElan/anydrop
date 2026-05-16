@@ -14,9 +14,11 @@ namespace AnyDrop.Components.Pages;
 public partial class Home : IAsyncDisposable
 {
     private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
+    // 缩短降级等待：降低连接失败到轮询兜底的感知延迟；仍保留一次短重试避免瞬时抖动。
     private const int HubInitialDelayMs = 100;
     private const int HubRetryDelayMs = 200;
     private const int MaxHubConnectionAttempts = 2;
+    private const int MessageTimeCacheMaxEntries = 2_000;
 
     [Inject] public required IShareService ShareService { get; set; }
     [Inject] public required ITopicService TopicService { get; set; }
@@ -335,6 +337,7 @@ public partial class Home : IAsyncDisposable
                     }
 
                     var changed = false;
+                    // deletedIds 可能包含重复项（网络重放/多源合并），先转 HashSet 避免重复扫描与重复移除。
                     var deletedIdSet = new HashSet<Guid>(deletedIds);
                     foreach (var id in deletedIdSet)
                     {
@@ -1101,6 +1104,7 @@ public partial class Home : IAsyncDisposable
         {
             await JS.InvokeVoidAsync("AnyDropInterop.cleanupDropZone", _chatSectionRef);
             await JS.InvokeVoidAsync("AnyDropInterop.cleanupMessageScrollObserver", _messageListRef);
+            await JS.InvokeVoidAsync("AnyDropInterop.cleanupUploadCache");
         }
         catch (JSDisconnectedException)
         {
@@ -1344,6 +1348,10 @@ public partial class Home : IAsyncDisposable
 
         var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
         var text = local.ToString("yyyy/MM/dd HH:mm");
+        if (_messageTimeTextCache.Count >= MessageTimeCacheMaxEntries)
+        {
+            _messageTimeTextCache.Clear();
+        }
         _messageTimeTextCache[key] = text;
         return text;
     }

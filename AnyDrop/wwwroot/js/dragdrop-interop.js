@@ -8,20 +8,63 @@ const _messageScrollCleanups = new WeakMap();
 const _uploadFileCache = new Map();
 const _uploadFileCacheTtlMs = 10 * 60 * 1000;
 const _uploadFileCacheCleanupIntervalMs = 60 * 1000;
+// 快网兜底：覆盖资源很快完成布局但未触发媒体事件的场景
+const _fastNetworkFallbackMs = 180;
+// 慢网兜底：覆盖较慢资源加载完成后的高度变化
+const _slowNetworkFallbackMs = 600;
+let _uploadFileCacheCleanupTimer = null;
 
-setInterval(() => {
-  if (_uploadFileCache.size === 0) return;
-  const now = Date.now();
-  for (const [tempId, cached] of _uploadFileCache.entries()) {
-    if (!cached || typeof cached.cachedAt !== 'number') {
-      _uploadFileCache.delete(tempId);
-      continue;
+function _startUploadFileCacheCleanup() {
+  if (_uploadFileCacheCleanupTimer) return;
+  _uploadFileCacheCleanupTimer = setInterval(() => {
+    if (_uploadFileCache.size === 0) {
+      clearInterval(_uploadFileCacheCleanupTimer);
+      _uploadFileCacheCleanupTimer = null;
+      return;
     }
-    if (now - cached.cachedAt > _uploadFileCacheTtlMs) {
-      _uploadFileCache.delete(tempId);
+
+    const now = Date.now();
+    for (const [tempId, cached] of _uploadFileCache.entries()) {
+      if (!cached || typeof cached.cachedAt !== 'number') {
+        _uploadFileCache.delete(tempId);
+        continue;
+      }
+      if (now - cached.cachedAt > _uploadFileCacheTtlMs) {
+        _uploadFileCache.delete(tempId);
+      }
     }
+  }, _uploadFileCacheCleanupIntervalMs);
+}
+
+function _trackUploadCacheEntry(tempId, file, context) {
+  _uploadFileCache.set(tempId, { file, context, cachedAt: Date.now() });
+  _startUploadFileCacheCleanup();
+}
+
+AnyDropInterop.cleanupUploadCache = function () {
+  _uploadFileCache.clear();
+  if (_uploadFileCacheCleanupTimer) {
+    clearInterval(_uploadFileCacheCleanupTimer);
+    _uploadFileCacheCleanupTimer = null;
   }
-}, _uploadFileCacheCleanupIntervalMs);
+};
+
+AnyDropInterop._markMediaObserved = function (media) {
+  if (!media || media.dataset.anydropObserved === '1') return false;
+  media.dataset.anydropObserved = '1';
+  return true;
+};
+
+AnyDropInterop._cleanupObservedMediaMarks = function (element) {
+  if (!element) return;
+  const observedMediaNodes = element.querySelectorAll('img[data-anydrop-observed="1"],video[data-anydrop-observed="1"]');
+  const maxObservedNodes = 200;
+  if (observedMediaNodes.length <= maxObservedNodes) return;
+  const clearCount = observedMediaNodes.length - maxObservedNodes;
+  for (let i = 0; i < clearCount; i++) {
+    delete observedMediaNodes[i].dataset.anydropObserved;
+  }
+};
 
 /**
  * 通过 XMLHttpRequest 上传文件列表到 /api/v1/files，支持进度报告。
@@ -52,7 +95,7 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
   const tempId = AnyDropInterop._createTempId();
   const mimeType = file.type || 'application/octet-stream';
 
-  _uploadFileCache.set(tempId, { file, context, cachedAt: Date.now() });
+  _trackUploadCacheEntry(tempId, file, context);
 
   await dotNetRef.invokeMethodAsync(
     'OnFileUploadStarted',
@@ -328,6 +371,7 @@ AnyDropInterop._scheduleBottomStabilization = function (element) {
   const stabilizeScroll = () => AnyDropInterop._scrollElementToBottom(element);
   const mediaNodes = element.querySelectorAll('img,video');
   for (const media of mediaNodes) {
+    if (!AnyDropInterop._markMediaObserved(media)) continue;
     const tag = media.tagName;
     const isLoaded = (tag === 'IMG' && media.complete) || (tag === 'VIDEO' && media.readyState >= 2);
     if (isLoaded) continue;
@@ -337,8 +381,9 @@ AnyDropInterop._scheduleBottomStabilization = function (element) {
     media.addEventListener('loadeddata', stabilizeScroll, { once: true });
   }
 
-  setTimeout(stabilizeScroll, 180);
-  setTimeout(stabilizeScroll, 600);
+  setTimeout(stabilizeScroll, _fastNetworkFallbackMs);
+  setTimeout(stabilizeScroll, _slowNetworkFallbackMs);
+  AnyDropInterop._cleanupObservedMediaMarks(element);
 };
 
 AnyDropInterop.scrollToBottom = function (element) {
