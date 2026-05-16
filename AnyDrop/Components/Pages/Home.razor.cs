@@ -113,10 +113,16 @@ public partial class Home : IAsyncDisposable
     private Guid? _firstUnreadMessageId;
     private long _maxUploadFileSizeBytes = DefaultMaxFileSizeBytes;
 
+    /// <summary>
+    /// 表示下一次渲染时需要执行的滚动动作。
+    /// </summary>
     private enum PendingScrollAction
     {
+        /// <summary>无待执行滚动动作。</summary>
         None = 0,
+        /// <summary>下一次渲染后无条件滚动到底部。</summary>
         ToBottom = 1,
+        /// <summary>下一次渲染后仅在用户仍位于底部时滚动到底部。</summary>
         ToBottomIfAtBottom = 2
     }
 
@@ -1263,11 +1269,18 @@ public partial class Home : IAsyncDisposable
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
 
+    /// <summary>
+    /// 请求在下一次渲染后无条件滚动到底部。
+    /// </summary>
     private void RequestScrollToBottom()
     {
         _pendingScrollAction = PendingScrollAction.ToBottom;
     }
 
+    /// <summary>
+    /// 请求在下一次渲染后执行“仅在底部时滚动”。
+    /// 若已存在无条件滚动请求，则保持原请求优先级不被降级。
+    /// </summary>
     private void RequestScrollToBottomIfAtBottom()
     {
         if (_pendingScrollAction is PendingScrollAction.ToBottom)
@@ -1278,12 +1291,18 @@ public partial class Home : IAsyncDisposable
         _pendingScrollAction = PendingScrollAction.ToBottomIfAtBottom;
     }
 
+    /// <summary>
+    /// 累积未读消息计数，并在首次累积时记录首条未读消息 ID。
+    /// </summary>
     private void TrackUnreadMessage(Guid messageId)
     {
         _unreadMessageCount++;
         _firstUnreadMessageId ??= messageId;
     }
 
+    /// <summary>
+    /// 清空未读计数与首条未读消息锚点。
+    /// </summary>
     private void ResetUnreadMessages()
     {
         _unreadMessageCount = 0;
