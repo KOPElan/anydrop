@@ -237,6 +237,7 @@
   <data name="Home_MobileSendTitle"><value>傳送訊息</value></data>
   <data name="Home_MobileSendPlaceholder"><value>輸入訊息內容…</value></data>
   <data name="Home_BackToLatest"><value>回到最新訊息</value></data>
+  <data name="Home_NewMessages"><value>{0} 條新訊息</value></data>
 
   <!-- 縮圖設定 -->
   <data name="Settings_ThumbnailGeneration"><value>縮圖與預覽圖</value></data>

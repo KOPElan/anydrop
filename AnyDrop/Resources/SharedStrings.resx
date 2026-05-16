@@ -247,6 +247,7 @@
   <data name="Home_MobileSendTitle"><value>发送消息</value></data>
   <data name="Home_MobileSendPlaceholder"><value>输入消息内容…</value></data>
   <data name="Home_BackToLatest"><value>回到最新消息</value></data>
+  <data name="Home_NewMessages"><value>{0} 条新消息</value></data>
 
   <!-- 缩略图设置 / Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>缩略图与预览图</value></data>

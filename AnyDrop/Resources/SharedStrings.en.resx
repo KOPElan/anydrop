@@ -245,6 +245,7 @@
   <data name="Home_MobileSendTitle"><value>Send Message</value></data>
   <data name="Home_MobileSendPlaceholder"><value>Type your message...</value></data>
   <data name="Home_BackToLatest"><value>Back to latest</value></data>
+  <data name="Home_NewMessages"><value>{0} new messages</value></data>
 
   <!-- Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>Thumbnails &amp; Previews</value></data>

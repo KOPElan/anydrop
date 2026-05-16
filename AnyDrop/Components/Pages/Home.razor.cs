@@ -97,10 +97,7 @@ public partial class Home : IAsyncDisposable
     private ElementReference _imageInputRef;
     private ElementReference _attachmentInputRef;
     private DotNetObjectReference<Home>? _dotNetRef;
-    // 强制滚到底（初次加载、主题切换、手动发消息）
-    private bool _shouldScrollToBottom;
-    // 条件滚到底（收到新消息时，仅当用户处于底部附近才滚动）
-    private bool _shouldScrollIfNearBottom;
+    private PendingScrollAction _pendingScrollAction;
 
     // 消息加载中状态（切换主题/初次加载时显示骨架屏；发送消息后刷新不触发骨架屏）
     private bool _isLoadingMessages;
@@ -111,8 +108,17 @@ public partial class Home : IAsyncDisposable
 
     // 视频"点击展开播放"集合（thumbnail-first 交互）
     private readonly HashSet<Guid> _expandedVideoIds = [];
-    private bool _isNearMessageListBottom = true;
+    private bool _isAtBottom = true;
+    private int _unreadMessageCount;
+    private Guid? _firstUnreadMessageId;
     private long _maxUploadFileSizeBytes = DefaultMaxFileSizeBytes;
+
+    private enum PendingScrollAction
+    {
+        None = 0,
+        ToBottom = 1,
+        ToBottomIfAtBottom = 2
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,11 +134,13 @@ public partial class Home : IAsyncDisposable
 
         await LoadSelectedTopicMessagesAsync();
 
-        // 若有待高亮消息，不滚到底部，改为滚到目标消息
         if (_pendingHighlightId.HasValue)
         {
-            _shouldScrollToBottom = false;
             _shouldHighlight = true;
+        }
+        else
+        {
+            RequestScrollToBottom();
         }
     }
 
@@ -150,7 +158,11 @@ public partial class Home : IAsyncDisposable
             // 若有待高亮消息（从搜索页跳转而来），撤销自动滚到底的请求，保留高亮定位
             if (_shouldHighlight)
             {
-                _shouldScrollToBottom = false;
+                _pendingScrollAction = PendingScrollAction.None;
+            }
+            else
+            {
+                RequestScrollToBottom();
             }
         }
     }
@@ -159,53 +171,36 @@ public partial class Home : IAsyncDisposable
     {
         // ── 优先处理滚动/高亮（在 hub 初始化前执行，消除初次打开时先显示顶部再跳底的闪烁）──
 
-        if (_shouldScrollToBottom)
+        if (_pendingScrollAction is not PendingScrollAction.None)
         {
-            _shouldScrollToBottom = false;
+            var action = _pendingScrollAction;
+            _pendingScrollAction = PendingScrollAction.None;
             try
             {
-                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
+                if (action is PendingScrollAction.ToBottom)
+                {
+                    await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottom", _messageListRef);
+                }
+                else if (_isAtBottom)
+                {
+                    await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottomIfNearBottom", _messageListRef);
+                }
             }
             catch (JSDisconnectedException)
             {
-                Logger.LogDebug("JS interop disconnected during scrollToBottom — component is being disposed.");
+                Logger.LogDebug("JS interop disconnected during pending scroll action — component is being disposed.");
             }
             catch (TaskCanceledException)
             {
-                Logger.LogDebug("scrollToBottom was cancelled — component is being disposed.");
+                Logger.LogDebug("pending scroll action was cancelled — component is being disposed.");
             }
             catch (ObjectDisposedException ex)
             {
-                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottom.");
+                Logger.LogDebug(ex, "JS runtime disposed during pending scroll action.");
             }
             catch (InvalidOperationException ex)
             {
-                Logger.LogDebug(ex, "JS interop not available during scrollToBottom.");
-            }
-        }
-
-        if (_shouldScrollIfNearBottom)
-        {
-            _shouldScrollIfNearBottom = false;
-            try
-            {
-                await JS.InvokeVoidAsync("AnyDropInterop.scrollToBottomIfNearBottom", _messageListRef);
-            }
-            catch (JSDisconnectedException)
-            {
-                Logger.LogDebug("JS interop disconnected during scrollToBottomIfNearBottom — component is being disposed.");
-            }
-            catch (TaskCanceledException)
-            {
-                Logger.LogDebug("scrollToBottomIfNearBottom was cancelled — component is being disposed.");
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Logger.LogDebug(ex, "JS runtime disposed during scrollToBottomIfNearBottom.");
-            }
-            catch (InvalidOperationException ex)
-            {
-                Logger.LogDebug(ex, "JS interop not available during scrollToBottomIfNearBottom.");
+                Logger.LogDebug(ex, "JS interop not available during pending scroll action.");
             }
         }
 
@@ -308,7 +303,14 @@ public partial class Home : IAsyncDisposable
                         }
 
                         _messages.Add(dto);
-                        _shouldScrollIfNearBottom = true;
+                        if (_isAtBottom)
+                        {
+                            RequestScrollToBottomIfAtBottom();
+                        }
+                        else
+                        {
+                            TrackUnreadMessage(dto.Id);
+                        }
                         StateHasChanged();
                     }
                 });
@@ -353,7 +355,10 @@ public partial class Home : IAsyncDisposable
 
                     var pending = PendingUpload.FromRemoteSignal(signal);
                     _pendingUploads.Add(pending);
-                    _shouldScrollIfNearBottom = true;
+                    if (_isAtBottom)
+                    {
+                        RequestScrollToBottomIfAtBottom();
+                    }
                     StateHasChanged();
                 });
             });
@@ -438,6 +443,7 @@ public partial class Home : IAsyncDisposable
             // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示；
             // showSkeleton=false 避免清空现有列表并显示骨架屏
             await LoadSelectedTopicMessagesAsync(showSkeleton: false);
+            RequestScrollToBottom();
         }
         finally
         {
@@ -688,7 +694,10 @@ public partial class Home : IAsyncDisposable
         var createdAt = DateTimeOffset.UtcNow;
         var pending = new PendingUpload(tempId, _selectedTopicId.Value, fileName, mimeType, fileSize, contentType, createdAt);
         _pendingUploads.Add(pending);
-        _shouldScrollToBottom = true;
+        if (_isAtBottom)
+        {
+            RequestScrollToBottom();
+        }
 
         if (_hubConnection is not null)
         {
@@ -736,6 +745,14 @@ public partial class Home : IAsyncDisposable
                 if (_messageIds.Add(dto.Id))
                 {
                     _messages.Add(dto);
+                    if (_isAtBottom)
+                    {
+                        RequestScrollToBottomIfAtBottom();
+                    }
+                    else
+                    {
+                        TrackUnreadMessage(dto.Id);
+                    }
                 }
 
                 if (_selectedTopicId.HasValue && _hubConnection is not null)
@@ -743,7 +760,6 @@ public partial class Home : IAsyncDisposable
                     _ = _hubConnection.SendAsync("NotifyUploadSettled", tempId, _selectedTopicId.Value);
                 }
 
-                _shouldScrollIfNearBottom = true;
             }
             catch (Exception ex)
             {
@@ -832,12 +848,18 @@ public partial class Home : IAsyncDisposable
     [JSInvokable]
     public Task OnMessageListScrollPositionChanged(bool isNearBottom)
     {
-        if (_isNearMessageListBottom == isNearBottom)
+        if (_isAtBottom == isNearBottom)
         {
             return Task.CompletedTask;
         }
 
-        _isNearMessageListBottom = isNearBottom;
+        var wasAtBottom = _isAtBottom;
+        _isAtBottom = isNearBottom;
+        if (!wasAtBottom && _isAtBottom)
+        {
+            ResetUnreadMessages();
+        }
+
         return InvokeAsync(StateHasChanged);
     }
 
@@ -923,7 +945,10 @@ public partial class Home : IAsyncDisposable
             }
 
             ExitSelectMode();
-            _shouldScrollIfNearBottom = true;
+            if (_isAtBottom)
+            {
+                RequestScrollToBottomIfAtBottom();
+            }
         }
         catch (Exception ex)
         {
@@ -1023,11 +1048,35 @@ public partial class Home : IAsyncDisposable
         _expandedVideoIds.Add(messageId);
     }
 
-    private async Task ScrollToLatestAsync()
+    private async Task ScrollToFirstUnreadAsync()
     {
-        _shouldScrollToBottom = true;
-        _isNearMessageListBottom = true;
-        await InvokeAsync(StateHasChanged);
+        if (!_firstUnreadMessageId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.scrollToMessage", _firstUnreadMessageId.Value.ToString());
+            ResetUnreadMessages();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (JSDisconnectedException)
+        {
+            Logger.LogDebug("JS interop disconnected during scrollToFirstUnread.");
+        }
+        catch (TaskCanceledException)
+        {
+            Logger.LogDebug("scrollToFirstUnread was cancelled.");
+        }
+        catch (ObjectDisposedException ex)
+        {
+            Logger.LogDebug(ex, "JS runtime disposed during scrollToFirstUnread.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop not available during scrollToFirstUnread.");
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -1111,6 +1160,10 @@ public partial class Home : IAsyncDisposable
             {
                 _messages.Add(msg);
                 hasNew = true;
+                if (!_isAtBottom)
+                {
+                    TrackUnreadMessage(msg.Id);
+                }
             }
             else
             {
@@ -1122,8 +1175,10 @@ public partial class Home : IAsyncDisposable
 
         if (hasNew)
         {
-            // 仅当用户处于底部附近时才滚动，不强制跳转
-            _shouldScrollIfNearBottom = true;
+            if (_isAtBottom)
+            {
+                RequestScrollToBottomIfAtBottom();
+            }
         }
     }
 
@@ -1167,7 +1222,8 @@ public partial class Home : IAsyncDisposable
                 }
             }
 
-            _shouldScrollToBottom = true;
+            ResetUnreadMessages();
+            _isAtBottom = true;
         }
         finally
         {
@@ -1206,6 +1262,33 @@ public partial class Home : IAsyncDisposable
         => download
             ? $"/api/v1/share-items/{itemId}/file?download=true"
             : $"/api/v1/share-items/{itemId}/file";
+
+    private void RequestScrollToBottom()
+    {
+        _pendingScrollAction = PendingScrollAction.ToBottom;
+    }
+
+    private void RequestScrollToBottomIfAtBottom()
+    {
+        if (_pendingScrollAction is PendingScrollAction.ToBottom)
+        {
+            return;
+        }
+
+        _pendingScrollAction = PendingScrollAction.ToBottomIfAtBottom;
+    }
+
+    private void TrackUnreadMessage(Guid messageId)
+    {
+        _unreadMessageCount++;
+        _firstUnreadMessageId ??= messageId;
+    }
+
+    private void ResetUnreadMessages()
+    {
+        _unreadMessageCount = 0;
+        _firstUnreadMessageId = null;
+    }
 
     private static string GetThumbnailUrl(Guid itemId) => $"/api/v1/share-items/{itemId}/thumbnail";
 
