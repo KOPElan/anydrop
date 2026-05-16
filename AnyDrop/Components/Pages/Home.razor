@@ -13,7 +13,7 @@
          @ondragover:preventDefault>
 
     @* ─────────── 顶部标题栏（磨砂玻璃效果，absolute 定位覆盖消息列表）─────────── *@
-    <header class="absolute inset-x-0 top-0 z-40 flex h-20 items-center justify-between px-8 chat-header-glass">
+    <header class="absolute inset-x-0 top-0 z-40 flex h-15 items-center justify-between px-8 chat-header-glass">
         <div class="flex items-center gap-3">
             @* 移动端菜单按钮（桌面端隐藏）*@
             <button type="button"
@@ -26,10 +26,6 @@
                 <h2 class="font-headline text-2xl font-extrabold tracking-tight leading-none" style="color: var(--color-on-surface);">
                     @(_selectedTopicName ?? L["Home_SelectTopic"])
                 </h2>
-                @if (_selectedTopicId.HasValue)
-                {
-                    <p class="text-[11px] font-medium uppercase tracking-wider mt-1" style="color: var(--color-outline);">@L["Home_SessionStorage"]</p>
-                }
             </div>
         </div>
         @if (_selectedTopicId.HasValue)
@@ -492,7 +488,7 @@
     @if (_isSelectMode)
     {
         @* 批量操作工具栏：选择模式下替换输入框 *@
-        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass" style="pointer-events: none;">
+        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6" style="pointer-events: none;">
             <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
                 <div class="input-wrapper chat-input-card px-4 py-3 flex items-center justify-between">
                     <span class="text-sm font-semibold" style="color: var(--color-on-surface);">
@@ -513,7 +509,7 @@
     else
     {
         @* 桌面端输入框（移动端隐藏，改用 FAB）*@
-        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-glass chat-footer-desktop" style="pointer-events: none;">
+        <footer class="absolute inset-x-0 bottom-0 z-40 px-6 pb-6 pt-6 chat-footer-desktop" style="pointer-events: none;">
         <div class="mx-auto max-w-4xl" style="pointer-events: auto;">
         <div class="input-wrapper chat-input-card px-4 py-3">
             @* 附件按钮（带右侧分割线）*@

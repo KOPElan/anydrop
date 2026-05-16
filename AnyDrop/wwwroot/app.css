@@ -470,7 +470,7 @@
 
     /* ─── 输入卡片（floating frosted glass card）─── */
     .chat-input-card {
-        background: rgba(255, 255, 255, 0.80);
+        background: rgba(255, 255, 255, 0.6);
         backdrop-filter: blur(28px) saturate(200%);
         -webkit-backdrop-filter: blur(28px) saturate(200%);
         border-radius: 1rem;
@@ -1009,7 +1009,7 @@
         position: fixed;
         inset: 0;
         z-index: 46;
-        background: rgba(25, 28, 29, 0.40);
+        background: rgba(25, 28, 29, 0.60);
         animation: overlay-in 200ms ease both;
     }
 
@@ -1165,7 +1165,7 @@ html.dark .chat-footer-glass {
 
 /* ── 输入卡片 ── */
 html.dark .chat-input-card {
-    background: rgba(32, 34, 37, 0.88);
+    background: rgba(32, 34, 37, 0.6);
     border-color: rgba(60, 68, 80, 0.50);
     box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(60, 68, 80, 0.35);
 }
