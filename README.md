@@ -76,6 +76,13 @@ ANYDROP_TOKEN_EXPIRY_HOURS=24
 docker compose up -d
 ```
 
+如果要更新服务请使用build命令
+```bash
+git pull
+docker compose down
+docker compose up -d --build
+```
+
 **4. 初始化账号**
 
 首次启动后，在浏览器访问 `http://localhost:8080/setup`，设置登录密码。
