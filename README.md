@@ -20,8 +20,7 @@
 
 ---
 
-![AnyDrop 首页截图](docs/assets/screenshot-web.png)
-![跨设备共享演示](docs/assets/screenshot-mobile.jpg)
+![AnyDrop](docs/assets/record.gif)
 
 ---
 
