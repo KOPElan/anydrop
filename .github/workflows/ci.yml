@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # 所有分支的 push 都触发，便于在特性分支上直接验证 CI。
+  # 若在意「分支 push 与 PR 同步事件」造成的重复运行，可改回 branches: [main]。
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
