@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    AnyDrop 客户端核心库（平台无关）。
+
+    这里只放不依赖 MAUI 的代码：Models、Infrastructure、以及业务 Service。
+    平台适配（Preferences / SecureStorage / FilePicker / 通知 / 网络状态）留在
+    AnyDrop.App 中，因为那里才有按 TargetFramework 生效的 #if 条件编译。
+
+    之所以单独拆出来：AnyDrop.App 只面向 android/ios/maccatalyst/windows，
+    无法被 net10.0 的测试项目引用，导致客户端单元测试长期无法运行。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AnyDrop.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AnyDrop.Shared\AnyDrop.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
+  </ItemGroup>
+
+</Project>

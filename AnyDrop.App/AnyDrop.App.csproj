@@ -38,6 +38,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\AnyDrop.App.Core\AnyDrop.App.Core.csproj" />
         <ProjectReference Include="..\AnyDrop.Shared\AnyDrop.Shared.csproj" />
     </ItemGroup>
 

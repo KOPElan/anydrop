@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using AnyDrop.App.Infrastructure;
+using AnyDrop.App.Platform;
 using AnyDrop.App.Services;
 using Microsoft.Extensions.Logging;
 
@@ -22,13 +23,13 @@ namespace AnyDrop.App
             // 多语言本地化
             builder.Services.AddLocalization();
 
+            // 平台适配层：Preferences / SecureStorage 的具体实现。
+            // preferenceStore 需要在容器构建之前就能读取语言偏好，因此先创建实例再注册。
+            var preferenceStore = new MauiPreferenceStore();
+            builder.Services.AddSingleton<IPreferenceStore>(preferenceStore);
+
             // 在构建 App 之前应用存储的语言偏好，确保首次渲染使用正确语言
-            string? storedLang = null;
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-            var stored = Microsoft.Maui.Storage.Preferences.Get(LocalizationService.PrefKey, string.Empty);
-            if (!string.IsNullOrEmpty(stored))
-                storedLang = stored;
-#endif
+            var storedLang = preferenceStore.Get(LocalizationService.PrefKey);
             var initialLang = LocalizationService.NormalizeToSupported(
                 storedLang ?? CultureInfo.CurrentUICulture.Name);
             var initialCulture = new CultureInfo(initialLang);
@@ -56,6 +57,7 @@ namespace AnyDrop.App
 
             // 基础设施
             builder.Services.AddSingleton<AppEventBus>();
+            builder.Services.AddSingleton<ISecretStore, MauiSecretStore>();
             builder.Services.AddSingleton<ILocalizationService, LocalizationService>();
             builder.Services.AddSingleton<ISecureTokenStorage, SecureTokenStorage>();
             builder.Services.AddSingleton<IServerConfigService, ServerConfigService>();

@@ -1,15 +1,19 @@
 using System.Globalization;
+using AnyDrop.App.Platform;
 
 namespace AnyDrop.App.Services;
 
 /// <summary>
 /// 应用内语言管理服务实现。
 /// 支持简体中文（zh-CN）、繁體中文（zh-TW）和 English（en）三种语言，
-/// 默认以系统语言为主，用户手动切换后通过 <see cref="Microsoft.Maui.Storage.Preferences"/> 持久化。
+/// 默认以系统语言为主，用户手动切换后通过 <see cref="IPreferenceStore"/> 持久化。
 /// </summary>
 public sealed class LocalizationService : ILocalizationService
 {
-    internal const string PrefKey = "anydrop_language";
+    /// <summary>语言偏好的存储键。宿主在构建容器之前读取语言时需要用到，故为 public。</summary>
+    public const string PrefKey = "anydrop_language";
+
+    private readonly IPreferenceStore _preferences;
 
     /// <inheritdoc />
     public string CurrentLanguage { get; private set; }
@@ -22,8 +26,9 @@ public sealed class LocalizationService : ILocalizationService
         new("en", "English"),
     ];
 
-    public LocalizationService()
+    public LocalizationService(IPreferenceStore preferences)
     {
+        _preferences = preferences;
         CurrentLanguage = ResolveInitialLanguage();
         ApplyCulture(CurrentLanguage);
     }
@@ -34,25 +39,16 @@ public sealed class LocalizationService : ILocalizationService
         if (!IsSupported(languageCode)) return;
 
         CurrentLanguage = languageCode;
-
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-        Microsoft.Maui.Storage.Preferences.Set(PrefKey, languageCode);
-#endif
-
+        _preferences.Set(PrefKey, languageCode);
         ApplyCulture(languageCode);
     }
 
     // ── 内部方法 ─────────────────────────────────────────────────
 
-    private static string ResolveInitialLanguage()
+    private string ResolveInitialLanguage()
     {
-        string? stored = null;
-
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-        stored = Microsoft.Maui.Storage.Preferences.Get(PrefKey, null);
-#endif
-
         // 如果有合法的已存储语言，直接使用
+        var stored = _preferences.Get(PrefKey);
         if (!string.IsNullOrEmpty(stored) && IsSupported(stored))
             return stored;
 
@@ -72,9 +68,9 @@ public sealed class LocalizationService : ILocalizationService
 
     /// <summary>
     /// 将任意 BCP-47 语言代码归一化为应用支持的三种语言之一。
-    /// 未能匹配时回退为 <c>zh-CN</c>。
+    /// 未能匹配时回退为 <c>zh-CN</c>。宿主在容器构建之前需要用到，故为 public。
     /// </summary>
-    internal static string NormalizeToSupported(string cultureName)
+    public static string NormalizeToSupported(string cultureName)
     {
         if (cultureName.StartsWith("zh-TW", StringComparison.OrdinalIgnoreCase)
             || cultureName.StartsWith("zh-Hant", StringComparison.OrdinalIgnoreCase)

@@ -53,13 +53,21 @@ cd anydrop
 **2. 创建环境变量文件**
 
 ```bash
-cp .env.example .env   # 若不存在则手动创建
+cp .env.example .env
+```
+
+然后生成一个随机密钥填入 `ANYDROP_JWT_SECRET`（**必填，至少 32 个字符**）：
+
+```bash
+openssl rand -hex 32
+# 或
+pwsh -Command "[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')"
 ```
 
 `.env` 文件内容示例：
 
 ```dotenv
-# 必填：JWT 签名密钥（建议 32 位以上随机字符串）
+# 必填：JWT 签名密钥（至少 32 字符）
 ANYDROP_JWT_SECRET=your-very-long-random-secret-key
 
 # 可选：上传文件大小上限（字节），默认 100 MB
@@ -68,6 +76,8 @@ ANYDROP_MAX_FILE_SIZE=104857600
 # 可选：登录令牌有效期（小时），默认 24 小时
 ANYDROP_TOKEN_EXPIRY_HOURS=24
 ```
+
+> 未提供 `ANYDROP_JWT_SECRET` 时 `docker compose` 会直接报错退出；服务端在启动时也会因密钥缺失或短于 32 字符而失败。这是刻意设计的：宁可启动失败，也不要带着空密钥或公开的默认密钥运行。
 
 **3. 启动服务**
 
@@ -107,14 +117,15 @@ cd anydrop
 # 2. 安装前端依赖（Tailwind CSS）
 npm install
 
-# 3. 配置 JWT 密钥（推荐使用 .NET User Secrets，避免提交密钥到版本库）
-cd AnyDrop
-dotnet user-secrets set "Auth:JwtSecret" "your-very-long-random-secret-key"
-cd ..
+# 3. 配置 JWT 密钥（必填，至少 32 字符）
+#    使用 .NET User Secrets，密钥不会写入版本库
+dotnet user-secrets set "Auth:JwtSecret" "your-very-long-random-secret-key" --project AnyDrop
 
 # 4. 启动应用
 dotnet run --project AnyDrop
 ```
+
+> 缺少密钥时应用会在启动阶段直接抛出 `Auth:JwtSecret is required ...` 并退出，不会以空密钥运行。
 
 应用默认监听 `http://localhost:5002`。
 
@@ -132,8 +143,13 @@ dotnet run --project AnyDrop
   - **Services/**: 核心业务实现（接口 + 实现），禁止直接依赖 Razor 组件。
   - **wwwroot/**: Tailwind 编译后样式、JS 及其它静态资源。
 
-- **AnyDrop.App/**: 跨平台移动/桌面客户端（MAUI），用于在手机/桌面上接入 AnyDrop 服务并同步内容。
-  - MAUI 项目使用 `net10` 目标框架，平台代码放在 `Platforms/`，UI 放在 `UI/` 与 `Components/`。
+- **AnyDrop.App/**: 跨平台移动/桌面客户端（MAUI 外壳）。
+  - 目标框架为 `net10.0-android` / `net10.0-ios` / `net10.0-maccatalyst` / `net10.0-windows10.0.19041.0`；平台代码放在 `Platforms/`，UI 放在 `Components/`。
+  - 平台适配实现（`Preferences`、`SecureStorage`、`FilePicker`、通知、网络状态）保留在本项目，因为只有它才具备按目标框架生效的条件编译。
+
+- **AnyDrop.App.Core/**: 客户端平台无关核心库（`net10.0`），被 `AnyDrop.App` 与 `AnyDrop.Tests.Unit` 共同引用。
+  - 包含 `Models/`、`Infrastructure/`、`Services/`，以及 `Platform/` 下的平台原语抽象（`IPreferenceStore`、`ISecretStore`）。
+  - 之所以单独拆分：`AnyDrop.App` 只面向平台目标框架，无法被 `net10.0` 的测试项目引用，曾导致客户端单元测试完全无法运行。
 
 - **AnyDrop.Shared/**: 跨项目共享 DTO 与类型定义。
 
@@ -187,7 +203,7 @@ npm run css:watch:app
 | `Auth__LoginCooldownSeconds` | 登录冷却时间（秒） | `60` |
 | `Storage__DatabasePath` | SQLite 数据库路径 | `data/anydrop.db` |
 | `Storage__BasePath` | 上传文件存储目录 | `data/files` |
-| `Storage__MaxFileSizeBytes` | 单文件大小上限（字节） | `104857600`（100 MB） |
+| `Storage__MaxFileSizeBytes` | 单文件大小上限（字节） | Docker Compose 为 `104857600`（100 MB）；源码运行时见 `AnyDrop/appsettings.json` |
 | `ASPNETCORE_URLS` | Kestrel 监听地址 | `http://+:5002`（容器内为 `http://+:8080`） |
 
 ---
@@ -215,12 +231,14 @@ docker run --rm \
 ### 运行测试
 
 ```bash
-# 单元测试
+# 单元测试（覆盖服务端 + 客户端核心库 AnyDrop.App.Core）
 dotnet test AnyDrop.Tests.Unit
 
-# E2E 测试（需先启动应用）
+# E2E 测试（Playwright，需要本机已安装浏览器：pwsh AnyDrop.Tests.E2E/bin/Debug/net10.0/playwright.ps1 install）
 dotnet test AnyDrop.Tests.E2E
 ```
+
+> CI（`.github/workflows/ci.yml`）会在每次 push / PR 时执行服务端与客户端核心库编译、全部单元测试、MAUI 客户端编译以及 Docker 镜像构建。
 
 ### 数据库迁移
 

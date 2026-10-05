@@ -25,9 +25,14 @@
   <ItemGroup>
     <ProjectReference Include="..\AnyDrop.Shared\AnyDrop.Shared.csproj" />
     <ProjectReference Include="..\AnyDrop\AnyDrop.csproj" />
-    <ProjectReference Include="..\AnyDrop.App\AnyDrop.App.csproj">
-      <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework>
-    </ProjectReference>
+    <!--
+      客户端可测逻辑位于平台无关的 AnyDrop.App.Core（net10.0）。
+      此前这里引用的是 MAUI 项目 AnyDrop.App，并试图用
+      <SetTargetFramework>TargetFramework=net10.0</SetTargetFramework> 指定框架，
+      但 AnyDrop.App 只声明了 android/ios/maccatalyst/windows 四个 TFM，
+      导致 restore 直接失败（NU1201），整个测试项目无法运行。
+    -->
+    <ProjectReference Include="..\AnyDrop.App.Core\AnyDrop.App.Core.csproj" />
   </ItemGroup>
 
 </Project>
