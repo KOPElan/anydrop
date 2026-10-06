@@ -186,10 +186,16 @@ public static class TopicEndpoints
     private static async Task<IResult> GetTopicMessagesByDateAsync(
         Guid id,
         DateOnly date,
+        string? timeZone,
         IShareService shareService,
         CancellationToken ct)
     {
-        var messages = await shareService.GetTopicMessagesByDateAsync(id, date, ct);
+        if (!TryResolveTimeZone(timeZone, out var resolved, out var error))
+        {
+            return Results.BadRequest(ApiEnvelope<IReadOnlyList<ShareItemDto>>.Fail(error));
+        }
+
+        var messages = await shareService.GetTopicMessagesByDateAsync(id, date, resolved, ct);
         return Results.Ok(ApiEnvelope<IReadOnlyList<ShareItemDto>>.Ok(messages));
     }
 
@@ -197,6 +203,7 @@ public static class TopicEndpoints
         Guid id,
         DateOnly start,
         DateOnly end,
+        string? timeZone,
         IShareService shareService,
         CancellationToken ct)
     {
@@ -205,8 +212,42 @@ public static class TopicEndpoints
             return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail("end 不能早于 start"));
         }
 
-        var dates = await shareService.GetTopicActiveDatesAsync(id, start, end, ct);
+        if (!TryResolveTimeZone(timeZone, out var resolved, out var error))
+        {
+            return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail(error));
+        }
+
+        var dates = await shareService.GetTopicActiveDatesAsync(id, start, end, resolved, ct);
         return Results.Ok(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Ok(dates));
+    }
+
+    /// <summary>
+    /// 解析调用方传入的时区标识（IANA，如 <c>Asia/Shanghai</c>）。
+    ///
+    /// 日期类查询必须由客户端指定时区：服务端的时区与用户看到的时区不一致时，
+    /// 「某一天有哪些消息」会整体错位。缺省按 UTC 处理以保持行为可预期。
+    /// </summary>
+    internal static bool TryResolveTimeZone(string? timeZoneId, out TimeZoneInfo timeZone, out string error)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            timeZone = TimeZoneInfo.Utc;
+            error = string.Empty;
+            return true;
+        }
+
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+            error = $"无法识别的时区标识：{timeZoneId}";
+            return false;
+        }
     }
 
     private static async Task<IResult> GetTopicMessagesByTypeAsync(

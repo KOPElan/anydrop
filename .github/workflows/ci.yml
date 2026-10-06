@@ -126,3 +126,40 @@ jobs:
 
       - name: Build image
         run: docker build -f AnyDrop/Dockerfile -t anydrop:ci .
+
+  # ── 端到端：Playwright 驱动真实浏览器，覆盖单元测试无法触及的 UI 与实时推送链路 ──
+  # 这些用例此前从不运行，导致「AuthTestHelpers 只接受 201」这样的破坏长期无人发现。
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build E2E test project
+        run: dotnet build AnyDrop.Tests.E2E/AnyDrop.Tests.E2E.csproj --configuration Release
+
+      # --with-deps 会在 Ubuntu 上安装 Chromium 所需的系统库
+      - name: Install Playwright Chromium
+        run: pwsh AnyDrop.Tests.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run E2E tests
+        run: >
+          dotnet test AnyDrop.Tests.E2E/AnyDrop.Tests.E2E.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=e2e.trx"
+          --results-directory TestResults
+
+      - name: Upload E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: TestResults
+          if-no-files-found: ignore

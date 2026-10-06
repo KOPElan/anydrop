@@ -25,18 +25,22 @@ public sealed class SearchService : ISearchService
     public async Task<IReadOnlyList<ShareItemDto>> GetByDateAsync(Guid topicId, DateOnly date)
     {
         var client = _httpClientFactory.CreateClient("api");
-        var url = $"api/v1/topics/{topicId}/messages/by-date?date={date:yyyy-MM-dd}";
+        // 必须把设备时区告诉服务端：否则服务端按自己的时区划分「一天」，日期结果会整体错位
+        var url = $"api/v1/topics/{topicId}/messages/by-date" +
+                  $"?date={date:yyyy-MM-dd}&timeZone={Uri.EscapeDataString(TimeZoneInfo.Local.Id)}";
         var response = await client.GetFromJsonAsync<ApiEnvelope<IReadOnlyList<ShareItemDto>>>(url).ConfigureAwait(false);
         return response?.Data ?? [];
     }
 
     public async Task<IReadOnlyList<DateOnly>> GetActiveDatesAsync(Guid topicId, int year, int month)
     {
-        // 服务端接口：GET /api/v1/topics/{id}/active-dates?start=yyyy-MM-dd&end=yyyy-MM-dd
+        // 服务端接口：GET /api/v1/topics/{id}/active-dates?start=yyyy-MM-dd&end=yyyy-MM-dd&timeZone=...
         var client = _httpClientFactory.CreateClient("api");
         var start = new DateOnly(year, month, 1);
         var end = start.AddMonths(1).AddDays(-1);
-        var url = $"api/v1/topics/{topicId}/active-dates?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}";
+        var url = $"api/v1/topics/{topicId}/active-dates" +
+                  $"?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}" +
+                  $"&timeZone={Uri.EscapeDataString(TimeZoneInfo.Local.Id)}";
         var response = await client.GetFromJsonAsync<ApiEnvelope<IReadOnlyList<DateOnly>>>(url).ConfigureAwait(false);
         return response?.Data ?? [];
     }

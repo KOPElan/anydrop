@@ -120,7 +120,7 @@ public partial class TopicSidebar : IAsyncDisposable
         _error = null;
         var snapshot = _topics.ToList();
 
-        var byId = _topics.ToDictionary(t => t.Id);
+        var byId = _topics.GroupBy(t => t.Id).ToDictionary(g => g.Key, g => g.First());
         var orderedSet = orderedIds.ToHashSet();
         var reordered = orderedIds
             .Where(byId.ContainsKey)
@@ -151,8 +151,10 @@ public partial class TopicSidebar : IAsyncDisposable
 
     private async Task LoadTopicsAsync()
     {
-        _topics.Clear();
-        _topics.AddRange(await TopicService.GetAllTopicsAsync());
+        // 先取数据再整体替换：不在 Clear 与 AddRange 之间 await，
+        // 否则并发的推送可能插入到中间，导致列表出现重复主题。
+        var loaded = await TopicService.GetAllTopicsAsync();
+        ReplaceTopics(loaded);
 
         if (_selectedTopicId.HasValue && !_topics.Any(t => t.Id == _selectedTopicId.Value))
         {
@@ -167,6 +169,24 @@ public partial class TopicSidebar : IAsyncDisposable
             _selectedTopicId = defaultTopic.Id;
             await TopicStateService.SetSelectedTopicAsync(_selectedTopicId);
         }
+    }
+
+    /// <summary>
+    /// 用给定列表整体替换当前主题列表，并按 Id 去重。
+    ///
+    /// 去重不是可有可无的防御：主题按钮使用 <c>@key="topic.Id"</c>，
+    /// 一旦出现重复 Id，Blazor 会在 diff 时抛「same key value」并**终止整条线路**，
+    /// 页面从此不再响应任何交互。
+    /// </summary>
+    private void ReplaceTopics(IEnumerable<TopicDto> topics)
+    {
+        var deduplicated = topics
+            .GroupBy(t => t.Id)
+            .Select(g => g.First())
+            .ToList();
+
+        _topics.Clear();
+        _topics.AddRange(deduplicated);
     }
 
     private async Task ToggleArchivedDropdownAsync()
@@ -190,39 +210,47 @@ public partial class TopicSidebar : IAsyncDisposable
 
         _topicsUpdatedSubscription = _hubConnection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", async topics =>
         {
-            // 对比旧列表，检测非活动主题是否有新消息（LastMessageAt 更新）
-            var previousLastMessageAt = _topics.ToDictionary(t => t.Id, t => t.LastMessageAt);
-
-            _topics.Clear();
-            _topics.AddRange(topics);
-
-            foreach (var topic in _topics)
+            // 必须通过 InvokeAsync 回到渲染器的调度线程再改状态。
+            // 直接在 SignalR 回调线程上修改 _topics，会与调度线程上的
+            // LoadTopicsAsync / HandleTopicsChanged 并发，使列表出现重复主题——
+            // 表现为 @key 重复，Blazor 会直接抛异常终止整条线路，页面随即失去响应。
+            await InvokeAsync(async () =>
             {
-                if (topic.Id == _selectedTopicId) continue;
-                if (!topic.LastMessageAt.HasValue) continue;
+                // 对比旧列表，检测非活动主题是否有新消息（LastMessageAt 更新）
+                var previousLastMessageAt = _topics
+                    .GroupBy(t => t.Id)
+                    .ToDictionary(g => g.Key, g => g.First().LastMessageAt);
 
-                var hadPrevious = previousLastMessageAt.TryGetValue(topic.Id, out var prev);
-                // 若是新主题或消息时间更新，则标记为未读
-                if (!hadPrevious || prev is null || topic.LastMessageAt > prev)
-                {
-                    _unreadTopicIds.Add(topic.Id);
-                }
-            }
+                ReplaceTopics(topics);
 
-            // 若已归档下拉列表正在显示，也同步刷新已归档主题列表
-            if (_showArchivedDropdown)
-            {
-                try
+                foreach (var topic in _topics)
                 {
-                    await LoadArchivedTopicsAsync();
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "Failed to refresh archived topics list on TopicsUpdated.");
-                }
-            }
+                    if (topic.Id == _selectedTopicId) continue;
+                    if (!topic.LastMessageAt.HasValue) continue;
 
-            await InvokeAsync(StateHasChanged);
+                    var hadPrevious = previousLastMessageAt.TryGetValue(topic.Id, out var prev);
+                    // 若是新主题或消息时间更新，则标记为未读
+                    if (!hadPrevious || prev is null || topic.LastMessageAt > prev)
+                    {
+                        _unreadTopicIds.Add(topic.Id);
+                    }
+                }
+
+                // 若已归档下拉列表正在显示，也同步刷新已归档主题列表
+                if (_showArchivedDropdown)
+                {
+                    try
+                    {
+                        await LoadArchivedTopicsAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to refresh archived topics list on TopicsUpdated.");
+                    }
+                }
+
+                StateHasChanged();
+            });
         });
 
         try
@@ -264,8 +292,10 @@ public partial class TopicSidebar : IAsyncDisposable
 
     private async Task LoadArchivedTopicsAsync()
     {
+        // 同样先取数据再替换，避免 Clear 与 AddRange 之间被并发写入
+        var loaded = await TopicService.GetArchivedTopicsAsync();
         _archivedTopics.Clear();
-        _archivedTopics.AddRange(await TopicService.GetArchivedTopicsAsync());
+        _archivedTopics.AddRange(loaded.GroupBy(t => t.Id).Select(g => g.First()));
     }
 
     private async Task LogoutAsync()

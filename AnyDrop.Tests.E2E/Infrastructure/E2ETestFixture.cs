@@ -20,10 +20,15 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
     private Process? _appProcess;
     private string? _tempDataRoot;
+    private Task? _stdoutPump;
+    private Task? _stderrPump;
 
     public IPlaywright Playwright { get; private set; } = null!;
     public IBrowser Browser { get; private set; } = null!;
     public string BaseUrl { get; } = "http://127.0.0.1:5002";
+
+    /// <summary>被启动应用的日志目录，便于定位 E2E 失败（CI 会随测试产物一起上传）。</summary>
+    public string AppLogDirectory { get; private set; } = string.Empty;
 
     public async Task InitializeAsync()
     {
@@ -32,10 +37,18 @@ public sealed class E2ETestFixture : IAsyncLifetime
         _tempDataRoot = Path.Combine(Path.GetTempPath(), $"anydrop-e2e-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDataRoot);
 
+        // 应用日志写到 TestResults 下：否则 E2E 失败时只能看到浏览器侧的报错，
+        // 看不到服务端实际发生了什么。
+        AppLogDirectory = Path.Combine(repoRoot, "TestResults", "e2e-app-logs");
+        Directory.CreateDirectory(AppLogDirectory);
+
         var startInfo = new ProcessStartInfo("dotnet", "run --no-launch-profile --project AnyDrop/AnyDrop.csproj")
         {
             WorkingDirectory = repoRoot,
-            UseShellExecute = false
+            UseShellExecute = false,
+            // 必须重定向并持续读取：管道缓冲区写满后应用会被阻塞
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         startInfo.Environment["ASPNETCORE_URLS"] = BaseUrl;
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
@@ -47,10 +60,29 @@ public sealed class E2ETestFixture : IAsyncLifetime
         startInfo.Environment["Storage__BasePath"] = Path.Combine(_tempDataRoot, "files");
 
         _appProcess = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start AnyDrop application process.");
+        _stdoutPump = PumpToFileAsync(_appProcess.StandardOutput, Path.Combine(AppLogDirectory, "app-out.log"));
+        _stderrPump = PumpToFileAsync(_appProcess.StandardError, Path.Combine(AppLogDirectory, "app-err.log"));
+
         await WaitForApplicationReadyAsync();
 
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
         Browser = await Playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+    }
+
+    private static async Task PumpToFileAsync(StreamReader reader, string path)
+    {
+        try
+        {
+            await using var writer = new StreamWriter(path, append: false) { AutoFlush = true };
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                await writer.WriteLineAsync(line);
+            }
+        }
+        catch (Exception)
+        {
+            // 应用退出时管道关闭，属正常情况
+        }
     }
 
     public async Task DisposeAsync()
@@ -66,6 +98,24 @@ public sealed class E2ETestFixture : IAsyncLifetime
         {
             _appProcess.Kill(true);
             await _appProcess.WaitForExitAsync();
+        }
+
+        // 等待日志泵收尾，确保最后的错误信息已写入文件
+        foreach (var pump in new[] { _stdoutPump, _stderrPump })
+        {
+            if (pump is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                await pump.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            catch (Exception)
+            {
+                // 忽略超时或读取中断
+            }
         }
 
         // 必须先停掉应用再删临时目录：进程持有 SQLite 文件句柄。

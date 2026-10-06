@@ -239,7 +239,9 @@ public partial class TopicSearch
 
         try
         {
-            var results = await ShareService.GetTopicMessagesByDateAsync(TopicId, _selectedDate);
+            // 按用户浏览器所在时区查询：否则服务端时区与用户看到的日期不一致时，
+            // 结果会整体错位（下面的分组用的也是同一个时区）。
+            var results = await ShareService.GetTopicMessagesByDateAsync(TopicId, _selectedDate, _displayTimeZone);
             _dateResults = [.. results];
             _dateSearchPerformed = true;
         }
@@ -280,7 +282,7 @@ public partial class TopicSearch
         var end = start.AddMonths(1).AddDays(-1);
         try
         {
-            _pickerActiveDates = await ShareService.GetTopicActiveDatesAsync(TopicId, start, end);
+            _pickerActiveDates = await ShareService.GetTopicActiveDatesAsync(TopicId, start, end, _displayTimeZone);
         }
         catch (Exception ex)
         {

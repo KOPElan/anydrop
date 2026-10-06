@@ -326,16 +326,14 @@ public sealed class ShareService(
     public async Task<IReadOnlyList<ShareItemDto>> GetTopicMessagesByDateAsync(
         Guid topicId,
         DateOnly date,
+        TimeZoneInfo timeZone,
         CancellationToken ct = default)
     {
-        // 使用服务器本地时区将日期转换为 UTC 范围，与消息时间显示保持一致
-        var localMidnight = new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Local);
-        var startOffset = new DateTimeOffset(localMidnight);
-        var endOffset = startOffset.AddDays(1);
+        var (startUtc, endUtc) = GetUtcRange(date, date, timeZone);
 
         return await dbContext.ShareItems
             .AsNoTracking()
-            .Where(x => x.TopicId == topicId && x.CreatedAt >= startOffset && x.CreatedAt < endOffset)
+            .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
             .OrderBy(x => x.CreatedAt)
             .Select(x => x.ToDto())
             .ToListAsync(ct);
@@ -345,24 +343,53 @@ public sealed class ShareService(
         Guid topicId,
         DateOnly start,
         DateOnly end,
+        TimeZoneInfo timeZone,
         CancellationToken ct = default)
     {
-        // 将本地日期范围转换为 UTC 范围
-        var localStart = new DateTime(start.Year, start.Month, start.Day, 0, 0, 0, DateTimeKind.Local);
-        var localEndExclusive = new DateTime(end.Year, end.Month, end.Day, 0, 0, 0, DateTimeKind.Local).AddDays(1);
-        var startOffset = new DateTimeOffset(localStart);
-        var endOffset   = new DateTimeOffset(localEndExclusive);
+        var (startUtc, endUtc) = GetUtcRange(start, end, timeZone);
 
-        // 只拉取 CreatedAt 列，应用端转换为本地日期后去重
+        // 只拉取 CreatedAt 列，再按调用方时区归属到具体日期
         var timestamps = await dbContext.ShareItems
             .AsNoTracking()
-            .Where(x => x.TopicId == topicId && x.CreatedAt >= startOffset && x.CreatedAt < endOffset)
+            .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
             .Select(x => x.CreatedAt)
             .ToListAsync(ct);
 
         return timestamps
-            .Select(t => DateOnly.FromDateTime(t.ToLocalTime().DateTime))
+            .Select(t => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(t, timeZone).DateTime))
             .ToHashSet();
+    }
+
+    /// <summary>
+    /// 把「某个时区里的某段本地日期」转换为 UTC 的 [start, end) 区间。
+    ///
+    /// 不能用 <c>DateTimeKind.Local</c> 拼 <see cref="DateTimeOffset"/>：那取的是**服务器**
+    /// 的时区，而用户看到的日期是按浏览器/设备时区划分的，两者不一致时日期会整体错位一天。
+    ///
+    /// 也不能简单地把本地时间当成固定偏移：带夏令时的时区在同一天内偏移量可能变化，
+    /// DST 切换日甚至会是 23 或 25 小时。这里用 <see cref="TimeZoneInfo"/> 做真实转换。
+    /// </summary>
+    internal static (DateTimeOffset StartUtc, DateTimeOffset EndUtc) GetUtcRange(
+        DateOnly startInclusive,
+        DateOnly endInclusive,
+        TimeZoneInfo timeZone)
+    {
+        var localStart = startInclusive.ToDateTime(TimeOnly.MinValue);
+        var localEndExclusive = endInclusive.ToDateTime(TimeOnly.MinValue).AddDays(1);
+
+        return (ToUtcOffset(localStart, timeZone), ToUtcOffset(localEndExclusive, timeZone));
+    }
+
+    private static DateTimeOffset ToUtcOffset(DateTime localUnspecified, TimeZoneInfo timeZone)
+    {
+        // 夏令时春季跳变时这一小时在本地并不存在，按惯例顺延一小时；
+        // 秋季重复的一小时则取标准偏移（GetUtcOffset 对歧义时间返回标准时间偏移）。
+        if (timeZone.IsInvalidTime(localUnspecified))
+        {
+            localUnspecified = localUnspecified.AddHours(1);
+        }
+
+        return new DateTimeOffset(localUnspecified, timeZone.GetUtcOffset(localUnspecified));
     }
 
     public async Task<TopicMessagesResponse> GetTopicMessagesByTypeAsync(
