@@ -291,6 +291,80 @@ public class ShareServiceTests
         fileStorageMock.Verify(x => x.DeleteFileAsync("files/photo.png", It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task SendFileAsync_NonExistentTopic_DoesNotSaveFile()
+    {
+        // 主题校验必须发生在落盘之前：反过来时主题不存在会抛出 ArgumentException，
+        // 端点转换成 400 返回，但文件已写入磁盘且永远不会被任何 ShareItem 引用。
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _, out var fileStorageMock);
+        await using var stream = new MemoryStream([1, 2, 3]);
+
+        var act = () => service.SendFileAsync(
+            stream, "a.bin", "application/octet-stream", topicId: Guid.NewGuid());
+
+        await act.Should().ThrowAsync<ArgumentException>();
+
+        fileStorageMock.Verify(
+            x => x.SaveFileAsync(
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteShareItemsAsync_ImageItem_AlsoDeletesThumbnail()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _, out var fileStorageMock);
+
+        var item = new ShareItem
+        {
+            Id = Guid.NewGuid(),
+            ContentType = ShareContentType.Image,
+            Content = "20260101/a.png",
+            ThumbnailPath = "thumbnails/a.jpg",
+            MimeType = "image/png",
+            FileName = "a.png",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.ShareItems.Add(item);
+        await dbContext.SaveChangesAsync();
+
+        await service.DeleteShareItemsAsync([item.Id]);
+
+        fileStorageMock.Verify(
+            x => x.DeleteFileAsync("20260101/a.png", It.IsAny<CancellationToken>()), Times.Once);
+        fileStorageMock.Verify(
+            x => x.DeleteFileAsync("thumbnails/a.jpg", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CleanupOldMessagesAsync_VideoItem_AlsoDeletesThumbnail()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext, out _, out var fileStorageMock);
+
+        dbContext.ShareItems.Add(new ShareItem
+        {
+            Id = Guid.NewGuid(),
+            ContentType = ShareContentType.Video,
+            Content = "20260101/v.mp4",
+            ThumbnailPath = "thumbnails/v.jpg",
+            MimeType = "video/mp4",
+            FileName = "v.mp4",
+            CreatedAt = DateTimeOffset.UtcNow.AddMonths(-3)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var deleted = await service.CleanupOldMessagesAsync(1);
+
+        deleted.Should().Be(1);
+        fileStorageMock.Verify(
+            x => x.DeleteFileAsync("20260101/v.mp4", It.IsAny<CancellationToken>()), Times.Once);
+        fileStorageMock.Verify(
+            x => x.DeleteFileAsync("thumbnails/v.jpg", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static AnyDropDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()

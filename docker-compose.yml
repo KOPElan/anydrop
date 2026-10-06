@@ -25,11 +25,13 @@ services:
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
       - ASPNETCORE_ENVIRONMENT=Production
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      # 使用 /health 而不是首页：首页只能说明 Kestrel 起来了，
+      # 数据库损坏或卷写满时它依然返回 200。
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
 
 volumes:
   anydrop-data:

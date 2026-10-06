@@ -114,16 +114,24 @@ public static class AuthEndpoints
             new("nickname", user.Nickname)
         };
 
-        if (TryReadClaim(loginResponse.AccessToken, JwtClaimTypes.Subject, out var sub))
+        if (!TryReadClaim(loginResponse.AccessToken, JwtClaimTypes.Subject, out var sub))
         {
-            claims.Add(new Claim(JwtClaimTypes.Subject, sub!));
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, sub!));
+            // 没有 sub 的 Cookie 过不了 OnValidatePrincipal，表现为「登录成功但下一次请求立刻被登出」，
+            // 极难诊断。与其留下这种状态，不如直接失败。
+            throw new InvalidOperationException(
+                "Issued access token is missing the 'sub' claim; cannot build a valid cookie session.");
         }
 
-        if (TryReadClaim(loginResponse.AccessToken, "sessionVersion", out var sessionVersion))
+        claims.Add(new Claim(JwtClaimTypes.Subject, sub!));
+        claims.Add(new Claim(ClaimTypes.NameIdentifier, sub!));
+
+        if (!TryReadClaim(loginResponse.AccessToken, "sessionVersion", out var sessionVersion))
         {
-            claims.Add(new Claim("sessionVersion", sessionVersion!));
+            throw new InvalidOperationException(
+                "Issued access token is missing the 'sessionVersion' claim; cannot build a valid cookie session.");
         }
+
+        claims.Add(new Claim("sessionVersion", sessionVersion!));
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);

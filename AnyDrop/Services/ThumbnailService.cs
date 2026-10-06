@@ -164,8 +164,14 @@ public sealed class ThumbnailService(
             // 使用 ffmpeg 提取最具代表性的帧（-vf thumbnail 采样选取），
             // 再通过 scale 将宽度缩放到最大 400px，高度设为 -1 自动保持宽高比
             var exitCode = await RunFfmpegAsync(
-                args: $"-y -i \"{originalFullPath}\" -vf \"thumbnail,scale={MaxThumbnailSize}:-1\" -frames:v 1 \"{tempOutput}\"",
-                ct: ct);
+                [
+                    "-y",
+                    "-i", originalFullPath,
+                    "-vf", $"thumbnail,scale={MaxThumbnailSize}:-1",
+                    "-frames:v", "1",
+                    tempOutput
+                ],
+                ct);
 
             if (exitCode != 0 || !File.Exists(tempOutput))
             {
@@ -187,17 +193,29 @@ public sealed class ThumbnailService(
         }
     }
 
-    private async Task<int> RunFfmpegAsync(string args, CancellationToken ct)
+    /// <summary>
+    /// 以参数列表方式调用 ffmpeg。
+    ///
+    /// <see cref="System.Diagnostics.ProcessStartInfo.ArgumentList"/> 会按平台规则逐个转义参数，
+    /// 因此即使文件路径含有引号或空格也不会被解释成额外选项。此前把路径插值进
+    /// <c>Arguments</c> 字符串再用引号包裹，攻击者只要让文件名包含一个双引号即可闭合引号、
+    /// 注入任意 ffmpeg 参数（Linux 上双引号是合法文件名字符）。
+    /// </summary>
+    private async Task<int> RunFfmpegAsync(IReadOnlyList<string> arguments, CancellationToken ct)
     {
         var psi = new System.Diagnostics.ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = args,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+
+        foreach (var argument in arguments)
+        {
+            psi.ArgumentList.Add(argument);
+        }
 
         try
         {

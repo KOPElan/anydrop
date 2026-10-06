@@ -60,9 +60,10 @@ jobs:
           if-no-files-found: ignore
 
   # ── 客户端：MAUI 项目按平台编译，防止平台适配层代码腐化 ──────────────────────
+  # 目标平台为 Android（主分发平台）；linux runner 自带 Android SDK，比 Windows 更快更省。
   build-client:
-    name: Build MAUI client (Windows)
-    runs-on: windows-latest
+    name: Build MAUI client (Android)
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -72,13 +73,30 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Install MAUI workload
-        run: dotnet workload install maui-windows
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      - name: Build client (Windows target)
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      # runner 预装的 Android SDK 未必包含 net10.0-android 所需的 API 级别，
+      # 用工作负载自带的 target 按需补齐，避免因缺少 platforms;android-XX 而失败。
+      - name: Provision Android SDK dependencies
         run: >
           dotnet build AnyDrop.App/AnyDrop.App.csproj
-          -f net10.0-windows10.0.19041.0
+          -t:InstallAndroidDependencies
+          -f net10.0-android
+          -p:AndroidSdkDirectory="$ANDROID_HOME"
+          -p:JavaSdkDirectory="$JAVA_HOME"
+          -p:AcceptAndroidSDKLicenses=True
+
+      - name: Build client (Android target)
+        run: >
+          dotnet build AnyDrop.App/AnyDrop.App.csproj
+          -f net10.0-android
           --configuration Release
 
   # ── 容器：Dockerfile 是主要部署路径，此前完全没有被验证过 ────────────────────

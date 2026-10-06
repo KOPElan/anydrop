@@ -208,21 +208,72 @@ npm run css:watch:app
 
 ---
 
-## 数据备份
+## 健康检查
+
+`GET /health` 为匿名可访问的探针，会真实执行两项检查后返回 JSON：
+
+- `database`：查询一次数据库，可发现库文件损坏或表结构缺失
+- `storage`：在 `Storage:BasePath` 下写入并删除一个临时文件，可发现卷写满或目录不可写
+
+```bash
+curl -fsS http://localhost:8080/health
+# {"status":"healthy","checks":{"database":"ok","storage":"ok"}}
+```
+
+任一检查失败时返回 `503`。`docker-compose.yml` 的 healthcheck 已改用该端点——
+此前它只请求首页，而首页返回 200 仅说明进程起来了，数据库损坏或磁盘写满时依然会被判定为健康。
+
+---
+
+## 数据备份与恢复
 
 持久化数据存放在 Docker volume `anydrop-data`（挂载到容器的 `/data`），包含：
 
 - `/data/anydrop.db` — SQLite 数据库（用户、主题、消息元数据）
+- `/data/anydrop.db-wal`、`/data/anydrop.db-shm` — SQLite 预写日志（数据库运行在 WAL 模式）
 - `/data/files/` — 上传的文件
 
-备份示例：
+> ⚠️ **不要在服务运行时直接 `tar` 整个数据目录。** 数据库处于 WAL 模式，逐个复制文件可能得到
+> 不一致甚至损坏的备份——`.db` 与 `-wal` 的内容可能来自不同时刻。请使用下面两种方式之一。
+
+### 方式一：短暂停机备份（推荐，最可靠）
 
 ```bash
+docker compose stop anydrop
 docker run --rm \
-  -v anydrop-data:/data:ro \
-  -v $(pwd)/backup:/backup \
-  alpine tar czf /backup/anydrop-backup-$(date +%Y%m%d).tar.gz /data
+  -v anydrop-data:/data \
+  -v "$(pwd)/backup:/backup" \
+  alpine tar czf /backup/anydrop-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+docker compose start anydrop
 ```
+
+### 方式二：在线备份（服务不中断）
+
+使用 SQLite 自带的 `.backup` 命令导出快照，它保证读取到一个一致的事务视图：
+
+```bash
+mkdir -p backup
+docker run --rm \
+  -v anydrop-data:/data \
+  -v "$(pwd)/backup:/backup" \
+  alpine sh -c 'apk add --no-cache sqlite >/dev/null &&
+    sqlite3 /data/anydrop.db ".backup /backup/anydrop.db" &&
+    tar czf /backup/anydrop-files-$(date +%Y%m%d-%H%M%S).tar.gz -C /data files'
+```
+
+> 注意这里以**读写**方式挂载卷（没有 `:ro`）：WAL 模式下即使只读查询也需要访问 `-shm` 文件。
+
+### 恢复
+
+```bash
+docker compose down
+# 方式一产物（整目录归档）
+docker run --rm -v anydrop-data:/data -v "$(pwd)/backup:/backup" alpine \
+  sh -c 'rm -rf /data/* && tar xzf /backup/<备份文件>.tar.gz -C /data'
+docker compose up -d
+```
+
+恢复完成后访问 `/health` 确认数据库与存储均正常。
 
 ---
 

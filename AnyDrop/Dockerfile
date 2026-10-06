@@ -26,10 +26,12 @@ RUN dotnet publish "./AnyDrop.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p
 FROM base AS final
 # 重新声明 APP_UID，确保 RUN 中可用（默认 1654，与基础镜像一致）
 ARG APP_UID=1654
-# 安装 ffmpeg 并预建 /data 目录（同时设置所有权，解决命名卷/绑定挂载权限问题）
+# 安装需要 root：切换回来执行 apt-get，安装完再切回非特权用户
 USER root
+# 安装 ffmpeg（视频缩略图）与 curl（供 compose healthcheck 使用：
+# aspnet 基础镜像既不带 wget 也不带 curl，原 healthcheck 必然失败）
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg curl \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data \
     && chown -R $APP_UID:$APP_UID /data
