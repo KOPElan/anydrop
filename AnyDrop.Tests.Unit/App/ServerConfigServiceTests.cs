@@ -1,5 +1,6 @@
 using System.Net;
 using AnyDrop.App.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
@@ -21,7 +22,7 @@ public class ServerConfigServiceTests
         var factoryMock = new Mock<IHttpClientFactory>();
         factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
 
-        return new ServerConfigService(factoryMock.Object);
+        return new ServerConfigService(factoryMock.Object, new InMemoryPreferenceStore());
     }
 
     [Fact]
@@ -78,7 +79,7 @@ public class ServerConfigServiceTests
         var factoryMock = new Mock<IHttpClientFactory>();
         factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
 
-        var sut = new ServerConfigService(factoryMock.Object);
+        var sut = new ServerConfigService(factoryMock.Object, new InMemoryPreferenceStore());
 
         var result = await sut.ValidateUrlAsync("http://unreachable-host:9999");
 

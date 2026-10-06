@@ -1,40 +1,31 @@
+using AnyDrop.App.Platform;
+
 namespace AnyDrop.App.Services;
 
 /// <summary>
-/// 使用 Preferences 持久化服务端 BaseUrl 配置。
+/// 服务端 BaseUrl 配置服务。
+///
+/// 持久化通过 <see cref="IPreferenceStore"/> 完成，因此本类不再包含任何平台
+/// 条件编译，可以在普通 net10.0 测试项目中直接构造与断言。
 /// </summary>
 public sealed class ServerConfigService : IServerConfigService
 {
     private const string BaseUrlKey = "anydrop_base_url";
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IPreferenceStore _preferences;
 
-    // net10.0 回退存储（实例字段，保证测试隔离）
-    private readonly Dictionary<string, string> _prefs = new();
-
-    public ServerConfigService(IHttpClientFactory httpClientFactory)
+    public ServerConfigService(IHttpClientFactory httpClientFactory, IPreferenceStore preferences)
     {
         _httpClientFactory = httpClientFactory;
+        _preferences = preferences;
     }
 
-    public string? GetBaseUrl()
-    {
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-        return Preferences.Get(BaseUrlKey, null);
-#else
-        _prefs.TryGetValue(BaseUrlKey, out var val);
-        return val;
-#endif
-    }
+    public string? GetBaseUrl() => _preferences.Get(BaseUrlKey);
 
-    public async Task SetBaseUrlAsync(string url)
+    public Task SetBaseUrlAsync(string url)
     {
-        var normalized = NormalizeUrl(url);
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-        Preferences.Set(BaseUrlKey, normalized);
-#else
-        _prefs[BaseUrlKey] = normalized;
-#endif
-        await Task.CompletedTask.ConfigureAwait(false);
+        _preferences.Set(BaseUrlKey, NormalizeUrl(url));
+        return Task.CompletedTask;
     }
 
     public bool HasBaseUrl() => GetBaseUrl() is { Length: > 0 };

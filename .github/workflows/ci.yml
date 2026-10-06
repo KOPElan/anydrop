@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  # 所有分支的 push 都触发，便于在特性分支上直接验证 CI。
+  # 若在意「分支 push 与 PR 同步事件」造成的重复运行，可改回 branches: [main]。
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# 只读权限即可，最小化 Token 权限
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # ── 主门禁：服务端 + 客户端核心库编译，并运行全部单元测试 ────────────────────
+  build-and-test:
+    name: Build & unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # 注意：这里必须针对测试项目 restore。它同时覆盖 AnyDrop、AnyDrop.Shared
+      # 与 AnyDrop.App.Core，一旦客户端核心库的平台目标框架设置错误（此前
+      # AnyDrop.App 只有 android/ios/maccatalyst/windows 四个 TFM，导致
+      # restore 直接 NU1201 失败），这一步就会立刻失败。
+      - name: Restore
+        run: dotnet restore AnyDrop.Tests.Unit/AnyDrop.Tests.Unit.csproj
+
+      - name: Build server
+        run: dotnet build AnyDrop/AnyDrop.csproj --configuration Release --no-restore
+
+      - name: Build client core library
+        run: dotnet build AnyDrop.App.Core/AnyDrop.App.Core.csproj --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: >
+          dotnet test AnyDrop.Tests.Unit/AnyDrop.Tests.Unit.csproj
+          --configuration Release
+          --no-restore
+          --logger "trx;LogFileName=unit-tests.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: TestResults
+          if-no-files-found: ignore
+
+  # ── 客户端：MAUI 项目按平台编译，防止平台适配层代码腐化 ──────────────────────
+  build-client:
+    name: Build MAUI client (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui-windows
+
+      - name: Build client (Windows target)
+        run: >
+          dotnet build AnyDrop.App/AnyDrop.App.csproj
+          -f net10.0-windows10.0.19041.0
+          --configuration Release
+
+  # ── 容器：Dockerfile 是主要部署路径，此前完全没有被验证过 ────────────────────
+  build-container:
+    name: Build container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f AnyDrop/Dockerfile -t anydrop:ci .

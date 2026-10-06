@@ -2,6 +2,7 @@
   <Project Path="AnyDrop.App/AnyDrop.App.csproj" Id="3868614e-ef6c-410d-b444-b2b5dd4aed33">
     <Deploy Solution="Debug|*" />
   </Project>
+  <Project Path="AnyDrop.App.Core/AnyDrop.App.Core.csproj" />
   <Project Path="AnyDrop.Tests.E2E/AnyDrop.Tests.E2E.csproj" />
   <Project Path="AnyDrop.Tests.Unit/AnyDrop.Tests.Unit.csproj" />
   <Project Path="AnyDrop/AnyDrop.csproj" />

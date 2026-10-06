@@ -40,6 +40,8 @@ Thumbs.db
 # Secrets and env
 .env
 .env.*
+# 示例文件必须提交，否则 README 中的 `cp .env.example .env` 无法执行
+!.env.example
 secrets.json
 secrets.*
 *.Local.json

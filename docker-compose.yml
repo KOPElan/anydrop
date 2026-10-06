@@ -12,10 +12,10 @@ services:
       # 持久化 SQLite 数据库和上传文件
       - anydrop-data:/data
     environment:
-      # ── 必填：JWT 签名密钥（建议 32 位以上随机字符串）──────────────────────────
-      - Auth__JwtSecret=${ANYDROP_JWT_SECRET:-ANYDROP_JWT_SECRET}
-      # ── 可选：访问密码（留空则跳过密码验证）──────────────────────────────────
-      - Auth__Password=${ANYDROP_PASSWORD:-}
+      # ── 必填：JWT 签名密钥（至少 32 字符）────────────────────────────────────
+      # 未设置时 compose 直接报错退出，避免带着空密钥或默认密钥启动。
+      # 参考 .env.example 生成并写入 .env。
+      - Auth__JwtSecret=${ANYDROP_JWT_SECRET:?未设置 ANYDROP_JWT_SECRET。请复制 .env.example 为 .env 并填写至少 32 字符的随机密钥}
       # ── 存储路径（已在 Dockerfile 中设为 /data，通常无需修改）─────────────────
       - Storage__DatabasePath=/data/anydrop.db
       - Storage__BasePath=/data/files
