@@ -85,7 +85,33 @@ ANYDROP_TOKEN_EXPIRY_HOURS=24
 docker compose up -d
 ```
 
-如果要更新服务请使用build命令
+服务端镜像会从 GHCR 拉取（`ghcr.io/kopelan/anydrop`）。也可以不克隆源码，直接用镜像启动：
+
+```bash
+docker run -d --name anydrop \
+  -p 8080:8080 \
+  -e Auth__JwtSecret="<至少 32 字符的随机密钥>" \
+  -v anydrop-data:/data \
+  ghcr.io/kopelan/anydrop:latest
+```
+
+### 版本固定与回滚
+
+默认跟随 `latest`。要固定版本（推荐用于长期运行），在 `.env` 中指定版本号：
+
+```dotenv
+ANYDROP_VERSION=v1.2.3
+```
+
+```bash
+docker compose pull
+docker compose up -d --no-build
+```
+
+回滚只需把 `ANYDROP_VERSION` 改回上一个版本，再执行同样两条命令。
+
+### 从源码更新
+
 ```bash
 git pull
 docker compose down
@@ -326,9 +352,11 @@ dotnet ef database update --project AnyDrop
 ### 构建容器镜像
 
 ```bash
-docker build -t anydrop .
+docker build -f AnyDrop/Dockerfile -t anydrop .
 docker run -p 8080:8080 -e Auth__JwtSecret=your-secret anydrop
 ```
+
+发布：推送 `v*.*.*` 形式的标签即可由 [Release 工作流](.github/workflows/release.yml) 自动构建并推送镜像到 GHCR，同时生成 `1.2.3`、`1.2`、`1` 与 `latest` 四种标签。该工作流也支持手动触发，此时只构建、不推送，用于在不发布的前提下验证构建可用。
 
 ---
 

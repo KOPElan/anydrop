@@ -94,7 +94,7 @@ public static class ShareItemEndpoints
             var stream = await fileStorageService.GetFileAsync(item.Content, cancellationToken);
             var contentType = string.IsNullOrWhiteSpace(item.MimeType) ? "application/octet-stream" : item.MimeType;
             var fileName = item.FileName ?? "download.bin";
-            var asAttachment = download == true || ShouldForceAttachment(contentType);
+            var asAttachment = download == true || !CanServeInline(contentType);
             return asAttachment
                 ? TypedResults.File(stream, contentType, fileName, enableRangeProcessing: true, lastModified: null, entityTag: null)
                 : TypedResults.File(stream, contentType, enableRangeProcessing: true);
@@ -175,11 +175,23 @@ public static class ShareItemEndpoints
         }
     }
 
-    private static bool ShouldForceAttachment(string mimeType)
+    /// <summary>
+    /// 该类型是否可以安全地内联展示。
+    ///
+    /// 采用白名单而非黑名单：黑名单只能挡住已知的危险类型，会漏掉
+    /// <c>application/xhtml+xml</c> 这类同样能执行脚本的类型。
+    /// 现在只有图片、视频、音频内联，且排除 SVG（SVG 可以内嵌脚本与外部引用）；
+    /// 其余内容一律作为附件下载，并由 <c>X-Content-Type-Options: nosniff</c> 兜底。
+    /// </summary>
+    private static bool CanServeInline(string mimeType)
     {
-        return mimeType.Equals("text/html", StringComparison.OrdinalIgnoreCase)
-               || mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)
-               || mimeType.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-               || mimeType.Equals("text/javascript", StringComparison.OrdinalIgnoreCase);
+        if (mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+               || mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+               || mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
     }
 }

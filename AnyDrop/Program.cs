@@ -71,6 +71,9 @@ builder.Services.AddSingleton<LinkMetadataService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient();
+// 抓取外链元数据专用的客户端：禁用自动重定向，并在建连前校验目标 IP（SSRF 防护）
+builder.Services.AddHttpClient(LinkMetadataService.HttpClientName)
+    .ConfigurePrimaryHttpMessageHandler(() => LinkMetadataService.CreateHandler());
 builder.Services.AddHostedService<ExpiredMessageCleanupService>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
@@ -254,6 +257,29 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+// 安全响应头：放在管道最前面，确保所有响应（含静态资源与错误页）都带上。
+// 这里刻意只添加不影响资源加载的指令——完整的 default-src 'self' 还需验证
+// Blazor 的内联脚本与 WebSocket 行为，在浏览器端回归测试（E2E）接入 CI 之前
+// 不宜贸然收紧，否则可能以「页面白屏」的形式破坏应用。
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+
+    // 阻止浏览器对响应内容做 MIME 嗅探。
+    // 这是「上传 HTML / SVG 后被内联执行」的主要兜底：即使 Content-Type 判断出错，
+    // 浏览器也不会把内容当成脚本或 HTML 执行。
+    headers["X-Content-Type-Options"] = "nosniff";
+
+    // 避免 URL 中的敏感信息（例如 SignalR 的 ?access_token=）通过 Referer 泄露给第三方站点
+    headers["Referrer-Policy"] = "same-origin";
+
+    // 禁止被嵌入 iframe，防点击劫持
+    headers["X-Frame-Options"] = "DENY";
+    headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+
+    await next();
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
