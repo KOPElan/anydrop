@@ -30,6 +30,23 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # 守卫：AnyDrop/Data 目录同时存放源码与运行时数据，历史上的整目录忽略规则
+      # (/AnyDrop/Data/) 会把以后新增的源码文件静默排除在版本库之外。这里一旦发现
+      # 源码类文件处于被忽略状态就失败。
+      # 只检查会直接影响构建的源码扩展名，避免 .specify/ 与 docker-compose.override.yml
+      # 这类「有意忽略」的文件造成误报。
+      - name: Check no source file is git-ignored
+        run: |
+          ignored=$(git ls-files --others --ignored --exclude-standard \
+            | grep -vE '(^|/)(bin|obj|node_modules)/' \
+            | grep -E '\.(cs|razor|csproj|slnx|props|targets)$' || true)
+          if [ -n "$ignored" ]; then
+            echo "::error::以下源码文件被 .gitignore 忽略，会被静默排除在版本库之外："
+            echo "$ignored"
+            exit 1
+          fi
+          echo "OK: 没有被忽略的源码文件"
+
       # 注意：这里必须针对测试项目 restore。它同时覆盖 AnyDrop、AnyDrop.Shared
       # 与 AnyDrop.App.Core，一旦客户端核心库的平台目标框架设置错误（此前
       # AnyDrop.App 只有 android/ios/maccatalyst/windows 四个 TFM，导致

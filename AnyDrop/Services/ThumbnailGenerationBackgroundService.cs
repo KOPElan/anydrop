@@ -5,6 +5,7 @@ namespace AnyDrop.Services;
 /// </summary>
 public sealed class ThumbnailGenerationBackgroundService(
     IServiceProvider serviceProvider,
+    TimeProvider timeProvider,
     ILogger<ThumbnailGenerationBackgroundService> logger) : BackgroundService
 {
     // 保证同一时间只有一个批处理实例运行（定时触发与 API 手动触发互斥）
@@ -21,12 +22,12 @@ public sealed class ThumbnailGenerationBackgroundService(
                 var enabled = await IsScheduledGenerationEnabledAsync(stoppingToken);
                 if (!enabled)
                 {
-                    await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+                    await Task.Delay(TimeSpan.FromHours(1), timeProvider, stoppingToken);
                     continue;
                 }
 
                 var targetHour = await GetTargetHourAsync(stoppingToken);
-                var now = DateTime.UtcNow;
+                var now = timeProvider.GetUtcNow().UtcDateTime;
                 var nextRun = new DateTime(now.Year, now.Month, now.Day, targetHour, 0, 0, DateTimeKind.Utc);
                 if (nextRun <= now)
                 {
@@ -39,7 +40,7 @@ public sealed class ThumbnailGenerationBackgroundService(
                     nextRun,
                     delay.TotalMinutes);
 
-                await Task.Delay(delay, stoppingToken);
+                await Task.Delay(delay, timeProvider, stoppingToken);
 
                 await RunAsync(stoppingToken);
             }
@@ -52,7 +53,7 @@ public sealed class ThumbnailGenerationBackgroundService(
             {
                 logger.LogError(ex, "ThumbnailGenerationBackgroundService: Unhandled error in background loop.");
                 // 发生意外错误时等待 5 分钟后重试，避免死循环空转
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(5), timeProvider, stoppingToken);
             }
         }
 

@@ -7,13 +7,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace AnyDrop.Services;
 
-public sealed class TokenService(IOptions<AuthOptions> authOptions) : ITokenService
+public sealed class TokenService(IOptions<AuthOptions> authOptions, TimeProvider timeProvider) : ITokenService
 {
     private readonly AuthOptions _authOptions = authOptions.Value;
 
     public (string AccessToken, DateTimeOffset ExpiresAt) GenerateToken(User user)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var expiresAt = now.AddHours(Math.Max(1, _authOptions.TokenExpiryHours));
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

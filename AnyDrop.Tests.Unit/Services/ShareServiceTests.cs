@@ -377,7 +377,8 @@ public class ShareServiceTests
     private static ShareService CreateServiceWithThumbnailSettings(
         AnyDropDbContext dbContext,
         bool scheduledThumbnailGenerationEnabled,
-        out Mock<IThumbnailService> thumbnailServiceMock)
+        out Mock<IThumbnailService> thumbnailServiceMock,
+        TimeProvider? timeProvider = null)
     {
         var clientProxyMock = new Mock<IClientProxy>();
         clientProxyMock
@@ -427,6 +428,7 @@ public class ShareServiceTests
             linkMetadataService,
             systemSettingsMock.Object,
             scopeFactoryMock.Object,
+            timeProvider ?? TimeProvider.System,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }
 
@@ -434,7 +436,8 @@ public class ShareServiceTests
         AnyDropDbContext dbContext,
         out Mock<IClientProxy> clientProxyMock,
         out Mock<IFileStorageService> fileStorageServiceMock,
-        bool autoFetchEnabled = true)
+        bool autoFetchEnabled = true,
+        TimeProvider? timeProvider = null)
     {
         clientProxyMock = new Mock<IClientProxy>();
         clientProxyMock
@@ -485,6 +488,7 @@ public class ShareServiceTests
             linkMetadataService,
             systemSettingsMock.Object,
             scopeFactoryMock.Object,
+            timeProvider ?? TimeProvider.System,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }
 }

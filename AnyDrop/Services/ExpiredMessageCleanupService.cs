@@ -13,6 +13,7 @@ namespace AnyDrop.Services;
 /// </summary>
 public sealed class ExpiredMessageCleanupService(
     IServiceProvider serviceProvider,
+    TimeProvider timeProvider,
     ILogger<ExpiredMessageCleanupService> logger) : BackgroundService
 {
     // 记录上次执行自动清理的日期（UTC），避免一天内重复执行
@@ -20,7 +21,7 @@ public sealed class ExpiredMessageCleanupService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1), timeProvider);
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {
@@ -34,7 +35,7 @@ public sealed class ExpiredMessageCleanupService(
             }
 
             // 每天 UTC 日期变更后执行一次自动清理检查
-            var todayUtc = DateOnly.FromDateTime(DateTime.UtcNow);
+            var todayUtc = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             if (todayUtc > _lastAutoCleanupDate)
             {
                 try
@@ -58,7 +59,7 @@ public sealed class ExpiredMessageCleanupService(
         var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
         var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<ShareHub>>();
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var expired = await db.ShareItems
             .Where(x => x.ExpiresAt != null && x.ExpiresAt <= now)
             .ToListAsync(ct);

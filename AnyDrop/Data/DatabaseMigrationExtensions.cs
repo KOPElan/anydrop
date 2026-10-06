@@ -1,81 +1,30 @@
-using AnyDrop.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnyDrop.Data;
 
 public static class DatabaseMigrationExtensions
 {
-    public static async Task MigrateAndSeedAsync(this IServiceProvider serviceProvider, CancellationToken ct = default)
+    /// <summary>
+    /// 应用 EF Core 迁移。
+    ///
+    /// 这里原本还包含两段历史遗留逻辑，均已移除：
+    ///
+    /// 1. 一段运行时 <c>ALTER TABLE SystemSettings ADD COLUMN
+    ///    ScheduledThumbnailGenerationEnabled</c> 的 DDL。对应的正式迁移
+    ///    （20260513141000_AddScheduledThumbnailGenerationFlag）早已存在，
+    ///    而这段 DDL 不写入 __EFMigrationsHistory，会让数据库实际结构与迁移历史脱节，
+    ///    未来任何触及同一列的迁移都可能失败。
+    ///
+    /// 2. 一段「SystemSettings 为空则插入默认行」的种子逻辑。默认行由
+    ///    <see cref="AnyDropDbContext.OnModelCreating"/> 中的 HasData 声明并随迁移写入，
+    ///    因此该分支永远不会执行（同一行在 SystemSettingsService.EnsureSettingsAsync
+    ///    里还有一份防御性兜底）。三处重复且字段取值不一致，改默认值时极易漏改。
+    /// </summary>
+    public static async Task MigrateDatabaseAsync(this IServiceProvider serviceProvider, CancellationToken ct = default)
     {
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
 
         await db.Database.MigrateAsync(ct);
-        await EnsureScheduledThumbnailGenerationColumnAsync(db, ct);
-
-        if (!await db.SystemSettings.AnyAsync(ct))
-        {
-            db.SystemSettings.Add(new SystemSettings
-            {
-                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                AutoFetchLinkPreview = true,
-                UpdatedAt = DateTimeOffset.UtcNow
-            });
-            await db.SaveChangesAsync(ct);
-        }
-    }
-
-    private static async Task EnsureScheduledThumbnailGenerationColumnAsync(AnyDropDbContext dbContext, CancellationToken ct)
-    {
-        if (!string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        var connection = (SqliteConnection)dbContext.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync(ct);
-        }
-
-        if (!await TableExistsAsync(connection, "SystemSettings", ct))
-        {
-            return;
-        }
-
-        if (await ColumnExistsAsync(connection, "SystemSettings", "ScheduledThumbnailGenerationEnabled", ct))
-        {
-            return;
-        }
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = "ALTER TABLE SystemSettings ADD COLUMN ScheduledThumbnailGenerationEnabled INTEGER NOT NULL DEFAULT 0;";
-        await command.ExecuteNonQueryAsync(ct);
-    }
-
-    private static async Task<bool> TableExistsAsync(SqliteConnection connection, string tableName, CancellationToken ct)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $table LIMIT 1;";
-        command.Parameters.AddWithValue("$table", tableName);
-        var result = await command.ExecuteScalarAsync(ct);
-        return result is not null;
-    }
-
-    private static async Task<bool> ColumnExistsAsync(SqliteConnection connection, string tableName, string columnName, CancellationToken ct)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = $"PRAGMA table_info({tableName});";
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            if (string.Equals(reader["name"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

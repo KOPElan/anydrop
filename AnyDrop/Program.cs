@@ -49,6 +49,9 @@ if (!string.IsNullOrWhiteSpace(dbDirectory))
 builder.Services.AddDbContext<AnyDropDbContext>(options =>
     options.UseSqlite($"Data Source={fullDbPath}"));
 builder.Services.AddSignalR();
+// 统一的时间源。业务代码一律通过 TimeProvider 取当前时间，
+// 从而可以在测试中用假时钟确定性地验证限流冷却、令牌过期、阅后即焚等时间相关逻辑。
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<ITopicStateService, TopicStateService>();
@@ -60,6 +63,8 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddSingleton<ILoginRateLimiter, LoginRateLimiter>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
+builder.Services.AddScoped<OrphanFileReconciler>();
+builder.Services.AddHostedService<OrphanedFileCleanupService>();
 builder.Services.AddSingleton<ThumbnailGenerationBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ThumbnailGenerationBackgroundService>());
 builder.Services.AddSingleton<LinkMetadataService>();
@@ -343,6 +348,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AllowAnonymous();
 
-await app.Services.MigrateAndSeedAsync();
+await app.Services.MigrateDatabaseAsync();
 
 app.Run();

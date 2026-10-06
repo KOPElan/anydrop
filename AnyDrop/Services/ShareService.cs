@@ -16,6 +16,7 @@ public sealed class ShareService(
     LinkMetadataService linkMetadataService,
     ISystemSettingsService systemSettingsService,
     IServiceScopeFactory scopeFactory,
+    TimeProvider timeProvider,
     ILogger<ShareService> logger) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
@@ -43,7 +44,7 @@ public sealed class ShareService(
         }
 
         var isLink = IsLink(normalizedContent);
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var burnMinutes = burnAfterReading ? await systemSettingsService.GetBurnAfterReadingMinutesAsync(ct) : 0;
         var item = new ShareItem
         {
@@ -164,7 +165,7 @@ public sealed class ShareService(
         // 优先使用调用方传入的已知大小，其次尝试从流读取（仅当流支持 Seek）
         var fileSize = knownFileSize ?? (fileStream.CanSeek ? fileStream.Length : null);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var burnMinutes = burnAfterReading ? await systemSettingsService.GetBurnAfterReadingMinutesAsync(ct) : 0;
         var item = new ShareItem
         {
@@ -405,7 +406,7 @@ public sealed class ShareService(
     public async Task<int> CleanupOldMessagesAsync(int months, Guid? topicId = null, CancellationToken ct = default)
     {
         var safeMonths = months is 1 or 3 or 6 ? months : 1;
-        var cutoff = DateTimeOffset.UtcNow.AddMonths(-safeMonths);
+        var cutoff = timeProvider.GetUtcNow().AddMonths(-safeMonths);
 
         var query = dbContext.ShareItems
             .Where(x => x.CreatedAt < cutoff);

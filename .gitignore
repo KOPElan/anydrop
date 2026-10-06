@@ -14,8 +14,19 @@ artifacts/
 
 # Ignore AnyDrop obj build outputs explicitly
 /AnyDrop/obj/
-/AnyDrop/Data/
 /AnyDrop/.vs/
+
+# AnyDrop/Data 目录同时存放源码（AnyDropDbContext.cs、DatabaseMigrationExtensions.cs 等）
+# 与运行时数据（上传文件、Data Protection 密钥）。
+#
+# 这里只忽略运行时产物，不再整目录忽略：默认存储路径是相对项目目录的
+# Storage:DatabasePath=data/anydrop.db，在大小写不敏感的文件系统（Windows）上
+# 与源码目录 Data/ 是同一个目录，旧的 /AnyDrop/Data/ 规则会把以后新增的源码文件
+# 静默排除在版本库之外，造成「代码写好了却没提交、CI 神秘失败」。
+# 数据库文件本身已由下方的 *.db / *.db-shm / *.db-wal 规则覆盖。
+/AnyDrop/[Dd]ata/files/
+/AnyDrop/[Dd]ata/keys/
+/AnyDrop/[Dd]ata/dpkeys/
 
 # Rider
 *.sln.iml

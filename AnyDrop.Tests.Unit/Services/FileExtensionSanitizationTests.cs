@@ -28,7 +28,7 @@ public class FileExtensionSanitizationTests : IDisposable
             })
             .Build();
 
-        _service = new LocalFileStorageService(configuration);
+        _service = new LocalFileStorageService(configuration, TimeProvider.System);
     }
 
     [Theory]
