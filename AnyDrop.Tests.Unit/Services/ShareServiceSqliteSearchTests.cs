@@ -1,13 +1,9 @@
 using AnyDrop.Data;
-using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Moq;
 
 namespace AnyDrop.Tests.Unit.Services;
 
@@ -38,30 +34,7 @@ public class ShareServiceSqliteSearchTests : IDisposable
     }
 
     private static ShareService CreateService(AnyDropDbContext db)
-    {
-        var clientProxy = new Mock<IClientProxy>();
-        var hubClients = new Mock<IHubClients>();
-        hubClients.Setup(c => c.All).Returns(clientProxy.Object);
-
-        var hubContext = new Mock<IHubContext<ShareHub>>();
-        hubContext.Setup(c => c.Clients).Returns(hubClients.Object);
-
-        var httpClientFactory = new Mock<IHttpClientFactory>();
-        var linkMetadata = new LinkMetadataService(
-            httpClientFactory.Object, NullLogger<LinkMetadataService>.Instance);
-
-        return new ShareService(
-            db,
-            hubContext.Object,
-            new Mock<ITopicService>().Object,
-            new Mock<IFileStorageService>().Object,
-            new Mock<IThumbnailService>().Object,
-            linkMetadata,
-            new Mock<ISystemSettingsService>().Object,
-            new Mock<IServiceScopeFactory>().Object,
-            TimeProvider.System,
-            NullLogger<ShareService>.Instance);
-    }
+        => ShareServiceFactory.Create(db);
 
     private static async Task<Guid> SeedAsync(AnyDropDbContext db)
     {

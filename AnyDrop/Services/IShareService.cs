@@ -31,20 +31,25 @@ public interface IShareService
         CancellationToken ct = default);
 
     /// <summary>
-    /// 获取指定主题在某一天内的全部消息（按服务器本地时区确定"一天"的范围）。
+    /// 获取指定主题在某一天内的全部消息。
+    /// 「一天」的范围由 <paramref name="timeZone"/> 决定——必须由调用方显式给出，
+    /// 否则服务端的时区与用户看到的时区不一致，日期结果会整体错位。
     /// </summary>
     Task<IReadOnlyList<ShareItemDto>> GetTopicMessagesByDateAsync(
         Guid topicId,
         DateOnly date,
+        TimeZoneInfo timeZone,
         CancellationToken ct = default);
 
     /// <summary>
-    /// 获取指定主题在给定日期范围内有消息记录的日期集合（按服务器本地时区）。
+    /// 获取指定主题在给定日期范围内有消息记录的日期集合。
+    /// 日期归属由 <paramref name="timeZone"/> 决定，理由同上。
     /// </summary>
     Task<IReadOnlyCollection<DateOnly>> GetTopicActiveDatesAsync(
         Guid topicId,
         DateOnly start,
         DateOnly end,
+        TimeZoneInfo timeZone,
         CancellationToken ct = default);
 
     /// <summary>

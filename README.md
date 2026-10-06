@@ -333,11 +333,16 @@ docker compose up -d
 # 单元测试（覆盖服务端 + 客户端核心库 AnyDrop.App.Core）
 dotnet test AnyDrop.Tests.Unit
 
-# E2E 测试（Playwright，需要本机已安装浏览器：pwsh AnyDrop.Tests.E2E/bin/Debug/net10.0/playwright.ps1 install）
+# E2E 测试（Playwright 驱动真实浏览器）
+dotnet build AnyDrop.Tests.E2E
+# 首次需要安装浏览器；只跑无头模式时装 chromium-headless-shell 即可（体积约为完整 chromium 的一半）
+pwsh AnyDrop.Tests.E2E/bin/Debug/net10.0/playwright.ps1 install chromium-headless-shell
 dotnet test AnyDrop.Tests.E2E
 ```
 
-> CI（`.github/workflows/ci.yml`）会在每次 push / PR 时执行服务端与客户端核心库编译、全部单元测试、MAUI 客户端编译以及 Docker 镜像构建。
+E2E 会自行以**独立的临时数据目录**启动服务端，不会触碰本地的 `AnyDrop/Data`。若用例失败，服务端日志会写入 `TestResults/e2e-app-logs/`，CI 也会把它作为产物上传。
+
+> CI（`.github/workflows/ci.yml`）在每次 push / PR 时执行：服务端与客户端核心库编译、全部单元测试、**Playwright E2E**、MAUI 客户端（Android）编译，以及 Docker 镜像构建。
 
 ### 数据库迁移
 
