@@ -5,6 +5,7 @@ using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -127,8 +128,36 @@ builder.Services.AddAuthentication(options =>
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
         options.Cookie.Name = "anydrop.auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/login";
+
+        // 与 JWT 路径保持一致的会话版本校验。
+        // 缺少这一步时：修改密码 / 登出虽然会递增 SessionVersion，但已签发的 Cookie
+        // 仍会被接受，直到它自身过期（登录时按令牌有效期持久化，默认 24 小时）。
+        // 也就是说被盗 Cookie 在改密码后依然可用，JWT 的撤销能力对 Web 端形同虚设。
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var sub = context.Principal?.FindFirstValue("sub");
+            var versionRaw = context.Principal?.FindFirstValue("sessionVersion");
+            if (!Guid.TryParse(sub, out var userId) || !int.TryParse(versionRaw, out var sessionVersion))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var authService = context.HttpContext.RequestServices.GetRequiredService<IAuthService>();
+            var isValid = await authService.ValidateSessionVersionAsync(
+                userId, sessionVersion, context.HttpContext.RequestAborted);
+            if (!isValid)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
+
         options.Events.OnRedirectToLogin = context =>
         {
             if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
@@ -264,6 +293,8 @@ app.Use(async (context, next) =>
         path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/hubs", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/api", StringComparison.OrdinalIgnoreCase) ||
+        // 健康检查必须匿名可达，否则容器编排会被重定向到 /setup 或 /login
+        path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
         path.StartsWith("/not-found", StringComparison.OrdinalIgnoreCase))
     {
         await next();
@@ -307,6 +338,7 @@ app.MapFileEndpoints();
 app.MapTopicEndpoints();
 app.MapAuthEndpoints();
 app.MapSettingsEndpoints();
+app.MapHealthEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AllowAnonymous();

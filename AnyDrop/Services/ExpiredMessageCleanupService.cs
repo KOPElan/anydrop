@@ -77,19 +77,8 @@ public sealed class ExpiredMessageCleanupService(
 
         foreach (var item in expired)
         {
-            // 文件类消息：同步删除物理文件，失败时只记录警告，不阻断其余条目的清理
-            if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
-            {
-                try
-                {
-                    await fileStorage.DeleteFileAsync(item.Content, ct);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to delete expired file {StoragePath} for item {ItemId}.", item.Content, item.Id);
-                }
-            }
-
+            // 删除物理文件（原文件 + 缩略图），失败时只记录警告，不阻断其余条目的清理
+            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorage, logger, item, ct, "expired cleanup");
             db.ShareItems.Remove(item);
         }
 

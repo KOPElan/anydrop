@@ -145,8 +145,10 @@ public sealed class ShareService(
         }
 
         var contentType = ResolveContentType(mimeType);
-        var storagePath = await fileStorageService.SaveFileAsync(fileStream, fileName, mimeType, ct);
 
+        // 先校验主题、再落盘文件。
+        // 反过来（先落盘）时，主题不存在会抛出 ArgumentException，端点转换成 400 返回，
+        // 但磁盘上的文件已经写入且永远不会被任何 ShareItem 引用，成为永久孤儿。
         Topic? topic = null;
         if (topicId.HasValue)
         {
@@ -156,6 +158,8 @@ public sealed class ShareService(
                 throw new ArgumentException("Topic does not exist.", nameof(topicId));
             }
         }
+
+        var storagePath = await fileStorageService.SaveFileAsync(fileStream, fileName, mimeType, ct);
 
         // 优先使用调用方传入的已知大小，其次尝试从流读取（仅当流支持 Seek）
         var fileSize = knownFileSize ?? (fileStream.CanSeek ? fileStream.Length : null);
@@ -181,7 +185,17 @@ public sealed class ShareService(
         }
 
         dbContext.ShareItems.Add(item);
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // 数据库写入失败时回收已落盘的文件，否则磁盘上会留下无人引用的孤儿文件
+            await ShareItemFileCleanup.TryDeleteAsync(
+                fileStorageService, logger, storagePath, item.Id, ct, "file upload rollback");
+            throw;
+        }
 
         var shouldGenerateThumbnailInBackground = false;
         if (contentType is ShareContentType.Image or ShareContentType.Video)
@@ -418,19 +432,7 @@ public sealed class ShareService(
 
         foreach (var item in items)
         {
-            if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
-            {
-                try
-                {
-                    await fileStorageService.DeleteFileAsync(item.Content, ct);
-                }
-                catch (Exception ex)
-                {
-                    // 文件删除失败不阻断整体清理流程，但记录警告以便排查孤儿文件
-                    logger.LogWarning(ex, "Failed to delete file {StoragePath} for item {ItemId} during cleanup.", item.Content, item.Id);
-                }
-            }
-
+            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorageService, logger, item, ct, "cleanup");
             dbContext.ShareItems.Remove(item);
             deletedIds.Add(item.Id);
         }
@@ -476,19 +478,7 @@ public sealed class ShareService(
 
         foreach (var item in items)
         {
-            if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
-            {
-                try
-                {
-                    await fileStorageService.DeleteFileAsync(item.Content, ct);
-                }
-                catch (Exception ex)
-                {
-                    // 文件删除失败不阻断整体删除流程，但记录警告以便排查孤儿文件
-                    logger.LogWarning(ex, "Failed to delete file {StoragePath} for item {ItemId} during batch delete.", item.Content, item.Id);
-                }
-            }
-
+            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorageService, logger, item, ct, "batch delete");
             dbContext.ShareItems.Remove(item);
             deletedIds.Add(item.Id);
         }
