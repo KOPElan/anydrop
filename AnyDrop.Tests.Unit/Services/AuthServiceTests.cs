@@ -63,9 +63,10 @@ public class AuthServiceTests
             TokenExpiryHours = 24,
             LoginMaxFailures = 5,
             LoginCooldownSeconds = 60
-        }));
+        }), TimeProvider.System);
         var limiter = new LoginRateLimiter(new MemoryCache(new MemoryCacheOptions()),
-            Options.Create(new AuthOptions { LoginMaxFailures = 5, LoginCooldownSeconds = 60 }));
+            Options.Create(new AuthOptions { LoginMaxFailures = 5, LoginCooldownSeconds = 60 }),
+            TimeProvider.System);
         return new AuthService(db, userService, hasher, token, limiter);
     }
 

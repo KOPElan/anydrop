@@ -30,6 +30,7 @@ public static class FileEndpoints
         [FromForm] Guid? topicId,
         [FromForm] bool? burnAfterReading,
         IShareService shareService,
+        IFileStorageService fileStorageService,
         IConfiguration configuration,
         CancellationToken cancellationToken)
     {
@@ -48,6 +49,15 @@ public static class FileEndpoints
         {
             return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail(
                 $"文件大小（{file.Length:N0} 字节）超出限制（{maxFileSize:N0} 字节）。"));
+        }
+
+        // 磁盘写满会让文件落盘与 SQLite 写入一起失败，进而使整个实例不可用。
+        // 在真正写入前判断可负担性，返回 507 而不是写到一半才失败。
+        if (!fileStorageService.HasFreeSpace(file.Length))
+        {
+            return Results.Json(
+                ApiEnvelope<ShareItemDto>.Fail("服务器剩余存储空间不足，已拒绝本次上传。"),
+                statusCode: StatusCodes.Status507InsufficientStorage);
         }
 
         try

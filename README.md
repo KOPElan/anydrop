@@ -204,7 +204,29 @@ npm run css:watch:app
 | `Storage__DatabasePath` | SQLite 数据库路径 | `data/anydrop.db` |
 | `Storage__BasePath` | 上传文件存储目录 | `data/files` |
 | `Storage__MaxFileSizeBytes` | 单文件大小上限（字节） | Docker Compose 为 `104857600`（100 MB）；源码运行时见 `AnyDrop/appsettings.json` |
+| `Storage__OrphanCleanupEnabled` | 是否实际回收孤儿文件（`false` 时只报告） | `false` |
 | `ASPNETCORE_URLS` | Kestrel 监听地址 | `http://+:5002`（容器内为 `http://+:8080`） |
+
+---
+
+## 存储维护
+
+上传采用**先写临时文件再原子改名**的方式：进程崩溃或被 kill 时，不会在最终位置留下长度不完整的半截文件。写入前还会检查存储卷剩余空间，不足时返回 `507`，而不是写到一半失败——磁盘写满会让 SQLite 写入一并失败，导致整个实例不可用。
+
+此外，服务每天会做一次**存储目录与数据库的双向对账**：
+
+- 磁盘上存在、但没有任何消息引用的文件（孤儿文件，通常是历史遗留）
+- 数据库引用、但磁盘上已不存在的文件（例如卷未挂载或被部分恢复）
+
+**默认只写日志、不删除任何文件**（`Storage:OrphanCleanupEnabled=false`）。这是刻意选择的：本项目的卖点是数据完全由你掌握，静默删除文件的代价高于回收一点磁盘空间。请先查看日志中的报告：
+
+```
+孤儿文件对账完成：扫描 812 个文件；孤儿 3 个（5242880 字节），已删除 0 个；
+数据库引用了 0 个不存在的文件。模式：仅报告（Storage:OrphanCleanupEnabled=false）。
+样本：20260418/ab12….png, 20260418/cd34….jpg
+```
+
+确认这些文件确实无用后，把 `Storage__OrphanCleanupEnabled` 设为 `true` 即可自动回收。对账有 24 小时宽限期，正在进行中的上传不会被误判。
 
 ---
 

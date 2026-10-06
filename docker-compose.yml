@@ -23,6 +23,8 @@ services:
       - Storage__MaxFileSizeBytes=${ANYDROP_MAX_FILE_SIZE:-104857600}
       # ── JWT 令牌有效期（小时），默认 24 小时 ─────────────────────────────────
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
+      # ── 孤儿文件回收（默认只报告不删除）─────────────────────────────────────
+      - Storage__OrphanCleanupEnabled=${ANYDROP_ORPHAN_CLEANUP_ENABLED:-false}
       - ASPNETCORE_ENVIRONMENT=Production
     healthcheck:
       # 使用 /health 而不是首页：首页只能说明 Kestrel 起来了，

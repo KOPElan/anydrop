@@ -4,7 +4,10 @@ using Microsoft.Extensions.Options;
 
 namespace AnyDrop.Services;
 
-public sealed class LoginRateLimiter(IMemoryCache memoryCache, IOptions<AuthOptions> authOptions) : ILoginRateLimiter
+public sealed class LoginRateLimiter(
+    IMemoryCache memoryCache,
+    IOptions<AuthOptions> authOptions,
+    TimeProvider timeProvider) : ILoginRateLimiter
 {
     private readonly int _maxFailures = Math.Max(1, authOptions.Value.LoginMaxFailures);
     private readonly int _cooldownSeconds = Math.Max(1, authOptions.Value.LoginCooldownSeconds);
@@ -18,7 +21,7 @@ public sealed class LoginRateLimiter(IMemoryCache memoryCache, IOptions<AuthOpti
             return false;
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         if (state.LockedUntil is null || state.LockedUntil <= now)
         {
             memoryCache.Remove(cacheKey);
@@ -33,7 +36,7 @@ public sealed class LoginRateLimiter(IMemoryCache memoryCache, IOptions<AuthOpti
     {
         var cacheKey = BuildKey(key);
         var state = memoryCache.Get<LoginWindowState>(cacheKey) ?? new LoginWindowState();
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         if (state.LockedUntil is not null && state.LockedUntil <= now)
         {
             state = new LoginWindowState();

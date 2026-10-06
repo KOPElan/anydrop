@@ -1,8 +1,16 @@
 namespace AnyDrop.Services;
 
-public sealed class LocalFileStorageService(IConfiguration configuration) : IFileStorageService
+public sealed class LocalFileStorageService(
+    IConfiguration configuration,
+    TimeProvider timeProvider) : IFileStorageService
 {
     private readonly string _basePath = Path.GetFullPath(configuration["Storage:BasePath"] ?? "data/files");
+
+    /// <summary>
+    /// 写入时需要预留的安全余量。除了文件本身，还要求额外的 64 MB：
+    /// 磁盘被写满会让 SQLite 写入一并失败，导致整个实例不可用。
+    /// </summary>
+    public const long DefaultReserveBytes = 64L * 1024 * 1024;
 
     /// <summary>
     /// 允许的扩展名形态：一个点加上 1..10 个字母或数字。
@@ -15,14 +23,67 @@ public sealed class LocalFileStorageService(IConfiguration configuration) : IFil
     public async Task<string> SaveFileAsync(Stream content, string fileName, string mimeType, CancellationToken ct = default)
     {
         var extension = GetSafeExtension(fileName);
-        var safeName = $"{DateTimeOffset.UtcNow:yyyyMMdd}/{Guid.NewGuid():N}{extension}";
-        var fullPath = GetFullPath(safeName);
-        var directory = Path.GetDirectoryName(fullPath)!;
+        var safeName = $"{timeProvider.GetUtcNow():yyyyMMdd}/{Guid.NewGuid():N}{extension}";
+
+        await WriteAtomicallyAsync(safeName, content, ct);
+
+        return safeName.Replace('\\', '/');
+    }
+
+    public async Task<string> SaveFileAtPathAsync(Stream content, string storagePath, string mimeType, CancellationToken ct = default)
+    {
+        var safePath = storagePath.Replace('\\', '/').TrimStart('/');
+
+        await WriteAtomicallyAsync(safePath, content, ct);
+
+        return safePath;
+    }
+
+    /// <summary>
+    /// 写入同目录下的临时文件，再原子改名到目标路径。
+    ///
+    /// 直接写目标路径的问题是：进程崩溃、容器被 kill、客户端中途断开，都会在最终位置
+    /// 留下一个长度不完整、却能被正常读取的半截文件。临时文件与目标同目录，
+    /// 因此 <see cref="File.Move(string, string, bool)"/> 是同卷改名（原子，无拷贝开销）。
+    /// </summary>
+    private async Task WriteAtomicallyAsync(string storagePath, Stream content, CancellationToken ct)
+    {
+        var finalPath = GetFullPath(storagePath);
+        var directory = Path.GetDirectoryName(finalPath)!;
         Directory.CreateDirectory(directory);
 
-        await using var output = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await content.CopyToAsync(output, ct);
-        return safeName.Replace('\\', '/');
+        var tempPath = Path.Combine(directory, $".{Guid.NewGuid():N}.part");
+
+        try
+        {
+            await using (var output = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                await content.CopyToAsync(output, ct);
+            }
+
+            File.Move(tempPath, finalPath, overwrite: true);
+        }
+        catch
+        {
+            // 失败时清理半截临时文件，不留垃圾
+            TryDeleteQuietly(tempPath);
+            throw;
+        }
+    }
+
+    private static void TryDeleteQuietly(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // 清理失败不应掩盖原始异常
+        }
     }
 
     /// <summary>
@@ -40,16 +101,41 @@ public sealed class LocalFileStorageService(IConfiguration configuration) : IFil
         return SafeExtensionPattern.IsMatch(extension) ? extension : string.Empty;
     }
 
-    public async Task<string> SaveFileAtPathAsync(Stream content, string storagePath, string mimeType, CancellationToken ct = default)
+    public bool HasFreeSpace(long requiredBytes)
     {
-        var safePath = storagePath.Replace('\\', '/').TrimStart('/');
-        var fullPath = GetFullPath(safePath);
-        var directory = Path.GetDirectoryName(fullPath)!;
-        Directory.CreateDirectory(directory);
+        if (requiredBytes < 0)
+        {
+            return true;
+        }
 
-        await using var output = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await content.CopyToAsync(output, ct);
-        return safePath;
+        var available = GetAvailableFreeSpace();
+        if (available == long.MaxValue)
+        {
+            return true;
+        }
+
+        // 用减法而非 requiredBytes + 余量，避免 requiredBytes 接近 long.MaxValue 时相加溢出
+        return available - DefaultReserveBytes >= requiredBytes;
+    }
+
+    /// <summary>存储卷剩余可用字节数；无法确定时返回 <see cref="long.MaxValue"/>。</summary>
+    internal long GetAvailableFreeSpace()
+    {
+        try
+        {
+            var root = Path.GetPathRoot(_basePath);
+            if (string.IsNullOrEmpty(root))
+            {
+                return long.MaxValue;
+            }
+
+            return new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch (Exception)
+        {
+            // 平台差异或路径异常时不做拦截，避免误伤正常上传
+            return long.MaxValue;
+        }
     }
 
     public Task<Stream> GetFileAsync(string storagePath, CancellationToken ct = default)
