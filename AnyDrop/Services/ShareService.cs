@@ -270,7 +270,11 @@ public sealed class ShareService(
         }
 
         var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
-        var normalizedSearch = normalized.ToLower();
+
+        // 关键词在 .NET 侧用不变文化小写化：区域性规则（如土耳其语的 I/i）会让 ToLower
+        // 产生与预期不同的结果。注意列本身必须用 ToLower()——EF Core 的 SQLite provider
+        // 不支持翻译 ToLowerInvariant()，在查询里使用它会在运行时抛「could not be translated」。
+        var normalizedSearch = normalized.ToLowerInvariant();
 
         // 使用显式的大小写不敏感匹配，避免 SQLite 在未配置 NOCASE 时出现大小写行为与需求不一致。
         // 同时转义 LIKE 通配符，尽量保持原先 Contains 的“字面子串匹配”语义。
@@ -280,9 +284,20 @@ public sealed class ShareService(
             .Replace("_", @"\_", StringComparison.Ordinal);
         var likePattern = $"%{escapedSearch}%";
 
+        // 正文、文件名、链接标题与描述都要参与匹配。
+        // 此前只匹配 Content，而图片/视频/文件消息的 Content 是内部存储路径
+        // （形如 20260418/<guid>.png），用户按文件名完全搜不到——
+        // 这与 README 宣称的「全文搜索」不符。
         var queryable = dbContext.ShareItems
             .AsNoTracking()
-            .Where(x => x.TopicId == topicId && EF.Functions.Like(x.Content.ToLower(), likePattern, @"\"));
+            .Where(x => x.TopicId == topicId
+                        && (EF.Functions.Like(x.Content.ToLower(), likePattern, @"\")
+                            || (x.FileName != null
+                                && EF.Functions.Like(x.FileName.ToLower(), likePattern, @"\"))
+                            || (x.LinkTitle != null
+                                && EF.Functions.Like(x.LinkTitle.ToLower(), likePattern, @"\"))
+                            || (x.LinkDescription != null
+                                && EF.Functions.Like(x.LinkDescription.ToLower(), likePattern, @"\"))));
 
         if (before.HasValue)
         {

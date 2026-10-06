@@ -1,9 +1,13 @@
 services:
   anydrop:
+    # 使用已发布的镜像：可固定版本、可回滚。
+    #   固定版本：在 .env 中设置 ANYDROP_VERSION=v1.2.3，然后 docker compose pull && docker compose up -d --no-build
+    #   跟随最新：保持默认 latest
+    # 下方保留 build 段以便从源码构建；docker compose up -d --build 仍可用。
+    image: ghcr.io/kopelan/anydrop:${ANYDROP_VERSION:-latest}
     build:
       context: .
       dockerfile: AnyDrop/Dockerfile
-    image: anydrop:latest
     container_name: anydrop
     restart: unless-stopped
     ports:
