@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using AnyDrop.Models;
 using AnyDrop.Services;
@@ -98,6 +99,14 @@ public static class AuthEndpoints
     {
         if (!result.Succeeded)
         {
+            // 限流失败时带上 Retry-After，让客户端知道何时可以重试
+            if (result.RetryAfter is { } retryAfter)
+            {
+                httpContext.Response.Headers["Retry-After"] =
+                    Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds))
+                        .ToString(CultureInfo.InvariantCulture);
+            }
+
             return Results.Json(ApiEnvelope<LoginResponse>.Fail(result.Error ?? "认证失败。"), statusCode: result.StatusCode);
         }
 

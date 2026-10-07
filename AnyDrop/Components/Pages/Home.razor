@@ -240,7 +240,7 @@
                                              @onclick="() => OpenImagePreview(GetFileUrl(message.Id))">
                                             <img class="h-56 max-h-56 w-full object-cover transition-transform duration-200 hover:scale-[1.02]"
                                                   src="@GetThumbnailUrl(message.Id)"
-                                                  onerror="this.onerror=null;this.src='@GetFileUrl(message.Id)'"
+                                                  data-fallback-src="@GetFileUrl(message.Id)"
                                                   alt="@message.FileName" />
                                         </div>
                                         <div class="flex items-center justify-between px-1">
@@ -280,7 +280,7 @@
                                                      @onclick="() => ExpandVideo(message.Id)">
                                                     <img class="w-full max-h-64 object-cover rounded-xl bg-black/20"
                                                          src="@GetThumbnailUrl(message.Id)"
-                                                         onerror="this.onerror=null;this.style.minHeight='120px';this.style.background='rgba(0,0,0,0.3)'"
+                                                         data-fallback-style="placeholder"
                                                          alt="@message.FileName" />
                                                     <div class="absolute inset-0 flex items-center justify-center">
                                                         <div class="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform hover:scale-110">
