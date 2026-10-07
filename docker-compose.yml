@@ -29,6 +29,11 @@ services:
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
       # ── 孤儿文件回收（默认只报告不删除）─────────────────────────────────────
       - Storage__OrphanCleanupEnabled=${ANYDROP_ORPHAN_CLEANUP_ENABLED:-false}
+      # ── 反向代理（默认关闭）─────────────────────────────────────────────────
+      # 启用时务必同时设置 ANYDROP_REVERSE_PROXY_NETWORK 为代理的实际网段，
+      # 否则转发头会被忽略，登录限流将退化为所有访问者共享。
+      - ReverseProxy__Enabled=${ANYDROP_REVERSE_PROXY_ENABLED:-false}
+      - ReverseProxy__KnownNetworks__0=${ANYDROP_REVERSE_PROXY_NETWORK:-}
       - ASPNETCORE_ENVIRONMENT=Production
     healthcheck:
       # 使用 /health 而不是首页：首页只能说明 Kestrel 起来了，

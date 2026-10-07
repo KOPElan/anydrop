@@ -67,9 +67,15 @@ public sealed class AuthService(
 
     public async Task<AuthResult<LoginResponse>> LoginAsync(LoginRequest request, string rateLimitKey, CancellationToken ct = default)
     {
-        if (loginRateLimiter.IsLocked(rateLimitKey, out _))
+        if (loginRateLimiter.IsLocked(rateLimitKey, out var retryAfter))
         {
-            return AuthResult<LoginResponse>.Failure("账号或密码错误。", StatusCodes.Status401Unauthorized);
+            // 明确返回 429 与需要等待的时长，而不是伪装成「账号或密码错误」：
+            // 前端可以据此给出可操作的提示，也便于用户区分「密码不对」和「被限流」。
+            var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+            return AuthResult<LoginResponse>.Failure(
+                $"尝试次数过多，请 {seconds} 秒后再试。",
+                StatusCodes.Status429TooManyRequests,
+                retryAfter);
         }
 
         var user = await userService.GetSingleUserAsync(ct);
@@ -78,8 +84,8 @@ public sealed class AuthService(
             return AuthResult<LoginResponse>.Failure("请先完成初始化配置。", StatusCodes.Status409Conflict);
         }
 
-        var ok = passwordHasherService.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt);
-        if (!ok)
+        var verification = passwordHasherService.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt);
+        if (verification == PasswordVerificationResult.Failed)
         {
             loginRateLimiter.RegisterFailure(rateLimitKey);
             return AuthResult<LoginResponse>.Failure("账号或密码错误。", StatusCodes.Status401Unauthorized);
@@ -88,6 +94,16 @@ public sealed class AuthService(
         loginRateLimiter.Reset(rateLimitKey);
         user.LastLoginAt = DateTimeOffset.UtcNow;
         user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // 存储的哈希参数已过时（旧格式，或迭代次数低于当前要求）：
+        // 借这次已知明文的机会就地升级，用户无感。
+        if (verification == PasswordVerificationResult.SuccessRehashNeeded)
+        {
+            var (upgradedHash, upgradedSalt) = passwordHasherService.HashPassword(request.Password);
+            user.PasswordHash = upgradedHash;
+            user.PasswordSalt = upgradedSalt;
+        }
+
         await dbContext.SaveChangesAsync(ct);
 
         var token = tokenService.GenerateToken(user);
@@ -138,7 +154,8 @@ public sealed class AuthService(
             return AuthResult<bool>.Failure("用户不存在。", StatusCodes.Status404NotFound);
         }
 
-        if (!passwordHasherService.VerifyPassword(request.CurrentPassword, user.PasswordHash, user.PasswordSalt))
+        if (passwordHasherService.VerifyPassword(request.CurrentPassword, user.PasswordHash, user.PasswordSalt)
+            == PasswordVerificationResult.Failed)
         {
             return AuthResult<bool>.Failure("当前密码错误。", StatusCodes.Status401Unauthorized);
         }

@@ -231,6 +231,10 @@ npm run css:watch:app
 | `Storage__BasePath` | 上传文件存储目录 | `data/files` |
 | `Storage__MaxFileSizeBytes` | 单文件大小上限（字节） | Docker Compose 为 `104857600`（100 MB）；源码运行时见 `AnyDrop/appsettings.json` |
 | `Storage__OrphanCleanupEnabled` | 是否实际回收孤儿文件（`false` 时只报告） | `false` |
+| `Auth__PasswordHashIterations` | PBKDF2-HMAC-SHA256 迭代次数 | `600000`（OWASP 对 SHA256 的建议下限） |
+| `ReverseProxy__Enabled` | 是否启用反向代理支持（信任 `X-Forwarded-*`） | `false` |
+| `ReverseProxy__KnownProxies` | 受信任代理的 IP 列表 | — |
+| `ReverseProxy__KnownNetworks` | 受信任代理的网段（CIDR）列表 | — |
 | `ASPNETCORE_URLS` | Kestrel 监听地址 | `http://+:5002`（容器内为 `http://+:8080`） |
 
 ---
@@ -253,6 +257,35 @@ npm run css:watch:app
 ```
 
 确认这些文件确实无用后，把 `Storage__OrphanCleanupEnabled` 设为 `true` 即可自动回收。对账有 24 小时宽限期，正在进行中的上传不会被误判。
+
+---
+
+## 反向代理部署
+
+如果前面有 Nginx / Caddy / Traefik / Cloudflare 等反向代理，请启用转发头信任，**并填写代理的地址或网段**：
+
+```dotenv
+ReverseProxy__Enabled=true
+ReverseProxy__KnownNetworks__0=172.16.0.0/12   # Docker 默认网段
+```
+
+不启用时的后果是：所有请求看起来都来自代理的 IP，登录限流于是被所有访问者共享——一个人的失败尝试会把所有人（包括你自己）一起锁住。
+
+> ⚠️ 不要把可信来源写成「全部」。那样任何客户端都能伪造 `X-Forwarded-For`，从而绕过按客户端 IP 计算的登录限流。ASP.NET Core 默认只信任 loopback，未列入可信来源的转发头会被直接忽略，这是有意为之的安全默认值。
+
+---
+
+## 前端资源自托管
+
+页面不加载任何第三方资源：字体与图标字体、拖拽排序库都存放在 `AnyDrop/wwwroot/` 下，由 `scripts/fetch-web-assets.ps1` 从上游获取。这既符合本项目「不依赖第三方云服务」的定位，也让实例能在离线/内网环境正常工作。
+
+升级依赖或新增图标后重新运行该脚本即可（图标字体会按源码中实际出现的图标名自动子集化，避免把近 4 MB 的完整字体塞进仓库）：
+
+```bash
+pwsh scripts/fetch-web-assets.ps1
+```
+
+E2E 中的 `Page_DoesNotReferenceThirdPartyOrigins` 会在页面开始请求任何非本机地址时失败。
 
 ---
 
