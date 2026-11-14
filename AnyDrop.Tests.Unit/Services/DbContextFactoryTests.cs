@@ -147,6 +147,44 @@ public class DbContextFactoryTests : IDisposable
     }
 
     /// <summary>
+    /// 万级数据分批游标（S1-03 验收规模）：10000 条消息跨 10 天，每批 1000 条，
+    /// 10 个批次都不能漏、不能重复。
+    /// </summary>
+    [Fact]
+    public async Task GetTopicActiveDatesAsync_TenThousandMessages_ReturnsAllDates()
+    {
+        var options = new DbContextOptionsBuilder<AnyDropDbContext>()
+            .UseInMemoryDatabase($"anydrop-factory-dates-10k-{Guid.NewGuid():N}")
+            .Options;
+        var factory = new TestDbContextFactory(options);
+
+        var topicId = Guid.NewGuid();
+        await using (var seed = factory.CreateDbContext())
+        {
+            seed.Topics.Add(new Topic { Id = topicId, Name = "t", CreatedAt = DateTimeOffset.UtcNow });
+            var baseTime = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            for (var i = 0; i < 10000; i++)
+            {
+                seed.ShareItems.Add(new ShareItem
+                {
+                    TopicId = topicId,
+                    ContentType = ShareContentType.Text,
+                    Content = $"m{i}",
+                    CreatedAt = baseTime.AddDays(i / 1000)
+                });
+            }
+
+            await seed.SaveChangesAsync();
+        }
+
+        var sut = ShareServiceFactory.Create(factory);
+        var dates = await sut.GetTopicActiveDatesAsync(
+            topicId, new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 10), TimeZoneInfo.Utc);
+
+        dates.Should().BeEquivalentTo(Enumerable.Range(1, 10).Select(d => new DateOnly(2026, 1, d)));
+    }
+
+    /// <summary>
     /// 批量清理分批标记：600 条超龄消息（每批 500 条），两批都要标记到位。
     /// </summary>
     [Fact]

@@ -163,3 +163,15 @@ jobs:
           name: e2e-test-results
           path: TestResults
           if-no-files-found: ignore
+
+  # ── Compose 冒烟（S1-08 门禁）：起容器、登录、发文件、重建容器验登录态、备份恢复 ──
+  # Docker 在 ubuntu-latest 上可用；脚本自带清理，不碰真实数据。
+  compose-smoke:
+    name: Compose smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run compose smoke test
+        run: bash scripts/smoke-compose.sh
