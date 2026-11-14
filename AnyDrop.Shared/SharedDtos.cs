@@ -166,3 +166,38 @@ public sealed record MissingFileReportDto(
 
 /// <summary>处理缺失引用记录的请求。Action：delete-message（删除对应消息）或 dismiss（标记已处理）。</summary>
 public sealed record ResolveMissingFileRequest(string Action);
+
+// ── 分片上传 DTO（S2-07，CLI-05）───────────────────────────────────────────────
+
+/// <summary>分片上传初始化请求。TotalSha256 可空：客户端可在上传各片时增量计算，完成后提交。</summary>
+public sealed record InitUploadRequest(
+    string FileName,
+    long TotalSize,
+    string? TotalSha256,
+    string IdempotencyKey,
+    Guid? TopicId = null,
+    bool BurnAfterReading = false,
+    string? MimeType = null);
+
+/// <summary>分片上传初始化响应。同一幂等键重复初始化返回同一 UploadId 与已确认分片清单。</summary>
+public sealed record InitUploadResponse(
+    Guid UploadId,
+    int ChunkSize,
+    IReadOnlyList<int> ConfirmedChunks,
+    DateTimeOffset ExpiresAt);
+
+/// <summary>分片上传状态（断点续传查询）。</summary>
+public sealed record UploadStatusResponse(
+    Guid UploadId,
+    string FileName,
+    long TotalSize,
+    int ChunkSize,
+    IReadOnlyList<int> ConfirmedChunks,
+    string Status,
+    DateTimeOffset ExpiresAt);
+
+/// <summary>完成分片上传请求。TotalSha256 有值时服务端合并后校验，不一致则拒绝完成（分片需重传）。</summary>
+public sealed record CompleteUploadRequest(string? TotalSha256 = null);
+
+/// <summary>单片上传确认响应。</summary>
+public sealed record ChunkUploadResponse(int ChunkIndex, long Size, IReadOnlyList<int> ConfirmedChunks);

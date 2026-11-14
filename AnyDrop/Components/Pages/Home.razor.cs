@@ -3,6 +3,7 @@ using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -18,7 +19,8 @@ namespace AnyDrop.Components.Pages;
 
 public partial class Home : IAsyncDisposable
 {
-    private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
+    // D2：回退上限同样是 500MB（配置缺失时），不再回退 1GB。
+    private const long DefaultMaxFileSizeBytes = UploadLimits.MaxFileSizeBytes;
     // 缩短降级等待：降低连接失败到轮询兜底的感知延迟；仍保留一次短重试避免瞬时抖动。
     private const int HubInitialDelayMs = 100;
     private const int HubRetryDelayMs = 200;

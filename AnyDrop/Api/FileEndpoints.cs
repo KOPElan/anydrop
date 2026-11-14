@@ -7,7 +7,8 @@ namespace AnyDrop.Api;
 
 public static class FileEndpoints
 {
-    private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;
+    // D2：回退上限同样是 500MB（配置缺失时），不再回退 1GB。
+    private const long DefaultMaxFileSizeBytes = UploadLimits.MaxFileSizeBytes;
 
     public static IEndpointRouteBuilder MapFileEndpoints(this IEndpointRouteBuilder app)
     {

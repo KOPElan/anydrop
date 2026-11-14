@@ -110,7 +110,8 @@ public class DatabaseMigrationExtensionsTests : IDisposable
 
     /// <summary>
     /// 模拟旧库：历史改写为最后一版旧迁移、删掉新迁移带来的结构（UploadState 列、
-    /// MissingFileReports 表、RefreshTokens 表）与补丁列（模拟从未跑过补丁的旧库），
+    /// MissingFileReports 表、RefreshTokens 表、ChunkedUploads/ChunkedUploadChunks 表）
+    /// 与补丁列（模拟从未跑过补丁的旧库），
     /// 升级门应校验通过、补齐列、把基线记入历史；随后 MigrateAsync 应用新迁移。
     /// </summary>
     [Fact]
@@ -122,6 +123,8 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         await db.Database.ExecuteSqlRawAsync("ALTER TABLE ShareItems DROP COLUMN UploadState;");
         await db.Database.ExecuteSqlRawAsync("DROP TABLE MissingFileReports;");
         await db.Database.ExecuteSqlRawAsync("DROP TABLE RefreshTokens;");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE ChunkedUploadChunks;");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE ChunkedUploads;");
         await db.Database.ExecuteSqlRawAsync(
             $"ALTER TABLE SystemSettings DROP COLUMN {ColumnName};");
         (await ColumnExistsAsync(db, ColumnName)).Should().BeFalse("前置条件：模拟旧库缺补丁列");
@@ -133,12 +136,14 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         (await ColumnExistsAsync(db, ColumnName)).Should().BeTrue("升级门应补齐补丁列");
         (await ReadHistoryAsync(db)).Should().Contain(DatabaseMigrationExtensions.BaselineMigrationId);
 
-        // 随后 MigrateAsync 应用基线之后的新迁移（UploadState 列 + 修复记录表 + RefreshTokens 表），
-        // 不能因表已存在而失败
+        // 随后 MigrateAsync 应用基线之后的新迁移（UploadState 列 + 修复记录表 + RefreshTokens 表
+        // + 分片上传表），不能因表已存在而失败
         await db.Database.MigrateAsync();
         (await ColumnExistsAsync(db, "UploadState", "ShareItems")).Should().BeTrue("新迁移应补上 UploadState 列");
         (await TableExistsAsync(db, "MissingFileReports")).Should().BeTrue("新迁移应创建修复记录表");
         (await TableExistsAsync(db, "RefreshTokens")).Should().BeTrue("新迁移应创建 RefreshTokens 表");
+        (await TableExistsAsync(db, "ChunkedUploads")).Should().BeTrue("新迁移应创建分片上传会话表");
+        (await TableExistsAsync(db, "ChunkedUploadChunks")).Should().BeTrue("新迁移应创建分片确认表");
         (await db.SystemSettings.CountAsync()).Should().Be(1);
     }
 
