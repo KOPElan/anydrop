@@ -29,13 +29,18 @@ ARG APP_UID=1654
 # 安装需要 root：切换回来执行 apt-get，安装完再切回非特权用户
 USER root
 # 安装 ffmpeg（视频缩略图）与 curl（供 compose healthcheck 使用：
-# aspnet 基础镜像既不带 wget 也不带 curl，原 healthcheck 必然失败）
+# aspnet 基础镜像既不带 wget 也不带 curl，原 healthcheck 必然失败），
+# 以及 sqlite3（S1-06：备份脚本在容器内用 .backup 给数据库拍在线快照，
+# 不再依赖临时 apk add）。
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg curl \
+    && apt-get install -y --no-install-recommends ffmpeg curl sqlite3 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /data \
     && chown -R $APP_UID:$APP_UID /data
 USER $APP_UID
 WORKDIR /app
 COPY --from=publish /app/publish .
+# S1-06：备份/恢复脚本随镜像发布，备份可在一次性容器里直接跑
+# （docker run --rm -v anydrop-data:/data <image> sh /scripts/backup.sh …）。
+COPY scripts/ /scripts/
 ENTRYPOINT ["dotnet", "AnyDrop.dll"]
