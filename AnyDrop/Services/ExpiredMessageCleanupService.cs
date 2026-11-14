@@ -1,5 +1,6 @@
 using AnyDrop.Data;
 using AnyDrop.Hubs;
+using AnyDrop.Logging;
 using AnyDrop.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +35,8 @@ public sealed class ExpiredMessageCleanupService(
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogWarning(ex, "Expired message cleanup cycle failed.");
+                // S3-04：用 LogMarkers 常量记日志，摘要按同一字符串计数。
+                logger.LogWarning(ex, LogMarkers.ExpiredCleanupFailed);
             }
 
             // 每天后台任务时区日期变更后执行一次自动清理检查
@@ -51,7 +53,8 @@ public sealed class ExpiredMessageCleanupService(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    logger.LogWarning(ex, "Auto cleanup cycle failed.");
+                    // S3-04：用 LogMarkers 常量记日志，摘要按同一字符串计数。
+                    logger.LogWarning(ex, LogMarkers.AutoCleanupFailed);
                 }
             }
         }

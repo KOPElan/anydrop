@@ -3,6 +3,7 @@ using AnyDrop.Components;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Infrastructure;
+using AnyDrop.Logging;
 using AnyDrop.Middleware;
 using AnyDrop.Models;
 using AnyDrop.Services;
@@ -28,6 +29,9 @@ using System.Text;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// S3-04：文件日志（控制台之外再落一份，带轮转与保留期；配置非法时启动即失败）。
+builder.Logging.AddFileLogging(builder.Configuration);
 
 // 文件上传大小限制：优先从配置读取，回退到 D2 定稿的 500MB（不再回退 1GB）
 const long defaultMaxUploadBytes = UploadLimits.MaxFileSizeBytes;
@@ -214,6 +218,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(LinkMetadataService.HttpClientName)
     .ConfigurePrimaryHttpMessageHandler(() => LinkMetadataService.CreateHandler());
 builder.Services.AddHostedService<ExpiredMessageCleanupService>();
+builder.Services.AddHostedService<DailySummaryService>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents(options =>
 {
     // S2-10：断开的 Blazor 电路保留 10 分钟（默认仅 3 分钟，手机锁屏/弱网切换

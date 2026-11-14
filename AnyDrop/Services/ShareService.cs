@@ -1,5 +1,6 @@
 using AnyDrop.Data;
 using AnyDrop.Hubs;
+using AnyDrop.Logging;
 using AnyDrop.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Data.Sqlite;
@@ -291,7 +292,8 @@ public sealed class ShareService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Background thumbnail generation failed for item {ItemId}", itemId);
+            // S3-04：用 LogMarkers 常量记日志，摘要按同一字符串计数。
+            logger.LogWarning(ex, LogMarkers.ThumbnailFailed, itemId);
         }
     }
 
