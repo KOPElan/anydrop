@@ -113,6 +113,7 @@ builder.Services.AddScoped<IPasswordHasherService, PasswordHasherService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddSingleton<ILoginRateLimiter, LoginRateLimiter>();
+builder.Services.AddSingleton<MessageSearchIndex>();
 
 // S3-02：分端点限流（登录/初始化沿用 S0-03 的 LoginRateLimiter）。
 // 固定窗口 + 按来源 IP 分区；超限返回 429，分片客户端按片重试可自行

@@ -486,7 +486,8 @@ public class ShareServiceTests
             linkMetadataService,
             systemSettingsMock.Object,
             timeProvider ?? TimeProvider.System,
-            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
+            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>(),
+            new MessageSearchIndex());
     }
 
     private static ShareService CreateService(
@@ -547,6 +548,7 @@ public class ShareServiceTests
             linkMetadataService,
             systemSettingsMock.Object,
             timeProvider ?? TimeProvider.System,
-            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
+            Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>(),
+            new MessageSearchIndex());
     }
 }

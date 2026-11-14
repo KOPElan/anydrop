@@ -24,7 +24,8 @@ internal static class ShareServiceFactory
     public static ShareService Create(
         IDbContextFactory<AnyDropDbContext> dbContextFactory,
         IFileStorageService? fileStorageService = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        MessageSearchIndex? searchIndex = null)
     {
         var hubClients = new Mock<IHubClients>();
         hubClients.Setup(c => c.All).Returns(new Mock<IClientProxy>().Object);
@@ -45,6 +46,7 @@ internal static class ShareServiceFactory
             linkMetadata,
             new Mock<ISystemSettingsService>().Object,
             timeProvider ?? TimeProvider.System,
-            NullLogger<ShareService>.Instance);
+            NullLogger<ShareService>.Instance,
+            searchIndex ?? new MessageSearchIndex());
     }
 }

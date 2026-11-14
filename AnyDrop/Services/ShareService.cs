@@ -2,6 +2,7 @@ using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +23,8 @@ public sealed class ShareService(
     LinkMetadataService linkMetadataService,
     ISystemSettingsService systemSettingsService,
     TimeProvider timeProvider,
-    ILogger<ShareService> logger) : IShareService
+    ILogger<ShareService> logger,
+    MessageSearchIndex searchIndex) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
     {
@@ -332,7 +334,97 @@ public sealed class ShareService(
         }
 
         var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+        var now = timeProvider.GetUtcNow();
 
+        // S3-03：FTS5 为主、LIKE 兜底。
+        // unicode61 分词器命中不了中文词中子串（如“好世”搜“你好世界”），
+        // 因此 FTS 结果不满一页时再跑一次 LIKE 并合并去重，召回与旧行为一致；
+        // FTS 满页时不再跑 LIKE 全表扫描（否则 FTS 的速度收益就没了），
+        // 词中匹配会随翻页时的 LIKE 兜底陆续出现。
+        if (searchIndex.IsAvailable)
+        {
+            var ftsQuery = MessageSearchFts.BuildMatchQuery(normalized);
+            if (ftsQuery is not null)
+            {
+                try
+                {
+                    var ftsIds = await MessageSearchFts.SearchIdsAsync(dbContext, topicId, ftsQuery, safeLimit + 1, before, now, ct);
+                    var ftsMessages = await LoadMessagesByIdsAsync(dbContext, topicId, ftsIds, now, ct);
+                    if (ftsIds.Count > safeLimit)
+                    {
+                        return BuildSearchResponse(ftsMessages, safeLimit);
+                    }
+
+                    var likeMessages = await SearchViaLikeAsync(dbContext, topicId, normalized, safeLimit + 1, before, now, ct);
+                    return BuildSearchResponse(MergeByCreatedAtDesc(ftsMessages, likeMessages), safeLimit);
+                }
+                catch (SqliteException ex) when (MessageSearchFts.IsFtsUnavailable(ex))
+                {
+                    logger.LogWarning(ex, "FTS5 搜索索引不可用，已回退到 LIKE 搜索；本次启动内不再尝试 FTS。");
+                    searchIndex.MarkUnavailable();
+                }
+            }
+        }
+
+        var fallback = await SearchViaLikeAsync(dbContext, topicId, normalized, safeLimit + 1, before, now, ct);
+        return BuildSearchResponse(fallback, safeLimit);
+    }
+
+    private async Task<List<ShareItemDto>> LoadMessagesByIdsAsync(
+        AnyDropDbContext dbContext,
+        Guid topicId,
+        IReadOnlyList<Guid> ids,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.ShareItems
+            .AsNoTracking()
+            .NotExpired(now)
+            .Where(x => x.TopicId == topicId && ids.Contains(x.Id))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => x.ToDto())
+            .ToListAsync(ct);
+    }
+
+    private static List<ShareItemDto> MergeByCreatedAtDesc(List<ShareItemDto> first, List<ShareItemDto> second)
+    {
+        var seen = new HashSet<Guid>(first.Select(x => x.Id));
+        var merged = new List<ShareItemDto>(first);
+        merged.AddRange(second.Where(x => seen.Add(x.Id)));
+        merged.Sort((a, b) => b.CreatedAt.CompareTo(a.CreatedAt));
+        return merged;
+    }
+
+    private static TopicMessagesResponse BuildSearchResponse(List<ShareItemDto> orderedDesc, int safeLimit)
+    {
+        // 多取一条以判断是否有更多数据，避免额外的 COUNT/ANY 查询
+        var hasMore = orderedDesc.Count > safeLimit;
+        var messages = hasMore ? orderedDesc.Take(safeLimit).ToList() : orderedDesc;
+
+        string? nextCursor = null;
+        if (hasMore)
+        {
+            nextCursor = messages[^1].CreatedAt.ToString("O");
+        }
+
+        return new TopicMessagesResponse(messages, hasMore, nextCursor);
+    }
+
+    /// <summary>旧的四列 LIKE 搜索：FTS 不可用时的全量回退，也是 FTS 召回缺口的补齐。</summary>
+    private async Task<List<ShareItemDto>> SearchViaLikeAsync(
+        AnyDropDbContext dbContext,
+        Guid topicId,
+        string normalized,
+        int take,
+        DateTimeOffset? before,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         // 关键词在 .NET 侧用不变文化小写化：区域性规则（如土耳其语的 I/i）会让 ToLower
         // 产生与预期不同的结果。注意列本身必须用 ToLower()——EF Core 的 SQLite provider
         // 不支持翻译 ToLowerInvariant()，在查询里使用它会在运行时抛「could not be translated」。
@@ -352,7 +444,7 @@ public sealed class ShareService(
         // 这与 README 宣称的「全文搜索」不符。
         var queryable = dbContext.ShareItems
             .AsNoTracking()
-            .NotExpired(timeProvider.GetUtcNow())
+            .NotExpired(now)
             .Where(x => x.TopicId == topicId
                         && (EF.Functions.Like(x.Content.ToLower(), likePattern, @"\")
                             || (x.FileName != null
@@ -367,23 +459,11 @@ public sealed class ShareService(
             queryable = queryable.Where(x => x.CreatedAt < before.Value);
         }
 
-        // 多取一条以判断是否有更多数据，避免额外的 COUNT/ANY 查询
-        var rawMessages = await queryable
+        return await queryable
             .OrderByDescending(x => x.CreatedAt)
-            .Take(safeLimit + 1)
+            .Take(take)
             .Select(x => x.ToDto())
             .ToListAsync(ct);
-
-        var hasMore = rawMessages.Count > safeLimit;
-        var messages = hasMore ? rawMessages.Take(safeLimit).ToList() : rawMessages;
-
-        string? nextCursor = null;
-        if (hasMore)
-        {
-            nextCursor = messages[^1].CreatedAt.ToString("O");
-        }
-
-        return new TopicMessagesResponse(messages, hasMore, nextCursor);
     }
 
     public async Task<IReadOnlyList<ShareItemDto>> GetTopicMessagesByDateAsync(
