@@ -301,4 +301,9 @@
   <data name="Search_ImagePreview"><value>图片预览</value></data>
   <data name="Search_Today"><value>今天</value></data>
   <data name="Search_Yesterday"><value>昨天</value></data>
+  <data name="Settings_LoadFailed"><value>加载设置失败，请刷新重试。</value></data>
+  <data name="Home_FolderDropNotSupported"><value>暂不支持拖入文件夹，请选择文件上传。</value></data>
+  <data name="Home_UploadTimedOut"><value>上传超时，请重试。</value></data>
+  <data name="Home_UploadCancelled"><value>已取消上传。</value></data>
+  <data name="Home_CancelUpload"><value>取消上传</value></data>
 </root>

@@ -388,7 +388,18 @@
                                             <div class="h-full rounded-full transition-all duration-300"
                                                  style="width: @(pending.ProgressPercent)%; background: rgba(255,255,255,0.75);"></div>
                                         </div>
-                                        <p class="text-[10px] text-white/60 mt-1">@(pending.ProgressPercent)%</p>
+                                        <div class="flex items-center justify-between mt-1">
+                                            <p class="text-[10px] text-white/60">@(pending.ProgressPercent)%</p>
+                                            @if (!pending.IsRemote)
+                                            {
+                                                <button type="button"
+                                                        class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                                                        aria-label="@($"{L["Home_CancelUpload"]}: {pending.FileName}")"
+                                                        @onclick="() => CancelPendingUploadAsync(pending.TempId)">
+                                                    @L["Home_CancelUpload"]
+                                                </button>
+                                            }
+                                        </div>
                                     </div>
                                 }
                             </div>
@@ -548,7 +559,8 @@
                           placeholder="@L["Home_InputPlaceholder"]"
                           maxlength="10000"
                           rows="1"
-                          @bind="_inputText"
+                          @bind:get="_inputText"
+                          @bind:set="SetInputText"
                           @bind:event="oninput"
                           @onkeydown="HandleKeyDown"></textarea>
                 @if (!string.IsNullOrWhiteSpace(_validationError))
@@ -657,7 +669,8 @@
                               placeholder="@L["Home_InputPlaceholder"]"
                               maxlength="10000"
                               rows="1"
-                              @bind="_mobileInputText"
+                              @bind:get="_mobileInputText"
+                              @bind:set="SetMobileInputText"
                               @bind:event="oninput"></textarea>
                     @if (!string.IsNullOrWhiteSpace(_validationError))
                     {

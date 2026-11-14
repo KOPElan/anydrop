@@ -30,6 +30,9 @@ public partial class TopicSidebar : IAsyncDisposable
     private DotNetObjectReference<TopicSidebar>? _dotNetRef;
     private Guid? _selectedTopicId;
 
+    // S2-10：按浏览器时区显示最后消息时间；默认服务器本地时区，首渲染后以浏览器时区为准。
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
+
     // 排序错误提示
     private string? _error;
 
@@ -57,6 +60,20 @@ public partial class TopicSidebar : IAsyncDisposable
     {
         if (firstRender)
         {
+            // S2-10：获取浏览器时区，用于正确显示最后消息时间；拿到后重绘一次，
+            // 否则首屏一直按服务器本地时区显示。
+            try
+            {
+                var browserTimeZoneId = await JS.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
+                try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(browserTimeZoneId); }
+                catch { _displayTimeZone = TimeZoneInfo.Local; }
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Failed to get browser timezone, falling back to server local time.");
+            }
+
             // Hub 只在交互模式（Blazor 电路已建立）下启动，避免预渲染时连接失败
             await InitializeHubAsync();
         }
@@ -98,6 +115,14 @@ public partial class TopicSidebar : IAsyncDisposable
         _unreadTopicIds.Remove(topicId);
         await TopicStateService.SetSelectedTopicAsync(topicId);
         await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>S2-10：最后消息时间按浏览器时区换算；旧实现用 ToLocalTime()
+    /// （服务器本地时区，容器里常为 UTC，与浏览器差 8 小时）。</summary>
+    private string FormatSidebarTime(DateTimeOffset time)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
+        return local.ToString("HH:mm");
     }
 
     [JSInvokable]

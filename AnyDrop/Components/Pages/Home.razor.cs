@@ -70,6 +70,11 @@ public partial class Home : IAsyncDisposable
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
     private readonly Dictionary<long, string> _messageTimeTextCache = [];
+
+    // S2-10：输入框草稿落盘（localStorage，与 MAUI 端同键 anydrop_draft_{TopicId}）；
+    // 每话题独立，切换话题/刷新后回来仍在。保存防抖 500ms，避免每键一次 JS 往返。
+    private CancellationTokenSource? _draftSaveCts;
+    private string? DraftKey => _selectedTopicId.HasValue ? $"anydrop_draft_{_selectedTopicId.Value}" : null;
     private int _renderScheduled;
     private long _lastPollingHubReconnectAttemptTicks = DateTimeOffset.MinValue.UtcTicks;
 
@@ -174,9 +179,12 @@ public partial class Home : IAsyncDisposable
     {
         if (SelectedTopicId != _selectedTopicId)
         {
+            // S2-10：切换话题前先把旧话题的草稿立即落盘（不等防抖），切完再恢复新话题的草稿。
+            await SaveDraftNowAsync();
             _selectedTopicId = SelectedTopicId;
             await LoadSelectedTopicMessagesAsync();
             await LoadSelectedTopicMetaAsync();
+            await RestoreDraftAsync();
 
             // 主题切换时退出选择模式
             ExitSelectMode();
@@ -271,6 +279,15 @@ public partial class Home : IAsyncDisposable
             catch (Exception ex)
             {
                 Logger.LogDebug(ex, "Failed to get browser timezone, falling back to UTC.");
+            }
+
+            // S2-10：拿到浏览器时区后必须重绘一次，否则首屏消息时间一直按
+            // 服务器本地时区显示，直到下一次 SignalR/轮询触发渲染才纠正。
+            // 同时恢复当前话题的输入草稿（与时区同一次重绘，不多一次渲染）。
+            await RestoreDraftAsync();
+            if (!_isDisposed)
+            {
+                StateHasChanged();
             }
 
             // 设置聊天区域拖放处理（JS 端负责消抖，仅在状态变化时回调 .NET）
@@ -505,6 +522,9 @@ public partial class Home : IAsyncDisposable
         {
             await ShareService.SendTextAsync(trimmedText, _selectedTopicId, burnAfterReading: _burnAfterReading);
             _inputText = string.Empty;
+            _mobileInputText = string.Empty;
+            // S2-10：发送成功后清除当前话题的草稿
+            await ClearDraftAsync();
             // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示；
             // showSkeleton=false 避免清空现有列表并显示骨架屏
             await LoadSelectedTopicMessagesAsync(showSkeleton: false);
@@ -521,6 +541,103 @@ public partial class Home : IAsyncDisposable
         if (e.CtrlKey && string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
         {
             await SendAsync();
+        }
+    }
+
+    // ── 输入框草稿落盘（S2-10） ──────────────────────────────────────────────
+
+    /// <summary>桌面端输入框的绑定 setter：同步移动端字段并安排防抖保存。</summary>
+    private void SetInputText(string value)
+    {
+        _inputText = value;
+        _mobileInputText = value;
+        ScheduleDraftSave();
+    }
+
+    /// <summary>移动端输入框的绑定 setter：同步桌面端字段并安排防抖保存。</summary>
+    private void SetMobileInputText(string value)
+    {
+        _mobileInputText = value;
+        _inputText = value;
+        ScheduleDraftSave();
+    }
+
+    /// <summary>从 localStorage 恢复当前话题的草稿（预渲染阶段 JS 不可用时静默跳过，
+    /// 首渲染的 OnAfterRenderAsync 会再恢复一次）。</summary>
+    private async Task RestoreDraftAsync()
+    {
+        if (DraftKey is null) return;
+        try
+        {
+            var draft = await JS.InvokeAsync<string?>("AnyDropInterop.getDraft", DraftKey);
+            if (!string.IsNullOrEmpty(draft))
+            {
+                _inputText = draft;
+                _mobileInputText = draft;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to restore input draft.");
+        }
+    }
+
+    /// <summary>防抖保存：500ms 内无新输入才写一次 localStorage，避免每键一次 JS 往返。</summary>
+    private void ScheduleDraftSave()
+    {
+        if (DraftKey is null) return;
+        _draftSaveCts?.Cancel();
+        _draftSaveCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _draftSaveCts = cts;
+        _ = SaveDraftAfterDelayAsync(cts.Token);
+    }
+
+    private async Task SaveDraftAfterDelayAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(500, ct);
+            if (ct.IsCancellationRequested || _isDisposed || DraftKey is null) return;
+            await JS.InvokeVoidAsync("AnyDropInterop.setDraft", DraftKey, _inputText);
+        }
+        catch (OperationCanceledException)
+        {
+            // 被更新的输入打断，预期内
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to save input draft.");
+        }
+    }
+
+    /// <summary>立即保存当前草稿（切换话题前调用，不等防抖）。</summary>
+    private async Task SaveDraftNowAsync()
+    {
+        if (DraftKey is null) return;
+        _draftSaveCts?.Cancel();
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.setDraft", DraftKey, _inputText);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to save input draft.");
+        }
+    }
+
+    /// <summary>发送成功后清除当前话题的草稿。</summary>
+    private async Task ClearDraftAsync()
+    {
+        if (DraftKey is null) return;
+        _draftSaveCts?.Cancel();
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.clearDraft", DraftKey);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to clear input draft.");
         }
     }
 
@@ -735,7 +852,21 @@ public partial class Home : IAsyncDisposable
             ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading, _maxUploadFileSizeBytes)
             : null;
 
-    /// <summary>由 JS 调用：用户未选择主题时显示提示。</summary>
+    /// <summary>
+    /// 由 JS 调用：用户拖入了文件夹。浏览器不提供文件夹内容（dataTransfer.files
+    /// 为空），此前静默无任何反馈；现显示提示，普通文件仍正常上传。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFolderDropDetected()
+    {
+        _validationError = L["Home_FolderDropNotSupported"];
+        RequestRender();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 由 JS 调用：用户未选择主题时显示提示。
+    /// </summary>
     [JSInvokable]
     public Task OnNoTopicSelected()
     {
@@ -881,6 +1012,27 @@ public partial class Home : IAsyncDisposable
         });
     }
 
+    /// <summary>S2-10：取消进行中的上传。JS 中止 XHR 后，onabort 回调会调
+    /// OnFileUploadFailed 把占位气泡标记为失败（可重试）；这里只负责发起取消，
+    /// 不直接改本地状态，避免与 XHR 回调重复处理。</summary>
+    private async Task CancelPendingUploadAsync(string tempId)
+    {
+        var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && !p.IsFailed && !p.IsRemote);
+        if (pending is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeAsync<bool>("AnyDropInterop.cancelUpload", tempId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Cancel upload failed for pending item {TempId}", tempId);
+        }
+    }
+
     private async Task RetryPendingUploadAsync(string tempId)
     {
         var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && p.IsFailed && !p.IsRemote);
@@ -888,7 +1040,6 @@ public partial class Home : IAsyncDisposable
         {
             return;
         }
-
         _pendingUploads.Remove(pending);
         _validationError = null;
         RequestRender();
@@ -1177,6 +1328,8 @@ public partial class Home : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _isDisposed = true;
+        _draftSaveCts?.Cancel();
+        _draftSaveCts?.Dispose();
 
         // 清理 JS 拖放事件监听器，防止内存泄漏
         try
@@ -1634,6 +1787,17 @@ public partial class Home : IAsyncDisposable
         if (errorMessage.StartsWith("FILE_TOO_LARGE:", StringComparison.OrdinalIgnoreCase))
         {
             return L["Home_UploadFileTooLarge", FormatFileSize(_maxUploadFileSizeBytes)];
+        }
+
+        if (string.Equals(errorMessage, "UPLOAD_TIMED_OUT", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadTimedOut"];
+        }
+
+        if (string.Equals(errorMessage, "UPLOAD_CANCELLED", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(errorMessage, "Upload aborted", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadCancelled"];
         }
 
         if (errorMessage.Contains("413", StringComparison.OrdinalIgnoreCase)

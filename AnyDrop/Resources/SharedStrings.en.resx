@@ -299,4 +299,9 @@
   <data name="Search_ImagePreview"><value>Image preview</value></data>
   <data name="Search_Today"><value>Today</value></data>
   <data name="Search_Yesterday"><value>Yesterday</value></data>
+  <data name="Settings_LoadFailed"><value>Failed to load settings. Please refresh and try again.</value></data>
+  <data name="Home_FolderDropNotSupported"><value>Folders can't be dropped. Please select files to upload.</value></data>
+  <data name="Home_UploadTimedOut"><value>Upload timed out. Please try again.</value></data>
+  <data name="Home_UploadCancelled"><value>Upload cancelled.</value></data>
+  <data name="Home_CancelUpload"><value>Cancel upload</value></data>
 </root>

@@ -1,6 +1,7 @@
 using AnyDrop.Resources;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Text.Json;
 
@@ -11,6 +12,7 @@ public partial class Settings
     [Inject] public required IJSRuntime JSRuntime { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
+    [Inject] public required ILogger<Settings> Logger { get; set; }
 
     private string _nickname = string.Empty;
     private string _currentPassword = string.Empty;
@@ -39,6 +41,10 @@ public partial class Settings
     private List<MissingFileReportItem>? _missingFiles;
     private bool _isResolvingMissingFile;
 
+    // S2-10：存储健康“首次发现”时间按浏览器时区显示；旧实现直接 ToString()
+    //（UTC 原样输出，与本地时间差 8 小时）。
+    private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
+
     /// <summary>返回首页。</summary>
     private void GoBack() => NavigationManager.NavigateTo("/");
 
@@ -55,45 +61,74 @@ public partial class Settings
 
     private async Task LoadAsync()
     {
-        var profile = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/auth/me");
-        if (profile.ok && profile.body?.data.ValueKind == JsonValueKind.Object &&
-            profile.body.data.TryGetProperty("nickname", out var nickname))
+        // S2-10：JS 互操作失败（电路断开、JS 出错）时不再把异常抛给 Blazor 导致页面崩溃——
+        // 逐项捕获，失败的项保留默认值并显示加载失败提示。
+        try
         {
-            _nickname = nickname.GetString() ?? string.Empty;
+            var profile = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/auth/me");
+            if (profile.ok && profile.body?.data.ValueKind == JsonValueKind.Object &&
+                profile.body.data.TryGetProperty("nickname", out var nickname))
+            {
+                _nickname = nickname.GetString() ?? string.Empty;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogWarning(ex, "Failed to load profile in settings.");
+            _error = L["Settings_LoadFailed"];
         }
 
-        var security = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/settings/security");
-        if (security.ok && security.body?.data.ValueKind == JsonValueKind.Object)
+        try
         {
-            var data = security.body.data;
-            if (data.TryGetProperty("autoFetchLinkPreview", out var autoFetch))
+            var browserTimeZoneId = await JSRuntime.InvokeAsync<string>("AnyDropInterop.getBrowserTimeZone");
+            try { _displayTimeZone = TimeZoneInfo.FindSystemTimeZoneById(browserTimeZoneId); }
+            catch { _displayTimeZone = TimeZoneInfo.Local; }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to get browser timezone in settings, falling back to server local time.");
+        }
+
+        try
+        {
+            var security = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/settings/security");
+            if (security.ok && security.body?.data.ValueKind == JsonValueKind.Object)
             {
-                _autoFetchLinkPreview = autoFetch.GetBoolean();
+                var data = security.body.data;
+                if (data.TryGetProperty("autoFetchLinkPreview", out var autoFetch))
+                {
+                    _autoFetchLinkPreview = autoFetch.GetBoolean();
+                }
+                if (data.TryGetProperty("burnAfterReadingMinutes", out var burn))
+                {
+                    _burnAfterReadingMinutes = burn.GetInt32();
+                }
+                if (data.TryGetProperty("language", out var lang))
+                {
+                    _language = lang.GetString() ?? "zh-CN";
+                }
+                if (data.TryGetProperty("autoCleanupEnabled", out var autoCleanup))
+                {
+                    _autoCleanupEnabled = autoCleanup.GetBoolean();
+                }
+                if (data.TryGetProperty("autoCleanupMonths", out var months))
+                {
+                    _autoCleanupMonths = months.GetInt32();
+                }
+                if (data.TryGetProperty("thumbnailGenerationHour", out var thumbHour))
+                {
+                    _thumbnailGenerationHour = thumbHour.GetInt32();
+                }
+                if (data.TryGetProperty("scheduledThumbnailGenerationEnabled", out var scheduledThumbnails))
+                {
+                    _scheduledThumbnailGenerationEnabled = scheduledThumbnails.GetBoolean();
+                }
             }
-            if (data.TryGetProperty("burnAfterReadingMinutes", out var burn))
-            {
-                _burnAfterReadingMinutes = burn.GetInt32();
-            }
-            if (data.TryGetProperty("language", out var lang))
-            {
-                _language = lang.GetString() ?? "zh-CN";
-            }
-            if (data.TryGetProperty("autoCleanupEnabled", out var autoCleanup))
-            {
-                _autoCleanupEnabled = autoCleanup.GetBoolean();
-            }
-            if (data.TryGetProperty("autoCleanupMonths", out var months))
-            {
-                _autoCleanupMonths = months.GetInt32();
-            }
-            if (data.TryGetProperty("thumbnailGenerationHour", out var thumbHour))
-            {
-                _thumbnailGenerationHour = thumbHour.GetInt32();
-            }
-            if (data.TryGetProperty("scheduledThumbnailGenerationEnabled", out var scheduledThumbnails))
-            {
-                _scheduledThumbnailGenerationEnabled = scheduledThumbnails.GetBoolean();
-            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogWarning(ex, "Failed to load security settings.");
+            _error = L["Settings_LoadFailed"];
         }
 
         // 从 localStorage 读取主题设置
@@ -103,37 +138,53 @@ public partial class Settings
         await LoadMissingFilesAsync();
     }
 
+    /// <summary>“首次发现”时间按浏览器时区换算后显示。</summary>
+    private string FormatDetectedTime(DateTimeOffset time)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
+        return local.ToString("yyyy-MM-dd HH:mm");
+    }
+
     /// <summary>加载未解决的缺失引用记录。</summary>
     private async Task LoadMissingFilesAsync()
     {
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/storage/missing-files");
-        if (!result.ok || result.body?.data.ValueKind != JsonValueKind.Array)
+        try
         {
-            _missingFiles = [];
-            return;
-        }
-
-        var list = new List<MissingFileReportItem>();
-        foreach (var element in result.body.data.EnumerateArray())
-        {
-            if (element.ValueKind != JsonValueKind.Object)
+            var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/storage/missing-files");
+            if (!result.ok || result.body?.data.ValueKind != JsonValueKind.Array)
             {
-                continue;
+                _missingFiles = [];
+                return;
             }
 
-            list.Add(new MissingFileReportItem(
-                element.TryGetProperty("id", out var id) && id.TryGetGuid(out var guid) ? guid : Guid.Empty,
-                element.TryGetProperty("shareItemId", out var itemId) && itemId.TryGetGuid(out var itemGuid) ? itemGuid : Guid.Empty,
-                element.TryGetProperty("storagePath", out var path) ? path.GetString() ?? string.Empty : string.Empty,
-                element.TryGetProperty("kind", out var kind) ? kind.GetString() ?? "content" : "content",
-                element.TryGetProperty("fileName", out var fileName) ? fileName.GetString() : null,
-                element.TryGetProperty("topicName", out var topicName) ? topicName.GetString() : null,
-                element.TryGetProperty("firstDetectedAt", out var first) && first.TryGetDateTimeOffset(out var firstDetected)
-                    ? firstDetected
-                    : DateTimeOffset.MinValue));
-        }
+            var list = new List<MissingFileReportItem>();
+            foreach (var element in result.body.data.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
 
-        _missingFiles = list;
+                list.Add(new MissingFileReportItem(
+                    element.TryGetProperty("id", out var id) && id.TryGetGuid(out var guid) ? guid : Guid.Empty,
+                    element.TryGetProperty("shareItemId", out var itemId) && itemId.TryGetGuid(out var itemGuid) ? itemGuid : Guid.Empty,
+                    element.TryGetProperty("storagePath", out var path) ? path.GetString() ?? string.Empty : string.Empty,
+                    element.TryGetProperty("kind", out var kind) ? kind.GetString() ?? "content" : "content",
+                    element.TryGetProperty("fileName", out var fileName) ? fileName.GetString() : null,
+                    element.TryGetProperty("topicName", out var topicName) ? topicName.GetString() : null,
+                    element.TryGetProperty("firstDetectedAt", out var first) && first.TryGetDateTimeOffset(out var firstDetected)
+                        ? firstDetected
+                        : DateTimeOffset.MinValue));
+            }
+
+            _missingFiles = list;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogWarning(ex, "Failed to load missing-file reports.");
+            _missingFiles = [];
+            _error = L["Settings_LoadFailed"];
+        }
     }
 
     /// <summary>处理一条缺失引用记录：delete-message 删除对应消息，dismiss 标记已处理。</summary>
@@ -165,14 +216,22 @@ public partial class Settings
     private async Task SaveNicknameAsync()
     {
         ResetMessages();
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/profile", new { nickname = _nickname });
-        if (!result.ok)
+        try
         {
-            _error = result.body?.error ?? L["Settings_SaveNicknameFailed"];
-            return;
-        }
+            var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/profile", new { nickname = _nickname });
+            if (!result.ok)
+            {
+                _error = result.body?.error ?? L["Settings_SaveNicknameFailed"];
+                return;
+            }
 
-        _message = L["Settings_NicknameSaved"];
+            _message = L["Settings_NicknameSaved"];
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogWarning(ex, "Save nickname failed via JS interop.");
+            _error = L["Settings_SaveNicknameFailed"];
+        }
     }
 
     private async Task SavePasswordAsync()
@@ -184,17 +243,25 @@ public partial class Settings
             newPassword = _newPassword,
             confirmPassword = _confirmPassword
         };
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/password", payload);
-        if (!result.ok)
+        try
         {
-            _error = result.body?.error ?? L["Settings_UpdatePasswordFailed"];
-            return;
-        }
+            var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/password", payload);
+            if (!result.ok)
+            {
+                _error = result.body?.error ?? L["Settings_UpdatePasswordFailed"];
+                return;
+            }
 
-        _currentPassword = string.Empty;
-        _newPassword = string.Empty;
-        _confirmPassword = string.Empty;
-        _message = L["Settings_PasswordUpdated"];
+            _currentPassword = string.Empty;
+            _newPassword = string.Empty;
+            _confirmPassword = string.Empty;
+            _message = L["Settings_PasswordUpdated"];
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogWarning(ex, "Change password failed via JS interop.");
+            _error = L["Settings_UpdatePasswordFailed"];
+        }
     }
 
     private async Task SaveSecurityAsync()
@@ -210,19 +277,28 @@ public partial class Settings
             thumbnailGenerationHour = _thumbnailGenerationHour,
             scheduledThumbnailGenerationEnabled = _scheduledThumbnailGenerationEnabled
         };
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
-        if (!result.ok)
+        try
         {
-            _error = result.body?.error ?? L["Settings_SaveSecurityFailed"];
-            return;
-        }
+            var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.putJson", "/api/v1/settings/security", payload);
+            if (!result.ok)
+            {
+                _error = result.body?.error ?? L["Settings_SaveSecurityFailed"];
+                return;
+            }
 
-        // 设置语言 Cookie，失败时记录提示但不阻断流程
-        var cultureResult = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/settings/set-culture",
-            new { culture = _language });
-        if (!cultureResult.ok)
+            // 设置语言 Cookie，失败时记录提示但不阻断流程
+            var cultureResult = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.postJson", "/api/v1/settings/set-culture",
+                new { culture = _language });
+            if (!cultureResult.ok)
+            {
+                _error = cultureResult.body?.error ?? L["Settings_SaveSecurityFailed"];
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
         {
-            _error = cultureResult.body?.error ?? L["Settings_SaveSecurityFailed"];
+            Logger.LogWarning(ex, "Save security settings failed via JS interop.");
+            _error = L["Settings_SaveSecurityFailed"];
             return;
         }
 
@@ -285,7 +361,16 @@ public partial class Settings
     private async Task ToggleThemeAsync()
     {
         _isDarkMode = !_isDarkMode;
-        await JSRuntime.InvokeVoidAsync("AnyDropTheme.set", _isDarkMode);
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("AnyDropTheme.set", _isDarkMode);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            // S2-10：JS 调用失败时回滚开关，保持界面与实际主题一致
+            Logger.LogWarning(ex, "Failed to apply theme via JS interop.");
+            _isDarkMode = !_isDarkMode;
+        }
     }
 
     /// <summary>立即触发缩略图批处理任务。</summary>

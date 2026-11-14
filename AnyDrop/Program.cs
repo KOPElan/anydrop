@@ -153,7 +153,15 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(LinkMetadataService.HttpClientName)
     .ConfigurePrimaryHttpMessageHandler(() => LinkMetadataService.CreateHandler());
 builder.Services.AddHostedService<ExpiredMessageCleanupService>();
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddRazorComponents().AddInteractiveServerComponents(options =>
+{
+    // S2-10：断开的 Blazor 电路保留 10 分钟（默认仅 3 分钟，手机锁屏/弱网切换
+    // 即丢电路，用户回来只能整页刷新重连）；单用户自托管，保留上限保持默认 100；
+    // JS 互操作调用超时保持默认 1 分钟。
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(10);
+    options.DisconnectedCircuitMaxRetained = 100;
+    options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
+});
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
