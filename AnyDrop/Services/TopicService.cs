@@ -347,6 +347,13 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
     }
 
     public async Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, CancellationToken ct = default)
+        => await GetTopicMessagesAsync(topicId, limit, before, after: null, ct);
+
+    /// <summary>
+    /// S2-04：重连补拉——<paramref name="after"/> 之后的新消息（按时间升序返回），
+    /// 供断线重连后增量补拉断线期消息。after 与 before 不可同时使用。
+    /// </summary>
+    public async Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, DateTimeOffset? after, CancellationToken ct = default)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -362,6 +369,19 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
             .AsNoTracking()
             .NotExpired(DateTimeOffset.UtcNow)
             .Where(x => x.TopicId == topicId);
+
+        if (after.HasValue)
+        {
+            // 用 >= 而不是 >：同一 CreatedAt 刻度（tick）内的多条消息不会被分页边界漏掉；
+            // 边界消息会被重复返回一次，调用方按 Id 去重（并以“本页无新增”作为分页终止条件）。
+            query = query.Where(x => x.CreatedAt >= after.Value);
+            var newMessages = await query
+                .OrderBy(x => x.CreatedAt)
+                .Take(safeLimit)
+                .Select(x => x.ToDto())
+                .ToListAsync(ct);
+            return new TopicMessagesResponse(newMessages, false, null);
+        }
 
         if (before.HasValue)
         {

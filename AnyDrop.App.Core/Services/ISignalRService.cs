@@ -12,11 +12,20 @@ public interface ISignalRService
     /// <summary>停止 SignalR 连接。</summary>
     Task StopAsync();
 
+    /// <summary>S2-05：服务器地址变更后重建底层 HubConnection（重新注册 handler）。</summary>
+    Task RebuildAsync();
+
     /// <summary>当前连接状态。</summary>
     HubConnectionState State { get; }
 
     /// <summary>连接状态变化时触发。</summary>
     event Action<HubConnectionState>? StateChanged;
+
+    /// <summary>
+    /// S2-04：重连成功后触发（自动重连与手动重连循环均触发）。
+    /// 订阅方在此按当前话题增量补拉断线期消息并刷新话题列表。
+    /// </summary>
+    event Action? Reconnected;
 
     /// <summary>收到 TopicsUpdated 推送时触发。</summary>
     event Action<IReadOnlyList<TopicDto>>? TopicsUpdated;

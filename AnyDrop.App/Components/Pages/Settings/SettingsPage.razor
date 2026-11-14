@@ -178,6 +178,10 @@
         await SignalR.StopAsync();
         await TokenStorage.ClearTokenAsync();
         await ServerConfig.SetBaseUrlAsync(_newBaseUrl);
+        // S2-05：HubConnectionManager 会缓存旧地址建好的连接，必须重建，
+        // 否则下次登录仍连旧服务器；SignalRService 重建后下次 StartAsync
+        // 会在新连接上重新注册事件 handler。
+        await SignalR.RebuildAsync();
         Nav.NavigateTo("/setup");
     }
 

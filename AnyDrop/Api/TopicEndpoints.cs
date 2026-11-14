@@ -58,10 +58,13 @@ public static class TopicEndpoints
         Guid id,
         int? limit,
         DateTimeOffset? before,
+        DateTimeOffset? after,
         ITopicService topicService,
         CancellationToken ct)
     {
-        var result = await topicService.GetTopicMessagesAsync(id, limit ?? 50, before, ct);
+        var result = after.HasValue
+            ? await topicService.GetTopicMessagesAsync(id, limit ?? 50, null, after, ct)
+            : await topicService.GetTopicMessagesAsync(id, limit ?? 50, before, ct);
         return result is null
             ? Results.NotFound(ApiEnvelope<TopicMessagesResponse>.Fail("主题不存在"))
             : Results.Ok(ApiEnvelope<TopicMessagesResponse>.Ok(result));

@@ -24,6 +24,15 @@ public sealed class ShareService : IShareService
         return response?.Data ?? new TopicMessagesResponse([], false, null);
     }
 
+    public async Task<TopicMessagesResponse> GetMessagesSinceAsync(Guid topicId, DateTimeOffset since, int limit = 100)
+    {
+        var client = _httpClientFactory.CreateClient("api");
+        var url = $"api/v1/topics/{topicId}/messages?limit={limit}&after={Uri.EscapeDataString(since.ToString("O"))}";
+
+        var response = await client.GetFromJsonAsync<ApiEnvelope<TopicMessagesResponse>>(url).ConfigureAwait(false);
+        return response?.Data ?? new TopicMessagesResponse([], false, null);
+    }
+
     public async Task<ShareItemDto> SendTextAsync(CreateTextShareItemRequest request)
     {
         // 服务端接口：POST /api/v1/share-items/text，请求体 { content, topicId }

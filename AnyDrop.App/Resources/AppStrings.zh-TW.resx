@@ -149,6 +149,7 @@
 
   <!-- 訊息輸入框 / Message Input -->
   <data name="MessageInput_Placeholder"><value>輸入訊息...</value></data>
+  <data name="MessageInput_OutboxPending"><value>有 {0} 條離線訊息待傳送，連網後自動發出，點擊立即重試</value></data>
   <data name="MessageInput_Uploading"><value>上傳中</value></data>
   <data name="MessageInput_BurnAfterReading"><value>定時銷毀</value></data>
 

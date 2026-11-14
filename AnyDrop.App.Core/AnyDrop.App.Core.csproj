@@ -19,6 +19,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AnyDrop.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AnyDrop.Shared\AnyDrop.Shared.csproj" />
   </ItemGroup>
 

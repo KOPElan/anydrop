@@ -149,6 +149,7 @@
 
   <!-- 消息输入框 / Message Input -->
   <data name="MessageInput_Placeholder"><value>输入消息...</value></data>
+  <data name="MessageInput_OutboxPending"><value>有 {0} 条离线消息待发送，联网后自动发出，点击立即重试</value></data>
   <data name="MessageInput_Uploading"><value>上传中</value></data>
   <data name="MessageInput_BurnAfterReading"><value>定时销毁</value></data>
 

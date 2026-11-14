@@ -27,4 +27,7 @@ public interface ITopicService
     Task<TopicDto> ArchiveTopicAsync(Guid topicId, bool isArchived, CancellationToken ct = default);
 
     Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, CancellationToken ct = default);
+
+    /// <summary>S2-04：重连补拉——返回 <paramref name="after"/> 之后的新消息（升序）。</summary>
+    Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, DateTimeOffset? after, CancellationToken ct = default);
 }

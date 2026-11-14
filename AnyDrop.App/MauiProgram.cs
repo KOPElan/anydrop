@@ -73,6 +73,10 @@ namespace AnyDrop.App
             // S2-01：单飞刷新与 Hub 短 token 提供器（Singleton）。
             builder.Services.AddSingleton<ITokenRefreshService, TokenRefreshService>();
 
+            // S2-05：离线发件箱（Singleton，JSON 文件持久化到 AppDataDirectory）。
+            builder.Services.AddSingleton<IOutboxService>(_ =>
+                new OutboxService(FileSystem.AppDataDirectory));
+
             // 命名 HttpClient "api"，挂载 AuthDelegatingHandler
             builder.Services.AddHttpClient("api", (sp, client) =>
             {

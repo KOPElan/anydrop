@@ -2,9 +2,18 @@
 @inject IFileUploadService FileUploadService
 @inject IPickerService Picker
 @inject IAppStateService AppState
+@inject IOutboxService Outbox
+@inject AppEventBus EventBus
 @inject IStringLocalizer<AppStrings> L
+@implements IDisposable
 
 <div class="glass border-t border-white/50 dark:border-gray-700/50 px-3 pt-2 pb-1 safe-area-bottom fixed bottom-0 w-full">
+    @if (_outboxPendingCount > 0)
+    {
+        <button @onclick="DrainOutboxAsync" class="mb-2 px-1 text-left w-full">
+            <p class="text-xs text-amber-600 dark:text-amber-400">@string.Format(L["MessageInput_OutboxPending"], _outboxPendingCount)</p>
+        </button>
+    }
     @if (_uploading)
     {
         <div class="mb-2 px-1">
@@ -63,6 +72,80 @@
     private bool _burnAfterReading;
     // 每次用户修改 _text 都递增，用于判断发送期间是否有新的用户输入
     private int _textGeneration;
+    // S2-05：发件箱待发送条数（>0 时显示提示，点击立即重试补发）
+    private int _outboxPendingCount;
+    private bool _drainingOutbox;
+
+    protected override void OnInitialized()
+    {
+        EventBus.ConnectivityChanged += OnConnectivityChanged;
+        _ = RefreshOutboxCountAsync();
+    }
+
+    private void OnConnectivityChanged(bool isOnline)
+    {
+        // 网络恢复时自动补发发件箱
+        if (isOnline)
+        {
+            _ = InvokeAsync(DrainOutboxAsync);
+        }
+    }
+
+    /// <summary>S2-05：按入箱顺序补发离线消息；成功发出的消息加入当前话题列表（若在看该话题）。</summary>
+    private async Task DrainOutboxAsync()
+    {
+        if (_drainingOutbox)
+        {
+            return;
+        }
+
+        _drainingOutbox = true;
+        try
+        {
+            await Outbox.DrainAsync(async m =>
+            {
+                var item = await ShareService.SendTextAsync(
+                    new CreateTextShareItemRequest(m.Content, m.TopicId, m.BurnAfterReading));
+                if (m.TopicId == TopicId && !AppState.Messages.Any(x => x.Id == item.Id))
+                {
+                    AppState.Messages.Add(item);
+                    AppState.NotifyMessageAdded();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 发件箱补发失败: {ex.Message}");
+        }
+        finally
+        {
+            _drainingOutbox = false;
+            await RefreshOutboxCountAsync();
+        }
+    }
+
+    private async Task RefreshOutboxCountAsync()
+    {
+        try
+        {
+            var pending = await Outbox.GetPendingAsync();
+            var count = pending.Count;
+            if (count != _outboxPendingCount)
+            {
+                _outboxPendingCount = count;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 读取发件箱失败: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        EventBus.ConnectivityChanged -= OnConnectivityChanged;
+    }
 
     private async Task SendTextAsync()
     {
@@ -78,9 +161,27 @@
                 AppState.Messages.Add(item);
             AppState.NotifyMessageAdded();
         }
+        catch (Exception ex) when (ex is HttpRequestException { StatusCode: null } or TaskCanceledException)
+        {
+            // S2-05：无 HTTP 状态码 = 网络不可达/超时（非服务端拒绝），写入离线发件箱持久化，
+            // 联网后自动补发；输入框不恢复（消息已入箱），避免用户重复发送。
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 离线，消息已存入发件箱: {ex.Message}");
+            try
+            {
+                await Outbox.EnqueueAsync(TopicId, textToSend, _burnAfterReading);
+            }
+            catch (Exception enqueueEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MessageInput] 发件箱写入失败，恢复输入: {enqueueEx.Message}");
+                if (_textGeneration == sendGeneration)
+                    _text = textToSend;
+            }
+
+            await RefreshOutboxCountAsync();
+        }
         catch (Exception ex)
         {
-            // 发送失败时恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
+            // 服务端拒绝（如 400/401/413）不入箱：恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
             System.Diagnostics.Debug.WriteLine($"[MessageInput] 发送消息失败: {ex.Message}");
             if (_textGeneration == sendGeneration)
                 _text = textToSend;

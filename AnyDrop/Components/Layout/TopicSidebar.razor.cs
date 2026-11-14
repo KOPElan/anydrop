@@ -253,6 +253,18 @@ public partial class TopicSidebar : IAsyncDisposable
             });
         });
 
+        // S2-04：自动重连成功后刷新话题列表（断线期新增主题/未读标记否则要等下一次 TopicsUpdated 推送）。
+        _hubConnection.Reconnected += _ => InvokeAsync(async () =>
+        {
+            await LoadTopicsAsync();
+            if (_showArchivedDropdown)
+            {
+                await LoadArchivedTopicsAsync();
+            }
+
+            StateHasChanged();
+        });
+
         try
         {
             await _hubConnection.StartAsync();

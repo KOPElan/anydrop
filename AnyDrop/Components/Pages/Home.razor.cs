@@ -51,6 +51,7 @@ public partial class Home : IAsyncDisposable
     private HubConnection? _hubConnection;
     private CancellationTokenSource? _pollingCts;
     private Task? _pollingTask;
+    private bool _isDisposed;
     private string _inputText = string.Empty;
     private string? _validationError;
     private bool _isSending;
@@ -416,6 +417,33 @@ public partial class Home : IAsyncDisposable
                     _pendingUploads.Remove(pending);
                     RequestRender();
                 });
+            });
+
+            // S2-04：自动重连成功后立即补拉断线期消息 + 刷新当前主题元数据。
+            // 轮询兜底期间的恢复由 StopPollingIfRealtimeRestoredAsync 覆盖，
+            // 此处覆盖“自动重连在 42 秒内成功、轮询从未启动”的情形。
+            _hubConnection.Reconnected += _ => InvokeAsync(async () =>
+            {
+                var changed = await PollNewMessagesAsync();
+                await LoadSelectedTopicMetaAsync();
+                if (changed)
+                {
+                    RequestRender();
+                }
+            });
+
+            // S2-04：自动重连耗尽（Closed）后降级为轮询兜底；此前仅初始连接
+            // 失败才启动轮询，连接成功后再断线会永久收不到新消息。
+            _hubConnection.Closed += _ => InvokeAsync(() =>
+            {
+                if (_isDisposed || _pollingTask is { IsCompleted: false })
+                {
+                    return;
+                }
+
+                _pollingCts?.Dispose();
+                _pollingCts = new CancellationTokenSource();
+                _pollingTask = StartPollingAsync(_pollingCts.Token);
             });
 
             // 短暂延迟，等待 Blazor 电路稳定后再连接 SignalR Hub，减少导航后的瞬时协商错误
@@ -1146,6 +1174,8 @@ public partial class Home : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _isDisposed = true;
+
         // 清理 JS 拖放事件监听器，防止内存泄漏
         try
         {
@@ -1230,47 +1260,65 @@ public partial class Home : IAsyncDisposable
     }
 
     /// <summary>
-    /// 增量轮询：查询最新一批消息，仅追加尚未显示的新条目，并在用户处于底部附近时
+    /// 增量轮询：查询新消息，仅追加尚未显示的新条目，并在用户处于底部附近时
     /// 触发条件滚动。不清空已有消息列表，不强制滚到底部，避免打断用户翻阅历史。
+    /// S2-04：本地已有消息时用 after=最后一条 CreatedAt 做真增量拉取（升序返回，
+    /// 直接按序追加）；本地为空时拉最新 50 条。断线期消息超过 100 条时分页拉满。
     /// </summary>
     private async Task<bool> PollNewMessagesAsync(CancellationToken ct = default)
     {
         if (!_selectedTopicId.HasValue) return false;
 
-        var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
-        if (response is null) return false;
-
         var hasNew = false;
         var hasUpdated = false;
-        foreach (var msg in response.Messages.Reverse())
+        DateTimeOffset? after = _messages.Count > 0 ? _messages[^1].CreatedAt : null;
+
+        while (true)
         {
-            if (_messageIds.Add(msg.Id))
+            var response = after.HasValue
+                ? await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 100, null, after.Value, ct)
+                : await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
+            if (response is null) return hasNew || hasUpdated;
+
+            // after 分页返回升序，直接按序追加；首次拉取返回降序，需反转为升序。
+            var ordered = after.HasValue ? response.Messages : response.Messages.Reverse();
+            var hasNewBeforePage = hasNew;
+            foreach (var msg in ordered)
             {
-                _messages.Add(msg);
-                hasNew = true;
-                if (!_isAtBottom)
+                if (_messageIds.Add(msg.Id))
                 {
-                    TrackUnreadMessage(msg.Id);
+                    _messages.Add(msg);
+                    hasNew = true;
+                    if (!_isAtBottom)
+                    {
+                        TrackUnreadMessage(msg.Id);
+                    }
+                }
+                else
+                {
+                    // 就地更新已有消息（例如链接元数据后台刷新）
+                    var idx = _messages.FindIndex(m => m.Id == msg.Id);
+                    if (idx >= 0)
+                    {
+                        _messages[idx] = msg;
+                        hasUpdated = true;
+                    }
                 }
             }
-            else
+
+            // 服务端 after 用 >=：本页若无新增（全是已去重的边界消息），说明已追平，停止分页，
+            // 否则同一刻度内的 100 条消息会反复返回同一页。
+            if (!after.HasValue || response.Messages.Count < 100 || hasNew == hasNewBeforePage)
             {
-                // 就地更新已有消息（例如链接元数据后台刷新）
-                var idx = _messages.FindIndex(m => m.Id == msg.Id);
-                if (idx >= 0)
-                {
-                    _messages[idx] = msg;
-                    hasUpdated = true;
-                }
+                break;
             }
+
+            after = response.Messages[^1].CreatedAt;
         }
 
-        if (hasNew)
+        if (hasNew && _isAtBottom)
         {
-            if (_isAtBottom)
-            {
-                RequestScrollToBottomIfAtBottom();
-            }
+            RequestScrollToBottomIfAtBottom();
         }
 
         return hasNew || hasUpdated;
