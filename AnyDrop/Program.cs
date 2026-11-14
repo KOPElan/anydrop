@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -50,6 +51,22 @@ if (!string.IsNullOrWhiteSpace(dbDirectory))
 {
     Directory.CreateDirectory(dbDirectory);
 }
+
+// S1-05（DAT-11）：Data Protection 密钥持久化。Cookie 与防伪令牌都由它签名，
+// 密钥只放内存时容器一重建全员掉登录。默认落到数据库同目录下的 keys 子目录
+// （Docker 里是 /data/keys，随 anydrop-data 卷持久化；本地是 data/keys），
+// 可用 DataProtection:KeysPath（环境变量 DataProtection__KeysPath）显式指定。
+// SetApplicationName 让密钥环与应用名绑定，容器重建后仍认同一套密钥。
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (string.IsNullOrWhiteSpace(keysPath))
+{
+    keysPath = Path.Combine(dbDirectory ?? "data", "keys");
+}
+keysPath = Path.GetFullPath(keysPath);
+Directory.CreateDirectory(keysPath);
+builder.Services.AddDataProtection()
+    .SetApplicationName("AnyDrop")
+    .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 
 // S1-03（DAT-09）：改用 DbContextFactory。Blazor Server 里 scoped 服务
 // 与电路同寿命，一个请求作用域的 DbContext 会被同一电路持有数小时，
@@ -326,6 +343,10 @@ var app = builder.Build();
 // S1-07（D6）：显式解析后台任务时区，让生效时区与来源一定出现在启动日志里，
 // 而不是等第一个后台任务启动时才出现。
 app.Services.GetRequiredService<BackgroundTaskTimeZone>();
+
+// S1-05（DAT-11）：密钥目录进启动日志——丢密钥等于全员掉登录，
+// 部署后一眼就能确认密钥落到了持久卷而不是容器内临时目录。
+app.Logger.LogInformation("Data Protection keys persisted to {KeysPath}.", keysPath);
 
 // 必须放在管道最前面：任何读取 RemoteIpAddress 或 Request.Scheme 的中间件
 // （限流、访问日志、Cookie 的 Secure 判定）都要看到代理转发的真实值。

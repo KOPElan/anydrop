@@ -27,6 +27,10 @@ services:
       - Storage__MaxFileSizeBytes=${ANYDROP_MAX_FILE_SIZE:-104857600}
       # ── JWT 令牌有效期（小时），默认 24 小时 ─────────────────────────────────
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
+      # ── Data Protection 密钥（S1-05）────────────────────────────────────────
+      # Cookie 与防伪令牌的签名密钥默认落到 /data/keys（数据库同目录），随
+      # anydrop-data 卷持久化；重建容器后原有登录态不失效。改路径时用本项指定。
+      - DataProtection__KeysPath=${ANYDROP_DATA_PROTECTION_KEYS_PATH:-/data/keys}
       # ── 孤儿文件回收（默认只报告不删除）─────────────────────────────────────
       - Storage__OrphanCleanupEnabled=${ANYDROP_ORPHAN_CLEANUP_ENABLED:-false}
       # ── 后台任务时区（D6）───────────────────────────────────────────────────

@@ -364,6 +364,7 @@ curl -fsS http://localhost:8080/health
 - `/data/anydrop.db` — SQLite 数据库（用户、主题、消息元数据）
 - `/data/anydrop.db-wal`、`/data/anydrop.db-shm` — SQLite 预写日志（数据库运行在 WAL 模式）
 - `/data/files/` — 上传的文件
+- `/data/keys/` — Data Protection 密钥（Cookie 与防伪令牌签名）。**密钥丢失等于全员掉登录**：重建容器后原有登录态失效、已签发的防伪令牌失效，备份时必须包含该目录，恢复时也必须随数据库一起恢复。
 
 > ⚠️ **不要在服务运行时直接 `tar` 整个数据目录。** 数据库处于 WAL 模式，逐个复制文件可能得到
 > 不一致甚至损坏的备份——`.db` 与 `-wal` 的内容可能来自不同时刻。请使用下面两种方式之一。
