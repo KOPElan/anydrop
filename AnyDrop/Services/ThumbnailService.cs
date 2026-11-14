@@ -9,9 +9,13 @@ namespace AnyDrop.Services;
 /// <summary>
 /// 使用 SixLabors.ImageSharp（图片）和 ffmpeg CLI（视频）生成缩略图。
 /// 缩略图以 JPEG 格式保存，最长边不超过 400 像素。
+///
+/// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
+/// 每次调用建短寿命上下文；批量游标改为 (CreatedAt, Id) 复合键，
+/// 同一时间戳的多条记录不再被跳过。
 /// </summary>
 public sealed class ThumbnailService(
-    AnyDropDbContext dbContext,
+    IDbContextFactory<AnyDropDbContext> dbContextFactory,
     IFileStorageService fileStorageService,
     IConfiguration configuration,
     ILogger<ThumbnailService> logger) : IThumbnailService
@@ -22,6 +26,7 @@ public sealed class ThumbnailService(
     /// <inheritdoc />
     public async Task<string?> GenerateThumbnailAsync(Guid itemId, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var item = await dbContext.ShareItems.FirstOrDefaultAsync(x => x.Id == itemId, ct);
         if (item is null)
         {
@@ -63,26 +68,32 @@ public sealed class ThumbnailService(
     /// <inheritdoc />
     public async Task<int> ProcessPendingThumbnailsAsync(CancellationToken ct = default)
     {
-        // 分批处理，每次最多加载 BatchSize 条 ID，避免一次性加载全部数据导致内存峰值
+        // 分批处理，每次最多加载 BatchSize 条 ID，避免一次性加载全部数据导致内存峰值。
+        // 游标是 (CreatedAt, Id) 复合键：同一时间戳批量上传时，只用 CreatedAt
+        // 做游标会跳过与上一批最后一条同时间戳的记录（S1-02，DAT-07/08）。
         const int BatchSize = 100;
         var success = 0;
-        DateTimeOffset? cursor = null;
+        DateTimeOffset? cursorCreatedAt = null;
+        Guid? cursorId = null;
 
         while (true)
         {
             ct.ThrowIfCancellationRequested();
 
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
             var query = dbContext.ShareItems
                 .Where(x => x.ThumbnailPath == null
                             && (x.ContentType == ShareContentType.Image || x.ContentType == ShareContentType.Video));
 
-            if (cursor.HasValue)
+            if (cursorCreatedAt.HasValue)
             {
-                query = query.Where(x => x.CreatedAt > cursor.Value);
+                query = query.Where(x => x.CreatedAt > cursorCreatedAt.Value
+                    || (x.CreatedAt == cursorCreatedAt.Value && x.Id.CompareTo(cursorId!.Value) > 0));
             }
 
             var batch = await query
                 .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
                 .Take(BatchSize)
                 .Select(x => new { x.Id, x.CreatedAt })
                 .ToListAsync(ct);
@@ -98,7 +109,8 @@ public sealed class ThumbnailService(
                 if (result is not null) success++;
             }
 
-            cursor = batch[^1].CreatedAt;
+            cursorCreatedAt = batch[^1].CreatedAt;
+            cursorId = batch[^1].Id;
             if (batch.Count < BatchSize) break;
         }
 

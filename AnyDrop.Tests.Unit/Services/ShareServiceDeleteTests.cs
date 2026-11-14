@@ -19,12 +19,12 @@ public class ShareServiceDeleteTests : IDisposable
     private readonly string _dbPath =
         Path.Combine(AppContext.BaseDirectory, "test-delete", $"{Guid.NewGuid():N}.db");
 
-    private AnyDropDbContext CreateInMemoryDb()
+    private static TestDbContextFactory CreateInMemoryDbFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-delete-{Guid.NewGuid():N}")
             .Options;
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
     private static ShareItem SeedFileItem(AnyDropDbContext db, DateTimeOffset createdAt)
@@ -47,9 +47,10 @@ public class ShareServiceDeleteTests : IDisposable
     [Fact]
     public async Task DeleteShareItemsAsync_RemovesRowBeforeDeletingFiles()
     {
-        await using var db = CreateInMemoryDb();
+        var factory = CreateInMemoryDbFactory();
+        await using var db = factory.CreateDbContext();
         var item = SeedFileItem(db, DateTimeOffset.UtcNow);
-        var sut = ShareServiceFactory.Create(db);
+        var sut = ShareServiceFactory.Create(factory);
 
         var deleted = await sut.DeleteShareItemsAsync([item.Id]);
 
@@ -60,20 +61,23 @@ public class ShareServiceDeleteTests : IDisposable
     [Fact]
     public async Task DeleteShareItemsAsync_FileDeleteFailure_IsQueuedNotLost()
     {
-        await using var db = CreateInMemoryDb();
+        var factory = CreateInMemoryDbFactory();
+        await using var db = factory.CreateDbContext();
         var item = SeedFileItem(db, DateTimeOffset.UtcNow);
 
         var fileStorage = new Mock<IFileStorageService>();
         fileStorage.Setup(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IOException("disk error"));
-        var sut = ShareServiceFactory.Create(db, fileStorageService: fileStorage.Object);
+        var sut = ShareServiceFactory.Create(factory, fileStorageService: fileStorage.Object);
 
         var deleted = await sut.DeleteShareItemsAsync([item.Id]);
 
         deleted.Should().Be(1);
         // 行已删（用户视角消息已消失），失败的文件路径进了队列而不是只记一条日志
-        (await db.ShareItems.CountAsync()).Should().Be(0);
-        var queued = await db.PendingFileDeletions.OrderBy(x => x.StoragePath).ToListAsync();
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        (await verifyDb.ShareItems.CountAsync()).Should().Be(0);
+        var queued = await verifyDb.PendingFileDeletions.OrderBy(x => x.StoragePath).ToListAsync();
         queued.Should().HaveCount(2, "原文件与缩略图各记一条");
         queued.Select(x => x.StoragePath).Should().BeEquivalentTo(
             "20261114/deadbeef.png", "thumbnails/deadbeef.jpg");
@@ -83,19 +87,22 @@ public class ShareServiceDeleteTests : IDisposable
     [Fact]
     public async Task CleanupOldMessagesAsync_MarksForDelayedDeletion_AndHidesImmediately()
     {
-        await using var db = CreateInMemoryDb();
+        var factory = CreateInMemoryDbFactory();
+        await using var db = factory.CreateDbContext();
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
         var item = SeedFileItem(db, clock.GetUtcNow().AddMonths(-2));
 
         var fileStorage = new Mock<IFileStorageService>();
-        var sut = ShareServiceFactory.Create(db, fileStorageService: fileStorage.Object, timeProvider: clock);
+        var sut = ShareServiceFactory.Create(factory, fileStorageService: fileStorage.Object, timeProvider: clock);
 
         var marked = await sut.CleanupOldMessagesAsync(1);
 
         marked.Should().Be(1);
         // 常规读路径已看不到（全局查询过滤器），但行仍在库里，带 7 天后的标记
-        (await db.ShareItems.CountAsync()).Should().Be(0);
-        var hidden = await db.ShareItems.IgnoreQueryFilters().SingleAsync();
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        (await verifyDb.ShareItems.CountAsync()).Should().Be(0);
+        var hidden = await verifyDb.ShareItems.IgnoreQueryFilters().SingleAsync();
         hidden.DeleteAfter.Should().Be(clock.GetUtcNow().AddDays(DeletionPolicy.DelayedDeleteDays));
         // 批量清理不再立即删文件：清扫任务到期后才处理
         fileStorage.Verify(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
@@ -105,10 +112,11 @@ public class ShareServiceDeleteTests : IDisposable
     [Fact]
     public async Task CleanupOldMessagesAsync_DoesNotReMarkAlreadyMarked()
     {
-        await using var db = CreateInMemoryDb();
+        var factory = CreateInMemoryDbFactory();
+        await using var db = factory.CreateDbContext();
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 11, 14, 12, 0, 0, TimeSpan.Zero));
         SeedFileItem(db, clock.GetUtcNow().AddMonths(-2));
-        var sut = ShareServiceFactory.Create(db, timeProvider: clock);
+        var sut = ShareServiceFactory.Create(factory, timeProvider: clock);
 
         (await sut.CleanupOldMessagesAsync(1)).Should().Be(1);
         (await sut.CleanupOldMessagesAsync(1)).Should().Be(0, "已标记的消息不再进入清理查询");
@@ -165,11 +173,9 @@ public class ShareServiceDeleteTests : IDisposable
             crashingStorage.Setup(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new IOException("simulated crash between DB commit and file delete"));
 
-            await using (var db = new AnyDropDbContext(Options()))
-            {
-                var sut = ShareServiceFactory.Create(db, fileStorageService: crashingStorage.Object);
-                (await sut.DeleteShareItemsAsync([itemId])).Should().Be(1);
-            }
+            // 服务用工厂建自己的上下文（与播种用的上下文共享同一个 InMemory 库名）。
+            var sut = ShareServiceFactory.Create(new TestDbContextFactory(Options()), fileStorageService: crashingStorage.Object);
+            (await sut.DeleteShareItemsAsync([itemId])).Should().Be(1);
 
             // "重启"：全新的 DbContext 读库
             await using var freshDb = new AnyDropDbContext(Options());

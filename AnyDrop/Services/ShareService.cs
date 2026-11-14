@@ -7,20 +7,27 @@ using Microsoft.Extensions.Logging;
 
 namespace AnyDrop.Services;
 
+/// <summary>
+/// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
+/// 每次调用建短寿命上下文，不再随 Blazor 电路持有同一上下文数小时。
+/// 同一方法内「读后改」共用一个上下文；私有辅助方法各建自己的上下文，
+/// 调用时调用方的写操作已提交，因此读到的是已提交状态。
+/// </summary>
 public sealed class ShareService(
-    AnyDropDbContext dbContext,
+    IDbContextFactory<AnyDropDbContext> dbContextFactory,
     IHubContext<ShareHub> hubContext,
     ITopicService topicService,
     IFileStorageService fileStorageService,
     IThumbnailService thumbnailService,
     LinkMetadataService linkMetadataService,
     ISystemSettingsService systemSettingsService,
-    IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider,
     ILogger<ShareService> logger) : IShareService
 {
     public async Task<ShareItemDto> SendTextAsync(string content, Guid? topicId = null, bool burnAfterReading = false, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var normalizedContent = content.Trim();
 
         if (string.IsNullOrWhiteSpace(normalizedContent))
@@ -98,9 +105,9 @@ public sealed class ShareService(
                 return;
             }
 
-            // 创建独立 Scope，避免复用已被请求 Scope 释放的 DbContext
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
+            // 工厂建短寿命上下文：后台任务独立于请求生命周期，不能复用
+            // 已被请求 Scope 释放的 DbContext。
+            await using var db = await dbContextFactory.CreateDbContextAsync();
 
             var item = await db.ShareItems.FindAsync(itemId);
             if (item is null)
@@ -130,6 +137,8 @@ public sealed class ShareService(
         bool burnAfterReading = false,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         if (fileStream is null)
         {
             throw new ArgumentNullException(nameof(fileStream));
@@ -239,6 +248,8 @@ public sealed class ShareService(
 
     public async Task<IReadOnlyList<ShareItemDto>> GetRecentAsync(int count = 50, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var normalizedCount = count <= 0 ? 50 : count;
         var safeCount = Math.Clamp(normalizedCount, 1, 200);
 
@@ -259,6 +270,8 @@ public sealed class ShareService(
         DateTimeOffset? before = null,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var normalized = query.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
@@ -332,6 +345,8 @@ public sealed class ShareService(
         TimeZoneInfo timeZone,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var (startUtc, endUtc) = GetUtcRange(date, date, timeZone);
 
         // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
@@ -351,20 +366,55 @@ public sealed class ShareService(
         TimeZoneInfo timeZone,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var (startUtc, endUtc) = GetUtcRange(start, end, timeZone);
 
-        // 只拉取 CreatedAt 列，再按调用方时区归属到具体日期
+        // S1-03：分批游标扫描，只拉取 (CreatedAt, Id) 两列，每批 1000 条，
+        // 不再把整个日期范围的时间戳一次性全量加载进内存。
         // S0-06：已到期的定时销毁消息不产生活跃日期。
-        var timestamps = await dbContext.ShareItems
-            .AsNoTracking()
-            .NotExpired(timeProvider.GetUtcNow())
-            .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
-            .Select(x => x.CreatedAt)
-            .ToListAsync(ct);
+        var activeDates = new HashSet<DateOnly>();
+        DateTimeOffset? cursorCreatedAt = null;
+        Guid? cursorId = null;
+        const int batchSize = 1000;
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var pageQuery = dbContext.ShareItems
+                .AsNoTracking()
+                .NotExpired(timeProvider.GetUtcNow())
+                .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc);
+            if (cursorCreatedAt.HasValue)
+            {
+                pageQuery = pageQuery.Where(x => x.CreatedAt > cursorCreatedAt.Value
+                    || (x.CreatedAt == cursorCreatedAt.Value && x.Id.CompareTo(cursorId!.Value) > 0));
+            }
 
-        return timestamps
-            .Select(t => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(t, timeZone).DateTime))
-            .ToHashSet();
+            var page = await pageQuery
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
+                .Select(x => new { x.CreatedAt, x.Id })
+                .Take(batchSize)
+                .ToListAsync(ct);
+            if (page.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var row in page)
+            {
+                activeDates.Add(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(row.CreatedAt, timeZone).DateTime));
+            }
+
+            cursorCreatedAt = page[^1].CreatedAt;
+            cursorId = page[^1].Id;
+            if (page.Count < batchSize)
+            {
+                break;
+            }
+        }
+
+        return activeDates;
     }
 
     /// <summary>
@@ -406,6 +456,8 @@ public sealed class ShareService(
         DateTimeOffset? before = null,
         CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
         if (!exists)
         {
@@ -455,47 +507,77 @@ public sealed class ShareService(
 
     public async Task<int> CleanupOldMessagesAsync(int months, Guid? topicId = null, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var safeMonths = months is 1 or 3 or 6 ? months : 1;
         var cutoff = timeProvider.GetUtcNow().AddMonths(-safeMonths);
 
-        var query = dbContext.ShareItems
-            .Where(x => x.CreatedAt < cutoff);
-
-        if (topicId.HasValue)
+        // S1-03：分批游标标记，每批 500 条、每批一次提交，不再把全部超龄行
+        // 一次性加载进内存再一次性提交（万级消息时既占内存又是长事务）。
+        // 全局查询过滤器已排除已标记的行，所以游标推进时不会重复读到本批
+        // 刚标记的行；每批提交后立即广播本批 ID，进程中途被 kill 时已标记
+        // 的批不会丢、未标记的批下次清理继续。
+        var affectedTopicIds = new HashSet<Guid>();
+        var deletedIds = new List<Guid>();
+        var deleteAfter = timeProvider.GetUtcNow().AddDays(DeletionPolicy.DelayedDeleteDays);
+        DateTimeOffset? cursorCreatedAt = null;
+        Guid? cursorId = null;
+        const int batchSize = 500;
+        while (true)
         {
-            query = query.Where(x => x.TopicId == topicId.Value);
+            ct.ThrowIfCancellationRequested();
+            var pageQuery = dbContext.ShareItems
+                .Where(x => x.CreatedAt < cutoff);
+            if (topicId.HasValue)
+            {
+                pageQuery = pageQuery.Where(x => x.TopicId == topicId.Value);
+            }
+
+            if (cursorCreatedAt.HasValue)
+            {
+                pageQuery = pageQuery.Where(x => x.CreatedAt > cursorCreatedAt.Value
+                    || (x.CreatedAt == cursorCreatedAt.Value && x.Id.CompareTo(cursorId!.Value) > 0));
+            }
+
+            var page = await pageQuery
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
+                .Take(batchSize)
+                .ToListAsync(ct);
+            if (page.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var item in page)
+            {
+                item.DeleteAfter = deleteAfter;
+                deletedIds.Add(item.Id);
+                if (item.TopicId.HasValue)
+                {
+                    affectedTopicIds.Add(item.TopicId.Value);
+                }
+            }
+
+            await dbContext.SaveChangesWithRetryAsync(ct);
+            // 清掉本批的变更跟踪，否则上下文会随批数增长一直攒着所有已标记行。
+            dbContext.ChangeTracker.Clear();
+
+            // 广播本批被清理的消息 ID，让已打开的客户端同步移除对应气泡
+            await hubContext.Clients.All.SendAsync("ShareItemsDeleted", page.Select(x => x.Id).ToList(), CancellationToken.None);
+
+            cursorCreatedAt = page[^1].CreatedAt;
+            cursorId = page[^1].Id;
+            if (page.Count < batchSize)
+            {
+                break;
+            }
         }
 
-        var items = await query.ToListAsync(ct);
-        if (items.Count == 0)
+        if (deletedIds.Count == 0)
         {
             return 0;
         }
-
-        // 收集受影响的主题 ID，以便更新预览
-        var affectedTopicIds = items
-            .Where(x => x.TopicId.HasValue)
-            .Select(x => x.TopicId!.Value)
-            .Distinct()
-            .ToHashSet();
-
-        var deletedIds = new List<Guid>(items.Count);
-
-        // S0-05（D5）：批量 / 自动清理只写延迟删除标记，不立即删行也不删文件。
-        // 标记一提交，消息就对所有读路径不可见（全局查询过滤器）；文件由
-        // Stage 1 的清扫任务在 DeleteAfter 到期后物理删除。进程在标记与清扫
-        // 之间被 kill，重启后行与文件都还在，不会出现悬空引用。
-        var deleteAfter = timeProvider.GetUtcNow().AddDays(DeletionPolicy.DelayedDeleteDays);
-        foreach (var item in items)
-        {
-            item.DeleteAfter = deleteAfter;
-            deletedIds.Add(item.Id);
-        }
-
-        await dbContext.SaveChangesWithRetryAsync(ct);
-
-        // 广播被清理的消息 ID，让已打开的客户端同步移除对应气泡
-        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", deletedIds, CancellationToken.None);
 
         // 更新受影响主题的预览并广播
         if (affectedTopicIds.Count > 0)
@@ -503,11 +585,13 @@ public sealed class ShareService(
             await RefreshTopicsAndBroadcastAsync(affectedTopicIds, ct);
         }
 
-        return items.Count;
+        return deletedIds.Count;
     }
 
     public async Task<int> DeleteShareItemsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var idList = ids.ToList();
         if (idList.Count == 0)
         {
@@ -565,26 +649,23 @@ public sealed class ShareService(
     /// </summary>
     private async Task RefreshTopicsAndBroadcastAsync(HashSet<Guid> topicIds, CancellationToken ct)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var topics = await dbContext.Topics
             .Where(t => topicIds.Contains(t.Id))
             .ToListAsync(ct);
 
-        // 一次性加载所有受影响主题的全部剩余消息并在内存中取最新一条，避免 foreach 内逐主题查询（N+1）
+        // S1-03：不再一次性加载所有受影响主题的全部剩余消息（万级消息时
+        // 全量进内存）；受影响主题数通常很少，逐主题取最新一条即可。
         // S0-06：主题预览不取已到期的消息。
-        var remainingItems = await dbContext.ShareItems
-            .NotExpired(timeProvider.GetUtcNow())
-            .Where(x => x.TopicId.HasValue && topicIds.Contains(x.TopicId.Value))
-            .OrderByDescending(x => x.CreatedAt)
-            .ThenByDescending(x => x.Id)
-            .ToListAsync(ct);
-
-        var latestByTopic = remainingItems
-            .GroupBy(x => x.TopicId!.Value)
-            .ToDictionary(g => g.Key, g => g.FirstOrDefault());
-
         foreach (var topic in topics)
         {
-            latestByTopic.TryGetValue(topic.Id, out var latest);
+            var latest = await dbContext.ShareItems
+                .NotExpired(timeProvider.GetUtcNow())
+                .Where(x => x.TopicId == topic.Id)
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .FirstOrDefaultAsync(ct);
+
             topic.LastMessageAt = latest?.CreatedAt;
             topic.LastMessagePreview = latest is null
                 ? null

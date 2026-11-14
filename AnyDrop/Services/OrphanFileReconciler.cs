@@ -24,9 +24,12 @@ public sealed record OrphanScanResult(
 /// 前者可以回收，后者只做报告：删除数据库行属于破坏性操作，不适合自动执行。
 ///
 /// 与后台定时循环分离，便于直接用临时目录做单元测试。
+///
+/// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
+/// 每次调用建短寿命上下文；引用集合分批游标加载，不再全量 ToList。
 /// </summary>
 public sealed class OrphanFileReconciler(
-    AnyDropDbContext dbContext,
+    IDbContextFactory<AnyDropDbContext> dbContextFactory,
     IConfiguration configuration,
     TimeProvider timeProvider,
     ILogger<OrphanFileReconciler> logger)
@@ -45,33 +48,84 @@ public sealed class OrphanFileReconciler(
     {
         var basePath = Path.GetFullPath(configuration["Storage:BasePath"] ?? "data/files");
 
-        var items = await dbContext.ShareItems
-            .AsNoTracking()
-            .Where(x => x.ContentType == ShareContentType.Image
-                        || x.ContentType == ShareContentType.Video
-                        || x.ContentType == ShareContentType.File)
-            .Select(x => new { x.Content, x.ThumbnailPath })
-            .ToListAsync(ct);
-
-        // 引用集合：一条消息可能同时占用原文件与缩略图两个路径
+        // S1-03：引用集合分批游标加载（每批 1000 条），不再把全部文件类
+        // 消息一次性 ToList 进内存。游标是 (CreatedAt, Id) 复合键。
+        // 注意必须 IgnoreQueryFilters：已写 DeleteAfter 标记的行对常规读
+        // 路径不可见，但它们的文件在 7 天清扫期满之前仍受保护——若按过滤
+        // 后的集合算引用，清扫期内的文件会被对账误判为孤儿而提前删掉。
         var referenced = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var item in items)
+        var liveReferenced = new HashSet<string>(StringComparer.Ordinal);
+        await using (var dbContext = await dbContextFactory.CreateDbContextAsync(ct))
         {
-            if (!string.IsNullOrWhiteSpace(item.Content))
+            DateTimeOffset? cursorCreatedAt = null;
+            Guid? cursorId = null;
+            const int batchSize = 1000;
+            while (true)
             {
-                referenced.Add(NormalizeRelativePath(item.Content));
-            }
+                ct.ThrowIfCancellationRequested();
+                var pageQuery = dbContext.ShareItems
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(x => x.ContentType == ShareContentType.Image
+                                || x.ContentType == ShareContentType.Video
+                                || x.ContentType == ShareContentType.File);
+                if (cursorCreatedAt.HasValue)
+                {
+                    pageQuery = pageQuery.Where(x => x.CreatedAt > cursorCreatedAt.Value
+                        || (x.CreatedAt == cursorCreatedAt.Value && x.Id.CompareTo(cursorId!.Value) > 0));
+                }
 
-            if (!string.IsNullOrWhiteSpace(item.ThumbnailPath))
-            {
-                referenced.Add(NormalizeRelativePath(item.ThumbnailPath));
+                var page = await pageQuery
+                    .OrderBy(x => x.CreatedAt)
+                    .ThenBy(x => x.Id)
+                    .Select(x => new { x.Content, x.ThumbnailPath, x.CreatedAt, x.Id, x.DeleteAfter })
+                    .Take(batchSize)
+                    .ToListAsync(ct);
+                if (page.Count == 0)
+                {
+                    break;
+                }
+
+                // 引用集合：一条消息可能同时占用原文件与缩略图两个路径。
+                // 已标记延迟删除的行仍占用引用（保护文件到清扫期满），
+                // 但「缺失文件」只对未标记的活行计数——待清扫行的文件丢了
+                // 由清扫任务收尾，不应再进缺失修复入口。
+                foreach (var item in page)
+                {
+                    var isLive = item.DeleteAfter is null;
+                    if (!string.IsNullOrWhiteSpace(item.Content))
+                    {
+                        referenced.Add(NormalizeRelativePath(item.Content));
+                        if (isLive)
+                        {
+                            liveReferenced.Add(NormalizeRelativePath(item.Content));
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.ThumbnailPath))
+                    {
+                        referenced.Add(NormalizeRelativePath(item.ThumbnailPath));
+                        if (isLive)
+                        {
+                            liveReferenced.Add(NormalizeRelativePath(item.ThumbnailPath));
+                        }
+                    }
+                }
+
+                cursorCreatedAt = page[^1].CreatedAt;
+                cursorId = page[^1].Id;
+                if (page.Count < batchSize)
+                {
+                    break;
+                }
             }
         }
 
         // 先统计缺失文件。即使存储目录整体不存在也要统计：
         // 目录不存在通常意味着卷没挂上，此时所有引用文件都不可用，必须明确报警，
         // 而不是返回一个「一切正常」的空结果。
-        var missing = CountMissingReferencedFiles(basePath, referenced);
+        // 只对活行计数（见上：待清扫行的缺失由清扫任务收尾）。
+        var missing = CountMissingReferencedFiles(basePath, liveReferenced);
 
         if (!Directory.Exists(basePath))
         {

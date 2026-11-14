@@ -1,6 +1,7 @@
 using AnyDrop.Data;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -19,16 +20,16 @@ public class OrphanFileReconcilerTests : IDisposable
     private readonly string _basePath =
         Path.Combine(AppContext.BaseDirectory, "test-orphan", Guid.NewGuid().ToString("N"));
 
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-orphan-{Guid.NewGuid():N}")
             .Options;
 
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
-    private OrphanFileReconciler CreateSut(AnyDropDbContext db)
+    private OrphanFileReconciler CreateSut(TestDbContextFactory factory)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -38,7 +39,7 @@ public class OrphanFileReconcilerTests : IDisposable
             .Build();
 
         return new OrphanFileReconciler(
-            db, configuration, TimeProvider.System, NullLogger<OrphanFileReconciler>.Instance);
+            factory, configuration, TimeProvider.System, NullLogger<OrphanFileReconciler>.Instance);
     }
 
     /// <summary>写入一个「足够旧」的文件，使其超出 24 小时宽限期。</summary>
@@ -72,14 +73,15 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_OrphanFile_IsReportedButKeptByDefault()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         db.ShareItems.Add(FileItem("20260101/keep.bin"));
         await db.SaveChangesAsync();
 
         var kept = WriteAgedFile("20260101/keep.bin");
         var orphan = WriteAgedFile("20260101/orphan.bin", "orphan-content");
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: false);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: false);
 
         result.FilesScanned.Should().Be(2);
         result.OrphansFound.Should().Be(1);
@@ -93,14 +95,15 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_WithDeleteEnabled_RemovesOnlyOrphans()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         db.ShareItems.Add(FileItem("20260101/keep.bin"));
         await db.SaveChangesAsync();
 
         var kept = WriteAgedFile("20260101/keep.bin");
         var orphan = WriteAgedFile("20260101/orphan.bin");
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: true);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: true);
 
         result.OrphansDeleted.Should().Be(1);
         File.Exists(kept).Should().BeTrue("被引用的文件绝不能删");
@@ -111,14 +114,15 @@ public class OrphanFileReconcilerTests : IDisposable
     public async Task ReconcileAsync_ThumbnailPath_CountsAsReferenced()
     {
         // 缩略图必须计入引用集合，否则会被当成孤儿误删
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         db.ShareItems.Add(FileItem("20260101/a.png", thumbnailPath: "thumbnails/a.jpg"));
         await db.SaveChangesAsync();
 
         var thumbnail = WriteAgedFile("thumbnails/a.jpg");
         var content = WriteAgedFile("20260101/a.png");
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: true);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: true);
 
         result.OrphansFound.Should().Be(0);
         File.Exists(thumbnail).Should().BeTrue();
@@ -128,12 +132,13 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_RecentUnreferencedFile_IsSkippedByGracePeriod()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
 
         // 刚写入、尚未被引用的文件可能正在上传中，不能判为孤儿
         var inFlight = WriteFreshFile("20260101/inflight.bin");
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: true);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: true);
 
         result.OrphansFound.Should().Be(0);
         File.Exists(inFlight).Should().BeTrue();
@@ -142,12 +147,13 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_AgedTempFileFromCrash_IsReclaimed()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
 
         // 原子写入的临时文件；崩溃残留的应被回收
         var staleTemp = WriteAgedFile("20260101/.abc123.part", "half-written");
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: true);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: true);
 
         result.OrphansFound.Should().Be(1);
         File.Exists(staleTemp).Should().BeFalse();
@@ -156,11 +162,12 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_MissingReferencedFile_IsCountedButNotDeleted()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         db.ShareItems.Add(FileItem("20260101/gone.bin"));
         await db.SaveChangesAsync();
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: true);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: true);
 
         result.MissingReferencedFiles.Should().Be(1);
         result.OrphansFound.Should().Be(0);
@@ -169,7 +176,8 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_TextAndLinkItems_AreNotTreatedAsFileReferences()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         db.ShareItems.Add(new ShareItem
         {
             Id = Guid.NewGuid(),
@@ -182,7 +190,7 @@ public class OrphanFileReconcilerTests : IDisposable
         // 文本消息的 Content 是正文，不是存储路径，因此不应保护同名文件
         var file = WriteAgedFile("20260101/not-a-file.bin");
 
-        var result = await CreateSut(db).ReconcileAsync(deleteOrphans: true);
+        var result = await CreateSut(factory).ReconcileAsync(deleteOrphans: true);
 
         result.OrphansFound.Should().Be(1);
         File.Exists(file).Should().BeFalse();
@@ -191,8 +199,9 @@ public class OrphanFileReconcilerTests : IDisposable
     [Fact]
     public async Task ReconcileAsync_WhenStorageDirectoryMissing_ReturnsEmptyResult()
     {
-        await using var db = CreateDbContext();
-        var sut = CreateSut(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = CreateSut(factory);
 
         var result = await sut.ReconcileAsync(deleteOrphans: true);
 

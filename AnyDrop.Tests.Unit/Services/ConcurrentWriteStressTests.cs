@@ -26,12 +26,16 @@ public class ConcurrentWriteStressTests : IDisposable
     private AnyDropDbContext CreateContext()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
-        var options = new DbContextOptionsBuilder<AnyDropDbContext>()
+        return new AnyDropDbContext(CreateOptions());
+    }
+
+    private TestDbContextFactory CreateFactory() => new(CreateOptions());
+
+    private DbContextOptions<AnyDropDbContext> CreateOptions()
+        => new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseSqlite($"Data Source={_dbPath}")
             .AddInterceptors(new SqliteBusyTimeoutInterceptor())
             .Options;
-        return new AnyDropDbContext(options);
-    }
 
     [Fact]
     public async Task ParallelWriters_NoDatabaseLockedErrors()
@@ -48,8 +52,7 @@ public class ConcurrentWriteStressTests : IDisposable
 
         var writerTasks = Enumerable.Range(0, writers).Select(async writer =>
         {
-            await using var db = CreateContext();
-            var service = ShareServiceFactory.Create(db);
+            var service = ShareServiceFactory.Create(CreateFactory());
             for (var i = 0; i < messagesPerWriter; i++)
             {
                 await service.SendTextAsync($"writer {writer} message {i}");
@@ -58,8 +61,7 @@ public class ConcurrentWriteStressTests : IDisposable
 
         var readerTask = Task.Run(async () =>
         {
-            await using var db = CreateContext();
-            var service = ShareServiceFactory.Create(db);
+            var service = ShareServiceFactory.Create(CreateFactory());
             for (var i = 0; i < 50; i++)
             {
                 _ = await service.GetRecentAsync();
@@ -69,8 +71,7 @@ public class ConcurrentWriteStressTests : IDisposable
 
         var cleanerTask = Task.Run(async () =>
         {
-            await using var db = CreateContext();
-            var service = ShareServiceFactory.Create(db);
+            var service = ShareServiceFactory.Create(CreateFactory());
             for (var i = 0; i < 20; i++)
             {
                 _ = await service.CleanupOldMessagesAsync(1);

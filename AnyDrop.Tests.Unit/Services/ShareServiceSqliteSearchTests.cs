@@ -33,8 +33,17 @@ public class ShareServiceSqliteSearchTests : IDisposable
         return db;
     }
 
-    private static ShareService CreateService(AnyDropDbContext db)
-        => ShareServiceFactory.Create(db);
+    private TestDbContextFactory CreateSqliteFactory()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
+        var options = new DbContextOptionsBuilder<AnyDropDbContext>()
+            .UseSqlite($"Data Source={_dbPath}")
+            .Options;
+        return new TestDbContextFactory(options);
+    }
+
+    private static ShareService CreateService(TestDbContextFactory factory)
+        => ShareServiceFactory.Create(factory);
 
     private static async Task<Guid> SeedAsync(AnyDropDbContext db)
     {
@@ -82,9 +91,10 @@ public class ShareServiceSqliteSearchTests : IDisposable
     public async Task SearchTopicMessagesAsync_TranslatesToSqliteAndMatchesFileName()
     {
         // 若 ToLowerInvariant / 多列 OR 的写法无法翻译成 SQL，这一步会直接抛异常
+        var factory = CreateSqliteFactory();
         await using var db = CreateSqliteContext();
         var topicId = await SeedAsync(db);
-        var service = CreateService(db);
+        var service = CreateService(factory);
 
         var byFileName = await service.SearchTopicMessagesAsync(topicId, "Quarterly-Report");
 
@@ -95,9 +105,10 @@ public class ShareServiceSqliteSearchTests : IDisposable
     [Fact]
     public async Task SearchTopicMessagesAsync_IsCaseInsensitive()
     {
+        var factory = CreateSqliteFactory();
         await using var db = CreateSqliteContext();
         var topicId = await SeedAsync(db);
-        var service = CreateService(db);
+        var service = CreateService(factory);
 
         var result = await service.SearchTopicMessagesAsync(topicId, "QUARTERLY-report");
 
@@ -107,9 +118,10 @@ public class ShareServiceSqliteSearchTests : IDisposable
     [Fact]
     public async Task SearchTopicMessagesAsync_MatchesLinkTitle()
     {
+        var factory = CreateSqliteFactory();
         await using var db = CreateSqliteContext();
         var topicId = await SeedAsync(db);
-        var service = CreateService(db);
+        var service = CreateService(factory);
 
         var result = await service.SearchTopicMessagesAsync(topicId, "查询翻译");
 
@@ -120,9 +132,10 @@ public class ShareServiceSqliteSearchTests : IDisposable
     [Fact]
     public async Task SearchTopicMessagesAsync_StillMatchesPlainTextContent()
     {
+        var factory = CreateSqliteFactory();
         await using var db = CreateSqliteContext();
         var topicId = await SeedAsync(db);
-        var service = CreateService(db);
+        var service = CreateService(factory);
 
         var result = await service.SearchTopicMessagesAsync(topicId, "hello");
 
@@ -133,9 +146,10 @@ public class ShareServiceSqliteSearchTests : IDisposable
     [Fact]
     public async Task SearchTopicMessagesAsync_WithNoMatch_ReturnsEmpty()
     {
+        var factory = CreateSqliteFactory();
         await using var db = CreateSqliteContext();
         var topicId = await SeedAsync(db);
-        var service = CreateService(db);
+        var service = CreateService(factory);
 
         var result = await service.SearchTopicMessagesAsync(topicId, "zzz-not-present-zzz");
 

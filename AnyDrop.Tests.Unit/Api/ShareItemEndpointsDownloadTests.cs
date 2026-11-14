@@ -1,6 +1,7 @@
 using System.Text;
 using AnyDrop.Api;
 using AnyDrop.Data;
+using AnyDrop.Tests.Unit.TestDoubles;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using FluentAssertions;
@@ -38,13 +39,13 @@ public class ShareItemEndpointsDownloadTests : IDisposable
         _storage = new LocalFileStorageService(configuration, TimeProvider.System);
     }
 
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-download-{Guid.NewGuid():N}")
             .Options;
 
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
     private async Task<Guid> SeedItemAsync(AnyDropDbContext db, string mimeType, string fileName)
@@ -73,10 +74,10 @@ public class ShareItemEndpointsDownloadTests : IDisposable
         return item.Id;
     }
 
-    private async Task<string?> GetDownloadNameAsync(AnyDropDbContext db, Guid id, bool? download)
+    private async Task<string?> GetDownloadNameAsync(TestDbContextFactory factory, Guid id, bool? download)
     {
         var result = await ShareItemEndpoints.GetFileAsync(
-            id, download, db, _storage, CancellationToken.None);
+            id, download, factory, _storage, CancellationToken.None);
 
         var fileResult = result.Result as FileStreamHttpResult;
         fileResult.Should().NotBeNull("文件存在时应返回文件流结果");
@@ -104,10 +105,11 @@ public class ShareItemEndpointsDownloadTests : IDisposable
     [InlineData("application/pdf", "doc.pdf")]
     public async Task GetFileAsync_DangerousOrUnknownTypes_AreForcedToAttachment(string mimeType, string fileName)
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var id = await SeedItemAsync(db, mimeType, fileName);
 
-        var downloadName = await GetDownloadNameAsync(db, id, download: null);
+        var downloadName = await GetDownloadNameAsync(factory, id, download: null);
 
         downloadName.Should().Be(fileName, "危险或未知类型必须带下载文件名，即强制作为附件");
     }
@@ -119,19 +121,21 @@ public class ShareItemEndpointsDownloadTests : IDisposable
     [InlineData("audio/mpeg", "a.mp3")]
     public async Task GetFileAsync_SafeMediaTypes_AreServedInline(string mimeType, string fileName)
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var id = await SeedItemAsync(db, mimeType, fileName);
 
-        (await GetDownloadNameAsync(db, id, download: null)).Should().BeNull();
+        (await GetDownloadNameAsync(factory, id, download: null)).Should().BeNull();
     }
 
     [Fact]
     public async Task GetFileAsync_WithDownloadFlag_ForcesAttachmentEvenForImages()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var id = await SeedItemAsync(db, "image/png", "a.png");
 
-        (await GetDownloadNameAsync(db, id, download: true)).Should().Be("a.png");
+        (await GetDownloadNameAsync(factory, id, download: true)).Should().Be("a.png");
     }
 
     public void Dispose()

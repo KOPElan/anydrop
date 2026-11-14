@@ -63,8 +63,11 @@ public sealed class ExpiredMessageCleanupService(
         // S0-04：后台写操作串行化——与缩略图批处理互斥写库，避免两个定时任务争写锁。
         using var _ = await dbWriteGate.AcquireAsync(ct);
 
+        // S1-03：上下文由工厂现建现用，本轮清理结束即释放。
+        // Hub 与 TopicService 仍从独立 Scope 取（TopicService 是 scoped 服务）。
         await using var scope = serviceProvider.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
+        var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AnyDropDbContext>>();
+        await using var db = await factory.CreateDbContextAsync(ct);
         var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<ShareHub>>();
 
         var now = timeProvider.GetUtcNow();

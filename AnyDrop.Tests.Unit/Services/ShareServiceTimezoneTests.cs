@@ -18,13 +18,13 @@ namespace AnyDrop.Tests.Unit.Services;
 /// </summary>
 public class ShareServiceTimezoneTests
 {
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-tz-{Guid.NewGuid():N}")
             .Options;
 
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
     private static TimeZoneInfo FixedOffset(string id, TimeSpan offset)
@@ -112,9 +112,10 @@ public class ShareServiceTimezoneTests
         // 2026-01-01T23:30Z：在 UTC 属于 1 月 1 日，在东八区已经是 1 月 2 日
         var instant = new DateTimeOffset(2026, 1, 1, 23, 30, 0, TimeSpan.Zero);
 
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedAsync(db, instant);
-        var service = ShareServiceFactory.Create(db);
+        var service = ShareServiceFactory.Create(factory);
 
         var plus8 = FixedOffset("Test-Plus8", TimeSpan.FromHours(8));
         var utc = TimeZoneInfo.Utc;
@@ -135,9 +136,10 @@ public class ShareServiceTimezoneTests
     {
         var instant = new DateTimeOffset(2026, 1, 1, 23, 30, 0, TimeSpan.Zero);
 
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedAsync(db, instant);
-        var service = ShareServiceFactory.Create(db);
+        var service = ShareServiceFactory.Create(factory);
 
         var plus8 = FixedOffset("Test-Plus8", TimeSpan.FromHours(8));
 
@@ -156,9 +158,10 @@ public class ShareServiceTimezoneTests
         var beforeMidnight = new DateTimeOffset(2026, 1, 1, 15, 0, 0, TimeSpan.Zero); // 东八区 1/1 23:00
         var afterMidnight = new DateTimeOffset(2026, 1, 1, 16, 0, 0, TimeSpan.Zero);  // 东八区 1/2 00:00
 
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedAsync(db, beforeMidnight, afterMidnight);
-        var service = ShareServiceFactory.Create(db);
+        var service = ShareServiceFactory.Create(factory);
 
         var plus8 = FixedOffset("Test-Plus8", TimeSpan.FromHours(8));
         var dates = await service.GetTopicActiveDatesAsync(

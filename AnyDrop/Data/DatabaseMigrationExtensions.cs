@@ -11,8 +11,9 @@ public static class DatabaseMigrationExtensions
     /// </summary>
     public static async Task MigrateDatabaseAsync(this IServiceProvider serviceProvider, CancellationToken ct = default)
     {
-        await using var scope = serviceProvider.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
+        // S1-03：上下文由工厂创建、随本次启动迁移用完即弃，不再取请求作用域的实例。
+        var factory = serviceProvider.GetRequiredService<IDbContextFactory<AnyDropDbContext>>();
+        await using var db = await factory.CreateDbContextAsync(ct);
 
         // S0-04：先开 WAL 再跑迁移（迁移本身也是写操作，同样受益）。
         // Microsoft.Data.Sqlite 的连接串不支持 Journal Mode 关键字，

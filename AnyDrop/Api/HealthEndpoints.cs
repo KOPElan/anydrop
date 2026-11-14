@@ -23,7 +23,7 @@ public static class HealthEndpoints
     }
 
     public static async Task<IResult> GetHealthAsync(
-        AnyDropDbContext dbContext,
+        IDbContextFactory<AnyDropDbContext> dbContextFactory,
         IConfiguration configuration,
         ILoggerFactory loggerFactory,
         CancellationToken ct)
@@ -33,8 +33,10 @@ public static class HealthEndpoints
         var healthy = true;
 
         // 探针 1：真正查询一次。只调用 CanConnectAsync 无法发现「表缺失 / 库损坏」。
+        // S1-03：上下文由工厂现建现用，探针结束即释放。
         try
         {
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
             _ = await dbContext.SystemSettings
                 .AsNoTracking()
                 .Select(x => x.Id)

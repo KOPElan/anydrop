@@ -1,6 +1,7 @@
 using AnyDrop.Data;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -13,13 +14,13 @@ public class ThumbnailServiceTests
 {
     // ── 辅助方法 ───────────────────────────────────────────────────────────────
 
-    private static AnyDropDbContext CreateDbContext() =>
+    private static TestDbContextFactory CreateDbContextFactory() =>
         new(new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-thumb-{Guid.NewGuid():N}")
             .Options);
 
     private static ThumbnailService CreateService(
-        AnyDropDbContext db,
+        TestDbContextFactory factory,
         IFileStorageService? storageService = null,
         string? basePath = null)
     {
@@ -30,7 +31,7 @@ public class ThumbnailServiceTests
                 ["Storage:BasePath"] = basePath ?? Path.Combine(Path.GetTempPath(), "anydrop-test")
             })
             .Build();
-        return new ThumbnailService(db, storage, config, NullLogger<ThumbnailService>.Instance);
+        return new ThumbnailService(factory, storage, config, NullLogger<ThumbnailService>.Instance);
     }
 
     // ── GenerateThumbnailAsync 基础路径 ───────────────────────────────────────
@@ -38,8 +39,9 @@ public class ThumbnailServiceTests
     [Fact]
     public async Task GenerateThumbnailAsync_WhenItemNotFound_ShouldReturnNull()
     {
-        await using var db = CreateDbContext();
-        var sut = CreateService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = CreateService(factory);
 
         var result = await sut.GenerateThumbnailAsync(Guid.NewGuid());
 
@@ -49,12 +51,13 @@ public class ThumbnailServiceTests
     [Fact]
     public async Task GenerateThumbnailAsync_WhenItemIsText_ShouldReturnNull()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var item = new ShareItem { ContentType = ShareContentType.Text, Content = "hello" };
         db.ShareItems.Add(item);
         await db.SaveChangesAsync();
 
-        var sut = CreateService(db);
+        var sut = CreateService(factory);
         var result = await sut.GenerateThumbnailAsync(item.Id);
 
         result.Should().BeNull();
@@ -63,7 +66,8 @@ public class ThumbnailServiceTests
     [Fact]
     public async Task GenerateThumbnailAsync_WhenThumbnailAlreadyExists_ShouldReturnExistingPath()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         const string existingPath = "thumbnails/existing.jpg";
         var item = new ShareItem
         {
@@ -75,7 +79,7 @@ public class ThumbnailServiceTests
         await db.SaveChangesAsync();
 
         var storageMock = new Mock<IFileStorageService>();
-        var sut = CreateService(db, storageMock.Object);
+        var sut = CreateService(factory, storageMock.Object);
         var result = await sut.GenerateThumbnailAsync(item.Id);
 
         result.Should().Be(existingPath);
@@ -87,7 +91,8 @@ public class ThumbnailServiceTests
     public async Task GenerateThumbnailAsync_WhenImageDataInvalid_ShouldReturnNull()
     {
         // 传入非图片数据时 ImageSharp 抛出异常，服务应捕获异常并返回 null（不向上抛出）
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var item = new ShareItem
         {
             ContentType = ShareContentType.Image,
@@ -102,7 +107,7 @@ public class ThumbnailServiceTests
             .Setup(s => s.GetFileAsync(item.Content, It.IsAny<CancellationToken>()))
             .ReturnsAsync(invalidData);
 
-        var sut = CreateService(db, storageMock.Object);
+        var sut = CreateService(factory, storageMock.Object);
         var act = async () => await sut.GenerateThumbnailAsync(item.Id);
 
         // 不应抛出异常
@@ -116,8 +121,9 @@ public class ThumbnailServiceTests
     [Fact]
     public async Task ProcessPendingThumbnailsAsync_WhenNoPendingItems_ShouldReturnZero()
     {
-        await using var db = CreateDbContext();
-        var sut = CreateService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = CreateService(factory);
 
         var count = await sut.ProcessPendingThumbnailsAsync();
 
@@ -127,7 +133,8 @@ public class ThumbnailServiceTests
     [Fact]
     public async Task ProcessPendingThumbnailsAsync_ShouldSkipItemsWithExistingThumbnailPath()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var item = new ShareItem
         {
             ContentType = ShareContentType.Image,
@@ -138,7 +145,7 @@ public class ThumbnailServiceTests
         await db.SaveChangesAsync();
 
         var storageMock = new Mock<IFileStorageService>();
-        var sut = CreateService(db, storageMock.Object);
+        var sut = CreateService(factory, storageMock.Object);
         var count = await sut.ProcessPendingThumbnailsAsync();
 
         // 已有缩略图的条目不计入"待处理"，成功数为 0

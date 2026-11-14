@@ -50,12 +50,14 @@ if (!string.IsNullOrWhiteSpace(dbDirectory))
     Directory.CreateDirectory(dbDirectory);
 }
 
-// 注意：不要往连接串里加 Journal Mode / Busy Timeout——Microsoft.Data.Sqlite
-// 根本不支持这两个关键字（会直接抛 ArgumentException）。
+// S1-03（DAT-09）：改用 DbContextFactory。Blazor Server 里 scoped 服务
+// 与电路同寿命，一个请求作用域的 DbContext 会被同一电路持有数小时，
+// 变更跟踪越积越多、还会读到过期数据。此后每个写操作都用工厂建短寿命
+// 上下文；请求作用域的 API 端点同样每次调用建新上下文。
 // WAL 在启动时由 DatabaseMigrationExtensions.EnsureWalModeAsync 对库文件设置
 // （按文件持久化）；busy_timeout 由 SqliteBusyTimeoutInterceptor 在每次打开
 // 连接时设置（按连接生效）。见 S0-04。
-builder.Services.AddDbContext<AnyDropDbContext>(options =>
+builder.Services.AddDbContextFactory<AnyDropDbContext>(options =>
     options.UseSqlite($"Data Source={fullDbPath}")
         .AddInterceptors(new SqliteBusyTimeoutInterceptor()));
 builder.Services.AddSingleton<DbWriteGate>();
