@@ -332,7 +332,12 @@ var requireHttps = reverseProxyOptions.RequireHttps ?? !app.Environment.IsDevelo
 if (requireHttps)
 {
     app.UseHsts();
-    app.UseHttpsRedirection();
+    // 健康检查探针（/health）不重定向：编排器与 compose healthcheck
+    // 在容器内用 plain HTTP 访问它，重定向到 https 会因容器内无 TLS
+    // 监听而失败，容器会被误判为不健康。
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase),
+        branch => branch.UseHttpsRedirection());
 }
 else
 {
