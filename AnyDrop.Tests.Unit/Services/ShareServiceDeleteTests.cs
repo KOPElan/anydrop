@@ -5,6 +5,7 @@ using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -111,6 +112,81 @@ public class ShareServiceDeleteTests : IDisposable
 
         (await sut.CleanupOldMessagesAsync(1)).Should().Be(1);
         (await sut.CleanupOldMessagesAsync(1)).Should().Be(0, "已标记的消息不再进入清理查询");
+    }
+
+    /// <summary>
+    /// S0-08（DAT-01）：模拟进程在「DB 提交之后、删文件之前」被 kill。
+    /// 真正的 kill -9 无法在单元测试里复现（会杀掉测试进程本身），这里用
+    /// 存储层在 DeleteFileAsync 抛错来模拟同一崩溃点：DB 已提交，文件还在。
+    /// 验收点是重启后零悬空引用（行不在、文件成孤儿而非悬空指针，
+    /// 孤儿由待删除队列在 Stage 1 消费）。
+    /// </summary>
+    [Fact]
+    public async Task KillMidDelete_SimulatedCrash_LeavesNoDanglingReferences()
+    {
+        var dbName = $"anydrop-kill-sim-{Guid.NewGuid():N}";
+        DbContextOptions<AnyDropDbContext> Options() => new DbContextOptionsBuilder<AnyDropDbContext>()
+            .UseInMemoryDatabase(dbName).Options;
+
+        var storageDir = Path.Combine(Path.GetTempPath(), "anydrop-kill-sim", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(storageDir);
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Storage:BasePath"] = storageDir
+                })
+                .Build();
+            var realStorage = new LocalFileStorageService(configuration, TimeProvider.System);
+            var storedPath = await realStorage.SaveFileAsync(
+                new MemoryStream(System.Text.Encoding.UTF8.GetBytes("victim")),
+                "victim.txt", "text/plain");
+
+            Guid itemId;
+            await using (var db = new AnyDropDbContext(Options()))
+            {
+                var item = new ShareItem
+                {
+                    Id = Guid.NewGuid(),
+                    ContentType = ShareContentType.File,
+                    Content = storedPath,
+                    FileName = "victim.txt",
+                    MimeType = "text/plain",
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                db.ShareItems.Add(item);
+                await db.SaveChangesAsync();
+                itemId = item.Id;
+            }
+
+            // 存储层在删文件时抛错 = 进程在 DB 提交后、文件删除前被 kill
+            var crashingStorage = new Mock<IFileStorageService>();
+            crashingStorage.Setup(s => s.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new IOException("simulated crash between DB commit and file delete"));
+
+            await using (var db = new AnyDropDbContext(Options()))
+            {
+                var sut = ShareServiceFactory.Create(db, fileStorageService: crashingStorage.Object);
+                (await sut.DeleteShareItemsAsync([itemId])).Should().Be(1);
+            }
+
+            // "重启"：全新的 DbContext 读库
+            await using var freshDb = new AnyDropDbContext(Options());
+            (await freshDb.ShareItems.CountAsync()).Should().Be(0, "DB 先提交：重启后没有任何悬空引用");
+            var queued = await freshDb.PendingFileDeletions.ToListAsync();
+            queued.Should().ContainSingle(x => x.ShareItemId == itemId && x.StoragePath == storedPath);
+            // 文件还在磁盘上（孤儿文件，不是悬空引用；Stage 1 的队列消费负责重试）
+            File.Exists(Path.Combine(storageDir, storedPath.Replace('/', Path.DirectorySeparatorChar)))
+                .Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(storageDir))
+            {
+                Directory.Delete(storageDir, recursive: true);
+            }
+        }
     }
 
     /// <summary>迁移确实建出了 DeleteAfter 列与 PendingFileDeletions 表。</summary>
