@@ -4,6 +4,7 @@
 @inject ISettingsService SettingsService
 @inject IServerConfigService ServerConfig
 @inject ISignalRService SignalR
+@inject INotificationService Notifications
 @inject ISecureTokenStorage TokenStorage
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -78,6 +79,88 @@
             </div>
         </section>
 
+        <!-- S2-08：系统设置（与 Web 设置页同款字段，接 ISettingsService 真实接口） -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl p-4 space-y-4 shadow-sm">
+            <h2 class="font-medium text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wider">@L["Settings_Security"]</h2>
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-800 dark:text-gray-100">@L["Settings_AutoFetchLink"]</span>
+                <button @onclick="() => _autoFetchLinkPreview = !_autoFetchLinkPreview"
+                        aria-pressed="@_autoFetchLinkPreview"
+                        class="w-11 h-6 rounded-full transition-colors relative @(_autoFetchLinkPreview ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600")">
+                    <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform @(_autoFetchLinkPreview ? "translate-x-5" : "translate-x-0")"></span>
+                </button>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-800 dark:text-gray-100 mb-1">@L["Settings_BurnDuration"]</label>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mb-2">@L["Settings_BurnDurationHint"]</p>
+                <input type="number" min="1" max="43200" @bind="_burnAfterReadingMinutes" class="input-base" />
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="block text-sm text-gray-800 dark:text-gray-100">@L["Settings_Notifications"]</span>
+                    <span class="block text-xs text-gray-400 dark:text-gray-500">@L["Settings_NotificationPermission"]: @(_notificationGranted is null ? "—" : _notificationGranted.Value ? L["Settings_NotificationGranted"] : L["Settings_NotificationNotGranted"])</span>
+                </div>
+                <button @onclick="RequestNotificationPermissionAsync" class="text-indigo-600 text-sm font-medium active:opacity-70">@L["Settings_RequestNotification"]</button>
+            </div>
+            @if (_securityMessage is not null)
+            {
+                <p class="text-xs @(_securitySaved ? "text-green-600" : "text-red-500")">@_securityMessage</p>
+            }
+            <button @onclick="SaveSecurityAsync" class="btn-primary text-sm">@L["Settings_SaveSecurity"]</button>
+        </section>
+
+        <!-- S2-08：消息管理（手动清理 + 自动清理，与 Web 设置页同款） -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl p-4 space-y-4 shadow-sm">
+            <h2 class="font-medium text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wider">@L["Settings_MessageManagement"]</h2>
+            <div>
+                <p class="text-sm font-medium text-gray-800 dark:text-gray-100">@L["Settings_ManualCleanup"]</p>
+                <p class="mb-3 text-xs text-gray-400 dark:text-gray-500">@L["Settings_ManualCleanupHint"]</p>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="btn-secondary text-sm" disabled="@_isCleaningUp" @onclick="() => RequestCleanup(1)">@L["Settings_Cleanup1Month"]</button>
+                    <button type="button" class="btn-secondary text-sm" disabled="@_isCleaningUp" @onclick="() => RequestCleanup(3)">@L["Settings_Cleanup3Months"]</button>
+                    <button type="button" class="btn-secondary text-sm" disabled="@_isCleaningUp" @onclick="() => RequestCleanup(6)">@L["Settings_Cleanup6Months"]</button>
+                </div>
+                @if (_showCleanupConfirm)
+                {
+                    <div class="mt-3 rounded-xl bg-red-50 dark:bg-red-900/20 p-3 space-y-2">
+                        <p class="text-sm font-medium text-red-600 dark:text-red-400">@L["Settings_CleanupConfirmTitle"]</p>
+                        <p class="text-xs text-gray-600 dark:text-gray-300">@string.Format(L["Settings_CleanupConfirmMessage"], _pendingCleanupMonths)</p>
+                        <div class="flex gap-2">
+                            <button @onclick="ConfirmCleanupAsync" class="btn-danger text-sm">@L["Settings_CleanupConfirmAction"]</button>
+                            <button @onclick="() => _showCleanupConfirm = false" class="btn-secondary text-sm">@L["Common_Cancel"]</button>
+                        </div>
+                    </div>
+                }
+                @if (_cleanupMessage is not null)
+                {
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">@_cleanupMessage</p>
+                }
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="block text-sm text-gray-800 dark:text-gray-100">@L["Settings_AutoCleanup"]</span>
+                    <span class="block text-xs text-gray-400 dark:text-gray-500">@L["Settings_AutoCleanupHint"]</span>
+                </div>
+                <button @onclick="() => _autoCleanupEnabled = !_autoCleanupEnabled"
+                        aria-pressed="@_autoCleanupEnabled"
+                        class="w-11 h-6 rounded-full transition-colors relative @(_autoCleanupEnabled ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600")">
+                    <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform @(_autoCleanupEnabled ? "translate-x-5" : "translate-x-0")"></span>
+                </button>
+            </div>
+            @if (_autoCleanupEnabled)
+            {
+                <div>
+                    <label class="block text-sm text-gray-800 dark:text-gray-100 mb-1">@L["Settings_AutoCleanupMonths"]</label>
+                    <select value="@_autoCleanupMonths" @onchange="OnAutoCleanupMonthsChanged" class="input-base">
+                        <option value="1">@L["Settings_AutoCleanupMonths1"]</option>
+                        <option value="3">@L["Settings_AutoCleanupMonths3"]</option>
+                        <option value="6">@L["Settings_AutoCleanupMonths6"]</option>
+                    </select>
+                </div>
+            }
+            <button @onclick="SaveSecurityAsync" class="btn-primary text-sm">@L["Settings_SaveSecurity"]</button>
+        </section>
+
         <!-- 危险区域 -->
         <section class="bg-white dark:bg-gray-800 rounded-2xl p-4 space-y-3 shadow-sm">
             <h2 class="font-medium text-red-500 dark:text-red-400 text-xs uppercase tracking-wider">@L["Settings_DangerZone"]</h2>
@@ -101,11 +184,28 @@
     private string? _passwordError;
     private bool _isDark;
     private string _newBaseUrl = string.Empty;
+    // S2-08：安全设置（与 Web 设置页同款字段）
+    private bool _autoFetchLinkPreview = true;
+    private int _burnAfterReadingMinutes = 10;
+    private bool _autoCleanupEnabled;
+    private int _autoCleanupMonths = 1;
+    // 缩略图定时任务字段本页不展示，加载后原样带回保存，避免误重置
+    private int _thumbnailGenerationHour = 2;
+    private bool _scheduledThumbnailGenerationEnabled;
+    private string? _securityMessage;
+    private bool _securitySaved;
+    private bool? _notificationGranted;
+    private bool _isCleaningUp;
+    private int _pendingCleanupMonths;
+    private bool _showCleanupConfirm;
+    private string? _cleanupMessage;
 
     protected override async Task OnInitializedAsync()
     {
         var profile = await AuthService.GetCurrentUserAsync();
         _nickname = profile.Nickname;
+
+        await LoadSecurityAsync();
 
         try
         {
@@ -123,6 +223,107 @@
         catch
         {
             _isDark = false;
+        }
+    }
+
+    /// <summary>S2-08：加载安全设置；服务端要求定时销毁时长 1–43200，离线兜底值 0 在此纠为默认 10。</summary>
+    private async Task LoadSecurityAsync()
+    {
+        try
+        {
+            var security = await SettingsService.GetSecuritySettingsAsync();
+            _autoFetchLinkPreview = security.AutoFetchLinkPreview;
+            _burnAfterReadingMinutes = security.BurnAfterReadingMinutes is >= 1 and <= 43200
+                ? security.BurnAfterReadingMinutes
+                : 10;
+            _autoCleanupEnabled = security.AutoCleanupEnabled;
+            _autoCleanupMonths = security.AutoCleanupMonths is 1 or 3 or 6 ? security.AutoCleanupMonths : 1;
+            _thumbnailGenerationHour = security.ThumbnailGenerationHour;
+            _scheduledThumbnailGenerationEnabled = security.ScheduledThumbnailGenerationEnabled;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SettingsPage] 加载安全设置失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>S2-08：保存安全设置（含自动清理）；语言取当前界面语言，缩略图字段原样带回。</summary>
+    private async Task SaveSecurityAsync()
+    {
+        _securityMessage = null;
+        try
+        {
+            var minutes = Math.Clamp(_burnAfterReadingMinutes, 1, 43200);
+            _burnAfterReadingMinutes = minutes;
+            await SettingsService.UpdateSecuritySettingsAsync(new UpdateSecuritySettingsRequest(
+                _autoFetchLinkPreview,
+                minutes,
+                Localization.CurrentLanguage,
+                _autoCleanupEnabled,
+                _autoCleanupMonths,
+                _thumbnailGenerationHour,
+                _scheduledThumbnailGenerationEnabled));
+            _securitySaved = true;
+            _securityMessage = L["Settings_SecuritySaved"];
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SettingsPage] 保存安全设置失败: {ex.Message}");
+            _securitySaved = false;
+            _securityMessage = L["Settings_SaveSecurityFailed"];
+        }
+    }
+
+    private void OnAutoCleanupMonthsChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var months) && months is 1 or 3 or 6)
+        {
+            _autoCleanupMonths = months;
+        }
+    }
+
+    /// <summary>S2-08：手动清理需二次确认（内联确认条），确认后调真实清理接口。</summary>
+    private void RequestCleanup(int months)
+    {
+        _pendingCleanupMonths = months;
+        _showCleanupConfirm = true;
+        _cleanupMessage = null;
+    }
+
+    private async Task ConfirmCleanupAsync()
+    {
+        _isCleaningUp = true;
+        _showCleanupConfirm = false;
+        _cleanupMessage = null;
+        try
+        {
+            var deleted = await SettingsService.CleanupOldMessagesAsync(_pendingCleanupMonths);
+            _cleanupMessage = deleted > 0
+                ? string.Format(L["Settings_CleanupSuccess"], deleted)
+                : L["Settings_CleanupNone"];
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SettingsPage] 手动清理失败: {ex.Message}");
+            _cleanupMessage = L["Settings_CleanupFailed"];
+        }
+        finally
+        {
+            _isCleaningUp = false;
+        }
+    }
+
+    /// <summary>S2-08：请求通知权限（Android 13+ 弹系统对话框），显示当前授权状态。</summary>
+    private async Task RequestNotificationPermissionAsync()
+    {
+        try
+        {
+            _notificationGranted = await Notifications.RequestPermissionAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SettingsPage] 请求通知权限失败: {ex.Message}");
+            _notificationGranted = false;
         }
     }
 

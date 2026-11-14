@@ -1,6 +1,7 @@
 @inject IShareService ShareService
 @inject ISignalRService SignalR
 @inject IAppStateService AppState
+@inject INotificationService Notifications
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject IStringLocalizer<AppStrings> L
@@ -360,7 +361,15 @@ else
 
     private void OnShareItemReceived(ShareItemDto item)
     {
-        if (item.TopicId != TopicId) return;
+        // S2-08：非当前话题的新消息不在本列表显示，改为本地通知（点击跳回该话题）。
+        // AppState.Topics 是当前已加载的话题列表；归档话题不在其中时用默认名。
+        if (item.TopicId != TopicId)
+        {
+            var topicId = item.TopicId ?? Guid.Empty;
+            var topicName = AppState.Topics.FirstOrDefault(t => t.Id == topicId)?.Name ?? "AnyDrop";
+            _ = Notifications.ShowMessageNotificationAsync(topicName, PreviewOf(item), topicId);
+            return;
+        }
         InvokeAsync(async () =>
         {
             if (AppState.Messages.Any(m => m.Id == item.Id)) return;
@@ -371,6 +380,19 @@ else
                 RequestScrollToBottom();
             }
         });
+    }
+
+    /// <summary>通知预览：文本取正文截断，文件/图片/视频取文件名，链接取标题。</summary>
+    private static string PreviewOf(ShareItemDto item)
+    {
+        var preview = item.ContentType switch
+        {
+            ShareContentType.Text => item.Content,
+            ShareContentType.Link => item.LinkTitle ?? item.Content,
+            _ => item.FileName ?? item.Content
+        };
+        preview ??= string.Empty;
+        return preview.Length > 100 ? preview[..100] + "…" : preview;
     }
 
     private void OnShareItemsDeleted(IReadOnlyList<Guid> ids)

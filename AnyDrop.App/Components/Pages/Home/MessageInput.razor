@@ -15,6 +15,14 @@
             <p class="text-xs text-amber-600 dark:text-amber-400">@string.Format(L["MessageInput_OutboxPending"], _outboxPendingCount)</p>
         </button>
     }
+    @if (_pickerPermissionDenied)
+    {
+        <div class="mb-2 px-1 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-900/25 px-3 py-2">
+            <p class="flex-1 text-xs text-amber-700 dark:text-amber-300">@L["MessageInput_PermissionDenied"]</p>
+            <button @onclick="OpenAppSettingsAsync" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 active:opacity-70">@L["MessageInput_OpenSettings"]</button>
+            <button @onclick="() => _pickerPermissionDenied = false" class="text-xs text-gray-400 active:opacity-70">@L["Common_Close"]</button>
+        </div>
+    }
     @if (_uploading)
     {
         <div class="mb-2 px-1">
@@ -76,6 +84,8 @@
     // S2-05：发件箱待发送条数（>0 时显示提示，点击立即重试补发）
     private int _outboxPendingCount;
     private bool _drainingOutbox;
+    // S2-08：选择器权限被拒时显示去设置的提示条
+    private bool _pickerPermissionDenied;
 
     protected override void OnInitialized()
     {
@@ -245,36 +255,74 @@
 
     private async Task PickFileAndUploadAsync()
     {
-        var picked = await Picker.PickFileAsync();
-        if (picked is null) return;
-        await UploadAsync(picked.Value.Stream, picked.Value.FileName, picked.Value.MimeType);
+        var result = await Picker.PickFilesAsync();
+        if (result.Status == PickStatus.PermissionDenied)
+        {
+            _pickerPermissionDenied = true;
+            return;
+        }
+        if (result.Status != PickStatus.Ok) return;
+        await UploadManyAsync(result.Files);
     }
 
     private async Task PickPhotoAndUploadAsync()
     {
-        var picked = await Picker.PickPhotoAsync();
-        if (picked is null) return;
-        await UploadAsync(picked.Value.Stream, picked.Value.FileName, picked.Value.MimeType);
+        var result = await Picker.PickPhotosAsync();
+        if (result.Status == PickStatus.PermissionDenied)
+        {
+            _pickerPermissionDenied = true;
+            return;
+        }
+        if (result.Status != PickStatus.Ok) return;
+        await UploadManyAsync(result.Files);
     }
 
-    private async Task UploadAsync(Stream stream, string fileName, string mimeType)
+    /// <summary>S2-08：多选文件依次上传，总进度 = (已完成数 + 当前文件进度) / 总数。</summary>
+    private async Task UploadManyAsync(IReadOnlyList<PickedFile> files)
     {
         _uploading = true;
         _uploadProgress = 0;
-        var progress = new Progress<double>(p => { _uploadProgress = p; InvokeAsync(StateHasChanged); });
         try
         {
-            var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
-            // 防止竞态：SignalR 推送可能已先于 HTTP 响应将文件消息加入列表
-            if (!AppState.Messages.Any(m => m.Id == item.Id))
-                AppState.Messages.Add(item);
-            AppState.NotifyMessageAdded();
+            for (var i = 0; i < files.Count; i++)
+            {
+                var index = i;
+                var progress = new Progress<double>(p =>
+                {
+                    _uploadProgress = (index + p) / files.Count;
+                    InvokeAsync(StateHasChanged);
+                });
+                await UploadAsync(files[i].Stream, files[i].FileName, files[i].MimeType, progress);
+            }
         }
         finally
         {
             _uploading = false;
             _uploadProgress = 0;
         }
+    }
+
+    /// <summary>打开系统设置（应用权限页），让用户为被拒的权限重新授权。</summary>
+    private void OpenAppSettingsAsync()
+    {
+        _pickerPermissionDenied = false;
+        try
+        {
+            AppInfo.ShowSettingsUI();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 打开系统设置失败: {ex.Message}");
+        }
+    }
+
+    private async Task UploadAsync(Stream stream, string fileName, string mimeType, IProgress<double> progress)
+    {
+        var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
+        // 防止竞态：SignalR 推送可能已先于 HTTP 响应将文件消息加入列表
+        if (!AppState.Messages.Any(m => m.Id == item.Id))
+            AppState.Messages.Add(item);
+        AppState.NotifyMessageAdded();
     }
 
     private void OnTextInput(ChangeEventArgs e)
