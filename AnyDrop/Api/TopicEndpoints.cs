@@ -16,7 +16,8 @@ public static class TopicEndpoints
         group.MapPut("/reorder", ReorderTopicsAsync);
         group.MapGet("/{id:guid}", GetTopicByIdAsync);
         group.MapGet("/{id:guid}/messages", GetTopicMessagesAsync);
-        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync);
+        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync)
+            .RequireRateLimiting(RateLimitPolicies.Search);
         group.MapGet("/{id:guid}/messages/by-date", GetTopicMessagesByDateAsync);
         group.MapGet("/{id:guid}/active-dates", GetTopicActiveDatesAsync);
         group.MapGet("/{id:guid}/messages/by-type", GetTopicMessagesByTypeAsync);

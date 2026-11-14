@@ -21,7 +21,8 @@ public static class SettingsEndpoints
         group.MapPut("/security", UpdateSecurityAsync);
         group.MapPost("/set-culture", SetCultureAsync);
         group.MapPost("/thumbnails/run", RunThumbnailsAsync)
-            .WithSummary("立即触发缩略图后台批处理任务");
+            .WithSummary("立即触发缩略图后台批处理任务")
+            .RequireRateLimiting(RateLimitPolicies.Thumbnail);
 
         return app;
     }

@@ -22,7 +22,8 @@ public static class UploadEndpoints
 
         group.MapPost("/init", InitUploadAsync)
             .WithName("InitChunkedUpload")
-            .WithSummary("初始化分片上传会话");
+            .WithSummary("初始化分片上传会话")
+            .RequireRateLimiting(RateLimitPolicies.Upload);
 
         group.MapGet("/{uploadId:guid}", GetUploadStatusAsync)
             .WithName("GetChunkedUploadStatus")
@@ -31,11 +32,13 @@ public static class UploadEndpoints
         group.MapPut("/{uploadId:guid}/chunks/{index:int}", UploadChunkAsync)
             .WithName("UploadChunk")
             .WithSummary("上传单个分片（Content-Range）")
+            .RequireRateLimiting(RateLimitPolicies.Upload)
             .DisableAntiforgery();
 
         group.MapPost("/{uploadId:guid}/complete", CompleteUploadAsync)
             .WithName("CompleteChunkedUpload")
-            .WithSummary("完成分片上传：合并并校验后落库");
+            .WithSummary("完成分片上传：合并并校验后落库")
+            .RequireRateLimiting(RateLimitPolicies.Upload);
 
         group.MapDelete("/{uploadId:guid}", CancelUploadAsync)
             .WithName("CancelChunkedUpload")

@@ -3,6 +3,7 @@ using AnyDrop.Components;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Infrastructure;
+using AnyDrop.Middleware;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using AnyDrop.Shared;
@@ -16,6 +17,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -23,6 +25,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,6 +113,63 @@ builder.Services.AddScoped<IPasswordHasherService, PasswordHasherService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddSingleton<ILoginRateLimiter, LoginRateLimiter>();
+
+// S3-02：分端点限流（登录/初始化沿用 S0-03 的 LoginRateLimiter）。
+// 固定窗口 + 按来源 IP 分区；超限返回 429，分片客户端按片重试可自行
+// 退避后继续。阈值见 RateLimitOptions（默认上传 120/分钟、搜索 30、
+// 批量删除 10、手动缩略图 10），越界时 Validate() 在启动时抛错。
+var rateLimitOptions = builder.Configuration.GetSection("RateLimit").Get<RateLimitOptions>() ?? new RateLimitOptions();
+rateLimitOptions.Validate();
+builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection("RateLimit"));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimitPolicies.Upload, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            GetRateLimitKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.UploadPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy(RateLimitPolicies.Search, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            GetRateLimitKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.SearchPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy(RateLimitPolicies.BatchDelete, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            GetRateLimitKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.BatchDeletePerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy(RateLimitPolicies.Thumbnail, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            GetRateLimitKey(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitOptions.ThumbnailPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
+
+// 限流分区键：ForwardedHeaders 还原后的真实来源 IP；
+// 未经可信代理时 RemoteIpAddress 是直连 IP，同样可用。
+static string GetRateLimitKey(HttpContext context)
+    => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
 builder.Services.AddScoped<ChunkedUploadService>();
@@ -188,6 +248,35 @@ if (string.IsNullOrWhiteSpace(authOptions.JwtSecret) ||
 if (authOptions.JwtSecret.Length < 32)
 {
     throw new InvalidOperationException("Auth:JwtSecret must be at least 32 characters long.");
+}
+
+// S3-02：配置上下限校验——防误配出「等于关闭保护」的值。
+// JWT 有效期过长等于拉长泄露窗口；LoginMaxFailures 为 0 等于关闭登录锁定；
+// 冷却下限高于上限时渐进冷却逻辑无意义。越界时启动即失败，
+// 而不是带着无效保护静默运行。
+if (authOptions.TokenExpiryHours < 1 || authOptions.TokenExpiryHours > 720)
+{
+    throw new InvalidOperationException("Auth:TokenExpiryHours must be between 1 and 720 hours.");
+}
+
+if (authOptions.RefreshTokenExpiryDays < 1 || authOptions.RefreshTokenExpiryDays > 365)
+{
+    throw new InvalidOperationException("Auth:RefreshTokenExpiryDays must be between 1 and 365 days.");
+}
+
+if (authOptions.HubTokenExpiryMinutes < 1 || authOptions.HubTokenExpiryMinutes > 60)
+{
+    throw new InvalidOperationException("Auth:HubTokenExpiryMinutes must be between 1 and 60 minutes.");
+}
+
+if (authOptions.LoginMaxFailures < 1)
+{
+    throw new InvalidOperationException("Auth:LoginMaxFailures must be at least 1 (0 disables login lockout).");
+}
+
+if (authOptions.LoginCooldownSeconds < 1 || authOptions.LoginMaxCooldownSeconds < authOptions.LoginCooldownSeconds)
+{
+    throw new InvalidOperationException("Auth:LoginCooldownSeconds must be at least 1 and Auth:LoginMaxCooldownSeconds must be >= Auth:LoginCooldownSeconds.");
 }
 
 var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.JwtSecret));
@@ -392,13 +481,18 @@ else
         "Only use this on a trusted LAN; set Auth:CookieSecurePolicy=None or login cookies will be dropped by browsers.");
 }
 
+// S3-02：表单类 API 接口的 Origin 校验（CSRF 纵深防御，见 SameOriginMiddleware）。
+// 放在 ForwardedHeaders 之后（Host 已还原），认证之前（跨站请求不必走到认证）。
+// 无 Origin 头的非浏览器客户端（MAUI、curl）不受影响。
+var requireSameOrigin = builder.Configuration.GetValue<bool?>("Security:RequireSameOrigin") ?? true;
+var allowedOrigins = SplitList(builder.Configuration["Security:AllowedOrigins"])
+    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+app.UseSameOriginCheck(requireSameOrigin, allowedOrigins);
+
 // 访问日志：默认只记录慢请求（级别为 Warning），可通过 AnyDrop.RequestLog 调整
 app.UseMiddleware<RequestLoggingMiddleware>();
 
 // 安全响应头：确保所有响应（含静态资源与错误页）都带上。
-// 这里刻意只添加不影响资源加载的指令——完整的 default-src 'self' 还需验证
-// Blazor 的内联脚本与 WebSocket 行为，在浏览器端回归测试（E2E）接入 CI 之前
-// 不宜贸然收紧，否则可能以「页面白屏」的形式破坏应用。
 app.Use(async (context, next) =>
 {
     var headers = context.Response.Headers;
@@ -432,6 +526,25 @@ app.Use(async (context, next) =>
         "form-action 'self'; " +
         "object-src 'none'";
 
+    // S3-02：HSTS 之外的安全头——本应用不用这些浏览器能力，全部显式关闭。
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
+    // S3-02：敏感响应不缓存。认证后响应与全部 /api/v1 响应加 no-store，
+    // 防浏览器/中间代理把含敏感内容（文件、消息、设置）的响应写进磁盘缓存。
+    // 认证状态此时尚未确定（认证中间件在后），用 OnStarting 在响应发出前再判断。
+    context.Response.OnStarting(() =>
+    {
+        var isSensitive = context.User.Identity?.IsAuthenticated == true
+            || context.Request.Path.StartsWithSegments("/api/v1", StringComparison.OrdinalIgnoreCase);
+        if (isSensitive)
+        {
+            context.Response.Headers["Cache-Control"] = "no-store";
+            context.Response.Headers["Pragma"] = "no-cache";
+        }
+
+        return Task.CompletedTask;
+    });
+
     await next();
 });
 
@@ -457,6 +570,9 @@ if (enableSwaggerUI)
 app.UseStatusCodePagesWithReExecute("/not-found");
 app.UseRequestLocalization();
 app.UseRouting();
+// S3-02：分端点限流中间件。须在 UseRouting 之后（需端点元数据确认策略），
+// 认证之前（未认证的刷量请求同样限流）。
+app.UseRateLimiter();
 app.UseAntiforgery();
 app.UseAuthentication();
 
@@ -552,3 +668,8 @@ app.Run();
 
 // 正常关机时退出码 0（上面迁移失败分支已 return 1）。
 return 0;
+
+static IEnumerable<string> SplitList(string? value)
+    => string.IsNullOrWhiteSpace(value)
+        ? []
+        : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

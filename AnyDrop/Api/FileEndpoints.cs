@@ -17,6 +17,7 @@ public static class FileEndpoints
         group.MapPost("/", UploadFileAsync)
             .WithName("UploadFile")
             .WithSummary("通过 HTTP multipart/form-data 上传文件并创建分享条目")
+            .RequireRateLimiting(RateLimitPolicies.Upload)
             .DisableAntiforgery();
 
         return app;

@@ -36,7 +36,8 @@ public static class ShareItemEndpoints
 
         group.MapDelete("/batch", BatchDeleteAsync)
             .WithName("BatchDeleteShareItems")
-            .WithSummary("Batch delete share items by IDs");
+            .WithSummary("Batch delete share items by IDs")
+            .RequireRateLimiting(RateLimitPolicies.BatchDelete);
 
         return app;
     }

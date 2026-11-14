@@ -113,7 +113,7 @@ public class ShareServiceTests
         await using var dbContext = factory.CreateDbContext();
         var service = CreateService(factory, out var clientProxyMock, out _);
 
-        await using var stream = new MemoryStream([1, 2, 3]);
+        await using var stream = new MemoryStream([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]); // S3-02：魔数校验要求 image/png 带真实 PNG 文件头
         var dto = await service.SendFileAsync(stream, "photo.png", "image/png");
 
         dto.ContentType.Should().Be(ShareContentType.Image);
@@ -128,6 +128,33 @@ public class ShareServiceTests
                 It.IsAny<object?[]>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task SendFileAsync_MagicNumberMismatch_ThrowsAndLeavesNoPlaceholder()
+    {
+        // S3-02：JPEG 字节自称 PNG——魔数校验在建预占位行之前拒绝，
+        // 不留 Uploading 残留行、不落盘、不推送。
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out var clientProxyMock, out var fileStorageMock);
+
+        await using var stream = new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x00, 0x00, 0x00]);
+        var act = () => service.SendFileAsync(stream, "photo.png", "image/png");
+
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*文件内容与声明的文件类型*");
+
+        await using var verifyDb = factory.CreateDbContext();
+        (await verifyDb.ShareItems.IgnoreQueryFilters().CountAsync()).Should().Be(0);
+        fileStorageMock.Verify(
+            x => x.SaveFileAtPathAsync(
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        clientProxyMock.Verify(
+            proxy => proxy.SendCoreAsync(
+                It.IsAny<string>(), It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -146,7 +173,7 @@ public class ShareServiceTests
             .Callback(() => thumbnailTriggered.TrySetResult(true))
             .ReturnsAsync((string?)null);
 
-        await using var stream = new MemoryStream([1, 2, 3]);
+        await using var stream = new MemoryStream([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]); // S3-02：魔数校验要求 image/png 带真实 PNG 文件头
         var dto = await service.SendFileAsync(stream, "photo.png", "image/png");
 
         var completedTask = await Task.WhenAny(thumbnailTriggered.Task, Task.Delay(300));
@@ -164,7 +191,7 @@ public class ShareServiceTests
             scheduledThumbnailGenerationEnabled: true,
             out var thumbnailServiceMock);
 
-        await using var stream = new MemoryStream([1, 2, 3]);
+        await using var stream = new MemoryStream([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]); // S3-02：魔数校验要求 image/png 带真实 PNG 文件头
         await service.SendFileAsync(stream, "photo.png", "image/png");
         await Task.Delay(150);
 

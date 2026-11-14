@@ -156,6 +156,12 @@ public sealed class ShareService(
 
         var contentType = ResolveContentType(mimeType);
 
+        // S3-02（SEC-07 同根）：魔数校验。MIME 由上传方自报，不可信。
+        // 校验在建预占位行之前：不符的上传不留行、不落盘。
+        // 可 Seek 的流倒回起点继续用；不可 Seek 的流包一层前置缓冲，不丢字节。
+        await using var validatedStream = await FileSignatureValidator.EnsureConsistentAsync(fileStream, mimeType, ct);
+        fileStream = validatedStream;
+
         // S1-01（DAT-02）：上传改为「先建预占位行，再落盘，落盘后转正」。
         // 旧流程是先落盘再插行：两者之间的窗口里进程被杀，磁盘上留下一个
         // 没有任何数据库行引用的孤儿文件，且没有任何记录能定位它。

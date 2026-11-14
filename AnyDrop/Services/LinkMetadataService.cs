@@ -251,6 +251,15 @@ public sealed class LinkMetadataService(
             return false;
         }
 
+        // S3-02：端口白名单——只允许 80 / 443。显式写 :8080、:6379 之类
+        // 端口的 URL 一律拒绝：公网 IP + 非标准端口往往是内网服务
+        // （管理后台、数据库、代理）被端口转发暴露出来的情况。
+        // IsDefaultPort 为 true 时端口即 scheme 的默认端口，直接放行。
+        if (!uri.IsDefaultPort && uri.Port is not (80 or 443))
+        {
+            return false;
+        }
+
         // 用 DnsSafeHost 而不是 Host：后者对 IPv6 字面量会返回带方括号的形式（如 "[::1]"），
         // IPAddress.TryParse 无法解析，于是公网 IPv6 地址会被误判成主机名而遭到拒绝。
         var host = uri.DnsSafeHost;

@@ -42,10 +42,13 @@ public sealed class AuthService(
             return AuthResult<LoginResponse>.Failure("昵称不能为空且不能超过 50 个字符。", StatusCodes.Status400BadRequest);
         }
 
-        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
+        // S3-02（SEC-03）：新密码最低 10 位（见 PasswordPolicy）。
+        // 登录不做长度校验——已有短密码仍能登录。
+        var passwordError = PasswordPolicy.ValidateNewPassword(request.Password);
+        if (passwordError is not null)
         {
             loginRateLimiter.RegisterFailure(rateLimitKey);
-            return AuthResult<LoginResponse>.Failure("密码长度至少 6 位。", StatusCodes.Status400BadRequest);
+            return AuthResult<LoginResponse>.Failure(passwordError, StatusCodes.Status400BadRequest);
         }
 
         if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
@@ -165,9 +168,11 @@ public sealed class AuthService(
 
     public async Task<AuthResult<bool>> UpdatePasswordAsync(Guid userId, UpdatePasswordRequest request, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6)
+        // S3-02（SEC-03）：新密码最低 10 位；新密码不得与当前密码相同。
+        var passwordError = PasswordPolicy.ValidateNewPassword(request.NewPassword);
+        if (passwordError is not null)
         {
-            return AuthResult<bool>.Failure("新密码长度至少 6 位。", StatusCodes.Status400BadRequest);
+            return AuthResult<bool>.Failure(passwordError, StatusCodes.Status400BadRequest);
         }
 
         if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
@@ -186,6 +191,13 @@ public sealed class AuthService(
             == PasswordVerificationResult.Failed)
         {
             return AuthResult<bool>.Failure("当前密码错误。", StatusCodes.Status401Unauthorized);
+        }
+
+        // 新旧相同直接拒绝：否则「改密码」等于没改，旧密码泄露后仍可用，
+        // 还会误触 SessionVersion 递增把全部设备登出。
+        if (passwordHasherService.VerifyPassword(request.NewPassword, user.PasswordHash, user.PasswordSalt))
+        {
+            return AuthResult<bool>.Failure("新密码不能与当前密码相同。", StatusCodes.Status400BadRequest);
         }
 
         var (hash, salt) = passwordHasherService.HashPassword(request.NewPassword);
