@@ -466,6 +466,7 @@ app.UseAuthorization();
 
 app.MapStaticAssets().AllowAnonymous();
 app.MapHub<ShareHub>("/hubs/share")
+   .RequireAuthorization()
    .DisableAntiforgery();
 app.MapShareItemEndpoints();
 app.MapFileEndpoints();

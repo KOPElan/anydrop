@@ -473,10 +473,14 @@ public sealed class ShareService(
 
         var deletedIds = new List<Guid>(items.Count);
 
+        // S0-05（D5）：批量 / 自动清理只写延迟删除标记，不立即删行也不删文件。
+        // 标记一提交，消息就对所有读路径不可见（全局查询过滤器）；文件由
+        // Stage 1 的清扫任务在 DeleteAfter 到期后物理删除。进程在标记与清扫
+        // 之间被 kill，重启后行与文件都还在，不会出现悬空引用。
+        var deleteAfter = timeProvider.GetUtcNow().AddDays(DeletionPolicy.DelayedDeleteDays);
         foreach (var item in items)
         {
-            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorageService, logger, item, ct, "cleanup");
-            dbContext.ShareItems.Remove(item);
+            item.DeleteAfter = deleteAfter;
             deletedIds.Add(item.Id);
         }
 
@@ -517,16 +521,24 @@ public sealed class ShareService(
             .Distinct()
             .ToHashSet();
 
-        var deletedIds = new List<Guid>(items.Count);
+        var deletedIds = items.Select(x => x.Id).ToList();
+
+        // S0-05（DAT-01）：先提交数据库删除，再删文件。顺序反过来之前是
+        // 「先删文件、再提交」，进程在中间被 kill 就会留下「行还在、文件已删」
+        // 的悬空引用；现在中间被 kill 只会留下孤儿文件（对账可发现），
+        // 行一定已经不可见。文件删失败不静默丢失，进待删除队列。
+        dbContext.ShareItems.RemoveRange(items);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         foreach (var item in items)
         {
-            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorageService, logger, item, ct, "batch delete");
-            dbContext.ShareItems.Remove(item);
-            deletedIds.Add(item.Id);
+            var failedPaths = await ShareItemFileCleanup.DeleteItemFilesAsync(
+                fileStorageService, logger, item, ct, "batch delete");
+            foreach (var path in failedPaths)
+            {
+                await PendingFileDeletionQueue.EnqueueAsync(dbContext, item.Id, path, "batch delete", ct);
+            }
         }
-
-        await dbContext.SaveChangesWithRetryAsync(ct);
 
         // 广播被删除的消息 ID，让所有客户端同步移除对应气泡；
         // 使用 CancellationToken.None 确保请求取消不影响其他客户端的同步

@@ -338,8 +338,11 @@ public class ShareServiceTests
             x => x.DeleteFileAsync("thumbnails/a.jpg", It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // S0-05（D5）：批量清理改为只写延迟删除标记，不再立即删文件。
+    // 原断言（清理时同时删原文件与缩略图）是旧语义，已废弃；
+    // 文件由 Stage 1 的清扫任务在 DeleteAfter 到期后删除。
     [Fact]
-    public async Task CleanupOldMessagesAsync_VideoItem_AlsoDeletesThumbnail()
+    public async Task CleanupOldMessagesAsync_VideoItem_MarksForDelayedDeletionWithoutDeletingFiles()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext, out _, out var fileStorageMock);
@@ -360,9 +363,9 @@ public class ShareServiceTests
 
         deleted.Should().Be(1);
         fileStorageMock.Verify(
-            x => x.DeleteFileAsync("20260101/v.mp4", It.IsAny<CancellationToken>()), Times.Once);
-        fileStorageMock.Verify(
-            x => x.DeleteFileAsync("thumbnails/v.jpg", It.IsAny<CancellationToken>()), Times.Once);
+            x => x.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        var marked = await dbContext.ShareItems.IgnoreQueryFilters().SingleAsync();
+        marked.DeleteAfter.Should().NotBeNull();
     }
 
     private static AnyDropDbContext CreateDbContext()

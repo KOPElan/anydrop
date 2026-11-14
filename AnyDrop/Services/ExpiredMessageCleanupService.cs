@@ -7,9 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace AnyDrop.Services;
 
 /// <summary>
-/// 后台服务：每分钟检查并删除已到期的"阅后即焚"消息；
+/// 后台服务：每分钟检查并标记已到期的"阅后即焚"消息；
 /// 同时每天（UTC 日期变更后）检查是否需要执行自动清理旧消息任务。
-/// 删除时同步清理对应的文件（Image/Video/File 类型）。
+/// 标记（<c>DeleteAfter</c>）一提交消息即不可见，文件由 Stage 1 的清扫任务
+/// 在到期后物理删除（D5）；本服务不再直接删文件。
 /// </summary>
 public sealed class ExpiredMessageCleanupService(
     IServiceProvider serviceProvider,
@@ -60,7 +61,6 @@ public sealed class ExpiredMessageCleanupService(
 
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
-        var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
         var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<ShareHub>>();
 
         var now = timeProvider.GetUtcNow();
@@ -80,15 +80,17 @@ public sealed class ExpiredMessageCleanupService(
             .Distinct()
             .ToHashSet();
 
+        // S0-05（D5）：过期清理同样只写延迟删除标记，不立即删行、不立即删文件。
+        // 标记一提交，消息就对所有读路径不可见；文件由 Stage 1 的清扫任务
+        // 在 DeleteAfter 到期后物理删除。
+        var deleteAfter = now.AddDays(DeletionPolicy.DelayedDeleteDays);
         foreach (var item in expired)
         {
-            // 删除物理文件（原文件 + 缩略图），失败时只记录警告，不阻断其余条目的清理
-            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorage, logger, item, ct, "expired cleanup");
-            db.ShareItems.Remove(item);
+            item.DeleteAfter = deleteAfter;
         }
 
         await db.SaveChangesWithRetryAsync(ct);
-        logger.LogInformation("Deleted {Count} expired burn-after-reading message(s).", expired.Count);
+        logger.LogInformation("Marked {Count} expired burn-after-reading message(s) for delayed deletion.", expired.Count);
 
         // 更新受影响主题的 LastMessageAt/LastMessagePreview 并广播
         if (affectedTopicIds.Count > 0)
@@ -144,7 +146,7 @@ public sealed class ExpiredMessageCleanupService(
 
         if (deleted > 0)
         {
-            logger.LogInformation("Auto cleanup deleted {Count} message(s) older than {Months} month(s).", deleted, months);
+            logger.LogInformation("Auto cleanup marked {Count} message(s) older than {Months} month(s) for delayed deletion.", deleted, months);
         }
     }
 }

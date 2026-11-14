@@ -9,6 +9,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
     public DbSet<Topic> Topics => Set<Topic>();
     public DbSet<User> Users => Set<User>();
     public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
+    public DbSet<PendingFileDeletion> PendingFileDeletions => Set<PendingFileDeletion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -57,8 +58,16 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 .HasConversion(
                     value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
                     value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.Property(e => e.DeleteAfter)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            // S0-05（D5）：已标记延迟删除的消息对所有常规读路径不可见。
+            // Stage 1 的清扫任务用 IgnoreQueryFilters() 才能看到它们。
+            entity.HasQueryFilter(e => e.DeleteAfter == null);
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.ExpiresAt);
+            entity.HasIndex(e => e.DeleteAfter);
             entity.HasIndex(e => new { e.TopicId, e.CreatedAt });
             entity.HasOne<Topic>()
                 .WithMany()
@@ -89,6 +98,18 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             // 单用户语义：固定唯一值索引，保证只有一条记录可插入
             entity.Property<int>("SingletonKey").HasDefaultValue(1);
             entity.HasIndex("SingletonKey").IsUnique();
+        });
+
+        modelBuilder.Entity<PendingFileDeletion>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StoragePath).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.CreatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.HasIndex(e => e.CreatedAt);
         });
 
         modelBuilder.Entity<SystemSettings>(entity =>
