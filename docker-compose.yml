@@ -29,11 +29,16 @@ services:
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
       # ── 孤儿文件回收（默认只报告不删除）─────────────────────────────────────
       - Storage__OrphanCleanupEnabled=${ANYDROP_ORPHAN_CLEANUP_ENABLED:-false}
-      # ── 反向代理（默认关闭）─────────────────────────────────────────────────
-      # 启用时务必同时设置 ANYDROP_REVERSE_PROXY_NETWORK 为代理的实际网段，
-      # 否则转发头会被忽略，登录限流将退化为所有访问者共享。
+      # ── 反向代理 ──────────────────────────────────────────────────────────
+      # 应用本身只监听容器内 plain HTTP 8080，TLS 由前面的反向代理终止；
+      # 生产环境默认强制 HTTPS 重定向 + HSTS。启用反代时务必把代理的实际网段
+      # 配进 ANYDROP_REVERSE_PROXY_NETWORK，否则转发头会被忽略，登录限流将
+      # 退化为所有访问者共享。纯 HTTP 局域网例外：把下面两项同时改为 false / None。
       - ReverseProxy__Enabled=${ANYDROP_REVERSE_PROXY_ENABLED:-false}
       - ReverseProxy__KnownNetworks__0=${ANYDROP_REVERSE_PROXY_NETWORK:-}
+      - ReverseProxy__RequireHttps=${ANYDROP_REQUIRE_HTTPS:-true}
+      - ReverseProxy__HttpsPort=${ANYDROP_HTTPS_PORT:-443}
+      - Auth__CookieSecurePolicy=${ANYDROP_COOKIE_SECURE_POLICY:-Always}
       - ASPNETCORE_ENVIRONMENT=Production
     healthcheck:
       # 使用 /health 而不是首页：首页只能说明 Kestrel 起来了，

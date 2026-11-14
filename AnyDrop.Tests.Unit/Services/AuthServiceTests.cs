@@ -1,6 +1,7 @@
 using AnyDrop.Data;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -125,7 +126,50 @@ public class AuthServiceTests
         (await db.Users.SingleAsync()).SessionVersion.Should().Be(oldVersion + 1);
     }
 
-    private static AuthService CreateSut(AnyDropDbContext db)
+    // S0-03：初始化接口按来源限流。反复提交无效初始化达到阈值后返回 429，
+    // 而不是继续消耗数据库写操作。
+    [Fact]
+    public async Task SetupAsync_RepeatedInvalidAttempts_ShouldReturnTooManyRequests()
+    {
+        await using var db = CreateDbContext();
+        var clock = new FakeTimeProvider();
+        var sut = CreateSut(db, clock, maxFailures: 2, cooldownSeconds: 60);
+
+        var first = await sut.SetupAsync(new SetupRequest("", "Password1!", "Password1!"), "k");
+        first.StatusCode.Should().Be(400);
+        var second = await sut.SetupAsync(new SetupRequest("", "Password1!", "Password1!"), "k");
+        second.StatusCode.Should().Be(400);
+
+        var third = await sut.SetupAsync(new SetupRequest("", "Password1!", "Password1!"), "k");
+        third.Succeeded.Should().BeFalse();
+        third.StatusCode.Should().Be(429);
+
+        // 冷却期内即使合法的初始化请求也被拒绝
+        var valid = await sut.SetupAsync(new SetupRequest("Admin", "Password1!", "Password1!"), "k");
+        valid.StatusCode.Should().Be(429);
+
+        // 冷却过期后合法请求恢复
+        clock.AdvanceSeconds(61);
+        var recovered = await sut.SetupAsync(new SetupRequest("Admin", "Password1!", "Password1!"), "k");
+        recovered.Succeeded.Should().BeTrue();
+        recovered.StatusCode.Should().Be(201);
+    }
+
+    [Fact]
+    public async Task SetupAsync_RateLimitIsPerSourceKey()
+    {
+        await using var db = CreateDbContext();
+        var sut = CreateSut(db, maxFailures: 1, cooldownSeconds: 60);
+
+        var locked = await sut.SetupAsync(new SetupRequest("", "Password1!", "Password1!"), "ip-a");
+        locked.StatusCode.Should().Be(400);
+
+        // 另一个来源不受影响：仍返回 400 而非 429
+        var other = await sut.SetupAsync(new SetupRequest("", "Password1!", "Password1!"), "ip-b");
+        other.StatusCode.Should().Be(400);
+    }
+
+    private static AuthService CreateSut(AnyDropDbContext db, TimeProvider? timeProvider = null, int maxFailures = 5, int cooldownSeconds = 60)
     {
         var userService = new UserService(db);
         // 测试里用很低的迭代次数：哈希参数的正确性由 PasswordHasherServiceTests 覆盖，
@@ -144,8 +188,8 @@ public class AuthServiceTests
             LoginCooldownSeconds = 60
         }), TimeProvider.System);
         var limiter = new LoginRateLimiter(new MemoryCache(new MemoryCacheOptions()),
-            Options.Create(new AuthOptions { LoginMaxFailures = 5, LoginCooldownSeconds = 60 }),
-            TimeProvider.System);
+            Options.Create(new AuthOptions { LoginMaxFailures = maxFailures, LoginCooldownSeconds = cooldownSeconds }),
+            timeProvider ?? TimeProvider.System);
         return new AuthService(db, userService, hasher, token, limiter);
     }
 

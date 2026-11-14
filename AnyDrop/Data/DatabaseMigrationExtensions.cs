@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +16,81 @@ public static class DatabaseMigrationExtensions
 
         await db.Database.MigrateAsync(ct);
         await EnsureScheduledThumbnailGenerationColumnAsync(db, ct);
+        await EnsureUserSingletonIndexAsync(db, ct);
     }
+
+    /// <summary>
+    /// 启动即校验 Users 表存在 SingletonKey 唯一索引（单用户保护）。
+    ///
+    /// S0-03（SEC-02/04/05）：该索引是「全库只能有一个用户」的唯一防线。
+    /// 若历史数据库迁移不完整导致索引缺失，继续运行会允许创建第二个用户，
+    /// 因此直接启动失败并给出明确信息，而不是静默放行。
+    /// </summary>
+    internal static async Task EnsureUserSingletonIndexAsync(
+        AnyDropDbContext dbContext,
+        CancellationToken ct)
+    {
+        if (!string.Equals(
+                dbContext.Database.ProviderName,
+                "Microsoft.EntityFrameworkCore.Sqlite",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var connection = (SqliteConnection)dbContext.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync(ct);
+        }
+
+        const string errorMessage =
+            "Users 表缺少 SingletonKey 唯一索引（单用户保护失效）。请先备份 data/anydrop.db，" +
+            "再检查数据库迁移是否完整应用（dotnet ef database update），或按 README 的修复指引重建索引；" +
+            "缺失该索引时服务端拒绝启动。";
+
+        if (!await TableExistsAsync(connection, "Users", ct))
+        {
+            throw new InvalidOperationException(errorMessage);
+        }
+
+        await using var indexCommand = connection.CreateCommand();
+        indexCommand.CommandText = "PRAGMA index_list(Users);";
+        await using var indexReader = await indexCommand.ExecuteReaderAsync(ct);
+        var uniqueIndexNames = new List<string>();
+        while (await indexReader.ReadAsync(ct))
+        {
+            var isUnique = Convert.ToInt32(indexReader["unique"], CultureInfo.InvariantCulture) == 1;
+            var name = indexReader["name"]?.ToString();
+            if (isUnique && !string.IsNullOrWhiteSpace(name))
+            {
+                uniqueIndexNames.Add(name);
+            }
+        }
+
+        await indexReader.CloseAsync();
+
+        foreach (var indexName in uniqueIndexNames)
+        {
+            await using var infoCommand = connection.CreateCommand();
+            infoCommand.CommandText = $"PRAGMA index_info({QuoteIdentifier(indexName)});";
+            await using var infoReader = await infoCommand.ExecuteReaderAsync(ct);
+            var columns = new List<string>();
+            while (await infoReader.ReadAsync(ct))
+            {
+                columns.Add(infoReader["name"]?.ToString() ?? string.Empty);
+            }
+
+            if (columns.Count == 1 && string.Equals(columns[0], "SingletonKey", StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
+
+        throw new InvalidOperationException(errorMessage);
+    }
+
+    private static string QuoteIdentifier(string name) => "\"" + name.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 
     /// <summary>
     /// 确保 <c>SystemSettings.ScheduledThumbnailGenerationEnabled</c> 列存在（幂等）。

@@ -226,7 +226,14 @@ npm run css:watch:app
 | `Auth__JwtSecret` | JWT 签名密钥（**必填**） | — |
 | `Auth__TokenExpiryHours` | 登录令牌有效期（小时） | `24` |
 | `Auth__LoginMaxFailures` | 登录失败锁定阈值 | `5` |
-| `Auth__LoginCooldownSeconds` | 登录冷却时间（秒） | `60` |
+| `Auth__LoginCooldownSeconds` | 登录首次冷却时间（秒），反复触发后按 `×2` 递增 | `60` |
+| `Auth__LoginMaxCooldownSeconds` | 登录渐进冷却上限（秒） | `900` |
+| `Auth__CookieSecurePolicy` | Cookie 的 Secure 策略：`Always` / `SameAsRequest` / `None` | `Always` |
+| `ReverseProxy__RequireHttps` | 是否强制 HTTPS（重定向 + HSTS）；未设置时生产环境默认 `true`、开发环境默认 `false` | 见说明 |
+| `ReverseProxy__HttpsPort` | 反代的公开 HTTPS 端口（重定向目标）；不配时重定向中间件会因无法确定端口而静默放行 | `443` |
+| `ForwardedHeaders__KnownProxies` | 信任的反代 IP（逗号分隔），默认仅本机回环 | — |
+| `ForwardedHeaders__KnownNetworks` | 信任的反代网段 CIDR（逗号分隔），例如 `172.18.0.0/16` | — |
+| `ForwardedHeaders__ForwardLimit` | 信任的代理级数（默认只信任最靠近本机的一级） | `1` |
 | `Storage__DatabasePath` | SQLite 数据库路径 | `data/anydrop.db` |
 | `Storage__BasePath` | 上传文件存储目录 | `data/files` |
 | `Storage__MaxFileSizeBytes` | 单文件大小上限（字节） | Docker Compose 为 `104857600`（100 MB）；源码运行时见 `AnyDrop/appsettings.json` |
@@ -236,6 +243,41 @@ npm run css:watch:app
 | `ReverseProxy__KnownProxies` | 受信任代理的 IP 列表 | — |
 | `ReverseProxy__KnownNetworks` | 受信任代理的网段（CIDR）列表 | — |
 | `ASPNETCORE_URLS` | Kestrel 监听地址 | `http://+:5002`（容器内为 `http://+:8080`） |
+
+---
+
+## 反向代理与 HTTPS
+
+AnyDrop 默认按 **TLS 反代**交付：应用本身只监听容器内 / 本机的 plain HTTP，
+TLS 由前面的反向代理（Caddy / Nginx / Traefik 等）终止。生产环境默认开启
+HTTPS 重定向 + HSTS，纯 HTTP 请求会被重定向到 HTTPS。
+
+部署时反代需把下面两个头透传给应用：
+
+- `X-Forwarded-For`：客户端真实 IP（限流按它计数）
+- `X-Forwarded-Proto`：客户端实际协议（`https`）
+
+应用**只信任已配置的代理**发来的这两个头。Docker 部署时反代与应用通常在同一
+网络，需把反代所在网段配进 `ForwardedHeaders__KnownNetworks`（例如
+`ForwardedHeaders__KnownNetworks=172.18.0.0/16`，以 `docker network inspect`
+看到的实际网段为准）；不配时，应用看到的来源 IP 会是反代容器 IP，
+登录限流会按容器 IP 计数（所有用户共用一个计数器），且无法按真实 IP 隔离。
+
+纯 HTTP 局域网例外（仅限可信内网）：显式设置以下两项，缺一不可——
+
+```bash
+ReverseProxy__RequireHttps=false
+Auth__CookieSecurePolicy=None
+```
+
+只关重定向、不改 Cookie 策略时，浏览器因 Secure 标记不会回传 Cookie，
+表现为「登录成功后立刻被登出」。本地源码开发（`http://0.0.0.0:5002`）
+已在开发环境配置中默认走此例外，无需手动设置。
+
+启动时应用会校验 `Users` 表的 `SingletonKey` 唯一索引是否存在——它是
+「全库只能有一个用户」的唯一防线。若历史数据库迁移不完整导致索引缺失，
+服务端会直接启动失败并给出明确信息；请先备份数据库，再按迁移指引修复，
+不要绕过该检查继续运行。
 
 ---
 

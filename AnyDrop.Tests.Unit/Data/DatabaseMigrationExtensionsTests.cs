@@ -105,6 +105,92 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         (await db.SystemSettings.CountAsync()).Should().Be(1);
     }
 
+    // S0-03：启动时校验 Users 表 SingletonKey 唯一索引（单用户保护的唯一防线）。
+    [Fact]
+    public async Task EnsureUserSingletonIndex_PassesAfterMigrations()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+
+        var check = async () => await DatabaseMigrationExtensions.EnsureUserSingletonIndexAsync(
+            db, CancellationToken.None);
+
+        await check.Should().NotThrowAsync("正常迁移后的数据库一定有该索引");
+    }
+
+    [Fact]
+    public async Task EnsureUserSingletonIndex_ThrowsWhenIndexMissing()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+
+        // 模拟历史数据库迁移不完整：删掉单例索引
+        var indexName = await FindSingletonIndexNameAsync(db);
+        indexName.Should().NotBeNull("迁移后的数据库应存在 SingletonKey 唯一索引");
+        await DropIndexAsync(db, indexName!);
+
+        var check = async () => await DatabaseMigrationExtensions.EnsureUserSingletonIndexAsync(
+            db, CancellationToken.None);
+
+        await check.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*SingletonKey*");
+    }
+
+    private static async Task<string?> FindSingletonIndexNameAsync(AnyDropDbContext db)
+    {
+        var connection = (SqliteConnection)db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var listCommand = connection.CreateCommand();
+        listCommand.CommandText = "PRAGMA index_list(Users);";
+        await using var listReader = await listCommand.ExecuteReaderAsync();
+        var names = new List<string>();
+        while (await listReader.ReadAsync())
+        {
+            if (Convert.ToInt32(listReader["unique"], System.Globalization.CultureInfo.InvariantCulture) == 1)
+            {
+                names.Add(listReader["name"]?.ToString() ?? string.Empty);
+            }
+        }
+
+        await listReader.CloseAsync();
+
+        foreach (var name in names)
+        {
+            await using var infoCommand = connection.CreateCommand();
+            infoCommand.CommandText = $"PRAGMA index_info(\"{name.Replace("\"", "\"\"", StringComparison.Ordinal)}\");";
+            await using var infoReader = await infoCommand.ExecuteReaderAsync();
+            var columns = new List<string>();
+            while (await infoReader.ReadAsync())
+            {
+                columns.Add(infoReader["name"]?.ToString() ?? string.Empty);
+            }
+
+            if (columns.Count == 1 && columns[0] == "SingletonKey")
+            {
+                return name;
+            }
+        }
+
+        return null;
+    }
+
+    private static async Task DropIndexAsync(AnyDropDbContext db, string indexName)
+    {
+        var connection = (SqliteConnection)db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DROP INDEX \"{indexName.Replace("\"", "\"\"", StringComparison.Ordinal)}\";";
+        await command.ExecuteNonQueryAsync();
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
