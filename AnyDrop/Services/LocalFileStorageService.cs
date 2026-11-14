@@ -156,6 +156,12 @@ public sealed class LocalFileStorageService(
         return Task.FromResult(stream);
     }
 
+    public Task<bool> FileExistsAsync(string storagePath, CancellationToken ct = default)
+    {
+        var fullPath = GetFullPath(storagePath);
+        return Task.FromResult(File.Exists(fullPath));
+    }
+
     public Task DeleteFileAsync(string storagePath, CancellationToken ct = default)
     {
         var fullPath = GetFullPath(storagePath);

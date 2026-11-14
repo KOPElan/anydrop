@@ -17,6 +17,12 @@ public interface IFileStorageService
 
     Task<Stream> GetFileAsync(string storagePath, CancellationToken ct = default);
 
+    /// <summary>
+    /// 存储相对路径对应的文件是否存在（S1-02：缩略图生成前先校验，
+    /// 避免对不存在的原文件抛异常、走完整解码路径）。
+    /// </summary>
+    Task<bool> FileExistsAsync(string storagePath, CancellationToken ct = default);
+
     Task DeleteFileAsync(string storagePath, CancellationToken ct = default);
 
     /// <summary>

@@ -13,6 +13,13 @@ namespace AnyDrop.Services;
 /// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
 /// 每次调用建短寿命上下文；批量游标改为 (CreatedAt, Id) 复合键，
 /// 同一时间戳的多条记录不再被跳过。
+///
+/// S1-02（DAT-07、DAT-08）：生成前校验原文件存在；图片先读头信息
+/// （<see cref="Image.IdentifyAsync(Stream, CancellationToken)"/>，不解码像素）
+/// 再按 <c>Thumbnails:MaxImageDimensionPixels</c> /
+/// <c>Thumbnails:MaxImagePixels</c> 限流，超限拒绝全量解码；ffmpeg
+/// 每文件 <c>Thumbnails:FfmpegTimeoutSeconds</c> 秒超时（默认 60 秒），
+/// 超时杀进程、本文件跳过、不堵整批；已存缩略图路径但文件丢失时清除并重生成。
 /// </summary>
 public sealed class ThumbnailService(
     IDbContextFactory<AnyDropDbContext> dbContextFactory,
@@ -22,6 +29,30 @@ public sealed class ThumbnailService(
 {
     private const int MaxThumbnailSize = 400;
     private const string ThumbnailSubdir = "thumbnails";
+
+    /// <summary>
+    /// 图片单边像素上限（默认 8192：覆盖 8K 立绘，解码峰值约 256MB RGBA）。
+    /// </summary>
+    private readonly int _maxImageDimensionPixels = Math.Clamp(
+        configuration.GetValue("Thumbnails:MaxImageDimensionPixels", 8192), 1, 65536);
+
+    /// <summary>
+    /// 图片总像素上限（默认 33_554_432 ≈ 33.5MP，约 8K 画面，解码峰值约 134MB RGBA）。
+    /// </summary>
+    private readonly long _maxImagePixels = Math.Clamp(
+        configuration.GetValue("Thumbnails:MaxImagePixels", 33_554_432L), 1L, 1_000_000_000L);
+
+    /// <summary>
+    /// 单个视频文件允许 ffmpeg 运行的最长时间（秒，默认 60，计划要求 30-60 秒）。
+    /// </summary>
+    private readonly int _ffmpegTimeoutSeconds = Math.Clamp(
+        configuration.GetValue("Thumbnails:FfmpegTimeoutSeconds", 60), 5, 600);
+
+    /// <summary>
+    /// ffmpeg 可执行文件路径（默认 "ffmpeg"，走 PATH；可配绝对路径）。
+    /// </summary>
+    private readonly string _ffmpegPath =
+        configuration["Thumbnails:FfmpegPath"] is { Length: > 0 } path ? path : "ffmpeg";
 
     /// <inheritdoc />
     public async Task<string?> GenerateThumbnailAsync(Guid itemId, CancellationToken ct = default)
@@ -39,13 +70,32 @@ public sealed class ThumbnailService(
             return null;
         }
 
-        if (!string.IsNullOrWhiteSpace(item.ThumbnailPath))
-        {
-            return item.ThumbnailPath;
-        }
-
         try
         {
+            if (!string.IsNullOrWhiteSpace(item.ThumbnailPath))
+            {
+                // S1-02：已存路径但文件丢失（被手动删掉）时不返回死路径，
+                // 清掉后继续走重生成，缩略图自愈。
+                if (await fileStorageService.FileExistsAsync(item.ThumbnailPath, ct))
+                {
+                    return item.ThumbnailPath;
+                }
+
+                logger.LogInformation(
+                    "ThumbnailService: Thumbnail file missing for {Id} ({Path}), regenerating.",
+                    itemId,
+                    item.ThumbnailPath);
+                item.ThumbnailPath = null;
+                await dbContext.SaveChangesWithRetryAsync(ct);
+            }
+
+            // S1-02：生成前校验原文件存在，缺失直接跳过（不抛异常、不走解码）。
+            if (!await fileStorageService.FileExistsAsync(item.Content, ct))
+            {
+                logger.LogWarning("ThumbnailService: Original file not found for {Id} ({Path}).", itemId, item.Content);
+                return null;
+            }
+
             var thumbnailPath = item.ContentType == ShareContentType.Image
                 ? await GenerateImageThumbnailAsync(item, ct)
                 : await GenerateVideoThumbnailAsync(item, ct);
@@ -124,7 +174,55 @@ public sealed class ThumbnailService(
     {
         await using var originalStream = await fileStorageService.GetFileAsync(item.Content, ct);
 
-        using var image = await Image.LoadAsync(originalStream, ct);
+        // S1-02：先只读头信息拿尺寸（不解码像素），超限直接跳过——
+        // 畸形大图（解压炸弹）绝不能走到全量解码那一步。
+        var info = await Image.IdentifyAsync(originalStream, ct);
+        if (info is null)
+        {
+            logger.LogWarning("ThumbnailService: Cannot identify image format for {Id}.", item.Id);
+            return null;
+        }
+
+        if (info.Width > _maxImageDimensionPixels || info.Height > _maxImageDimensionPixels)
+        {
+            logger.LogWarning(
+                "ThumbnailService: Image too large for thumbnail ({Width}x{Height}, limit {Limit}px per side), skipping {Id}.",
+                info.Width,
+                info.Height,
+                _maxImageDimensionPixels,
+                item.Id);
+            return null;
+        }
+
+        var pixels = (long)info.Width * info.Height;
+        if (pixels > _maxImagePixels)
+        {
+            logger.LogWarning(
+                "ThumbnailService: Image too large for thumbnail ({Width}x{Height} = {Pixels}px, limit {Limit}px), skipping {Id}.",
+                info.Width,
+                info.Height,
+                pixels,
+                _maxImagePixels,
+                item.Id);
+            return null;
+        }
+
+        // IdentifyAsync 已把流读到头之后：可定位的流倒回开头再解码；
+        // 不可定位的流重新取一次（当前存储实现返回的都是可定位流，此为防御）。
+        Stream decodeStream = originalStream;
+        IAsyncDisposable? refetched = null;
+        if (originalStream.CanSeek)
+        {
+            originalStream.Position = 0;
+        }
+        else
+        {
+            decodeStream = await fileStorageService.GetFileAsync(item.Content, ct);
+            refetched = decodeStream;
+        }
+
+        await using var _ = refetched; // null 时不做任何事；否则方法结束时释放重取的流
+        using var image = await Image.LoadAsync(decodeStream, ct);
 
         // 等比缩放到最长边不超过 400px（ResizeMode.Max：保持宽高比，长边限制为给定尺寸）
         if (image.Width > MaxThumbnailSize || image.Height > MaxThumbnailSize)
@@ -163,11 +261,7 @@ public sealed class ThumbnailService(
             return null;
         }
 
-        if (!File.Exists(originalFullPath))
-        {
-            logger.LogWarning("ThumbnailService: Original video file not found at {Path}.", originalFullPath);
-            return null;
-        }
+        // 原文件存在性已由 GenerateThumbnailAsync 的前置校验保证，这里不再重复检查。
 
         var tempOutput = Path.Combine(Path.GetTempPath(), $"anydrop_thumb_{item.Id:N}.jpg");
 
@@ -213,11 +307,15 @@ public sealed class ThumbnailService(
     /// <c>Arguments</c> 字符串再用引号包裹，攻击者只要让文件名包含一个双引号即可闭合引号、
     /// 注入任意 ffmpeg 参数（Linux 上双引号是合法文件名字符）。
     /// </summary>
+    /// <summary>
+    /// 以参数列表方式调用 ffmpeg，返回退出码；-1 表示 ffmpeg 不存在或无法启动，
+    /// -2 表示超过 <see cref="_ffmpegTimeoutSeconds"/> 秒被超时杀掉。
+    /// </summary>
     private async Task<int> RunFfmpegAsync(IReadOnlyList<string> arguments, CancellationToken ct)
     {
         var psi = new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "ffmpeg",
+            FileName = _ffmpegPath,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -240,7 +338,34 @@ public sealed class ThumbnailService(
             var stdoutTask = ReadLimitedAsync(process.StandardOutput, maxChars: 2000, ct);
             var stderrTask = ReadLimitedAsync(process.StandardError, maxChars: 2000, ct);
 
-            await process.WaitForExitAsync(ct);
+            // S1-02：每文件超时。超时只杀 ffmpeg、本文件跳过，不堵整批；
+            // 外层 ct（停机）触发时照常取消并向上传播。
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(_ffmpegTimeoutSeconds));
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    "ThumbnailService: ffmpeg timed out after {Timeout}s, killing it.",
+                    _ffmpegTimeoutSeconds);
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    // 进程刚好在此时自己退出了，无需再杀
+                    logger.LogDebug(ex, "ThumbnailService: ffmpeg already exited when killing after timeout.");
+                }
+
+                await process.WaitForExitAsync(ct);
+                await stdoutTask;
+                await stderrTask;
+                return -2;
+            }
 
             // 等待管道读取完毕
             await stdoutTask;
