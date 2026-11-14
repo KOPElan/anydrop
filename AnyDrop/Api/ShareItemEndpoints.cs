@@ -92,7 +92,8 @@ public static class ShareItemEndpoints
         try
         {
             var stream = await fileStorageService.GetFileAsync(item.Content, cancellationToken);
-            var contentType = string.IsNullOrWhiteSpace(item.MimeType) ? "application/octet-stream" : item.MimeType;
+            // MIME 先规范化再比较：上传方控制的 Content-Type 可能带参数或尾空格。
+            var contentType = MimeTypeHelper.Normalize(item.MimeType);
             var fileName = item.FileName ?? "download.bin";
             var asAttachment = download == true || !CanServeInline(contentType);
             return asAttachment
@@ -182,16 +183,21 @@ public static class ShareItemEndpoints
     /// <c>application/xhtml+xml</c> 这类同样能执行脚本的类型。
     /// 现在只有图片、视频、音频内联，且排除 SVG（SVG 可以内嵌脚本与外部引用）；
     /// 其余内容一律作为附件下载，并由 <c>X-Content-Type-Options: nosniff</c> 兜底。
+    ///
+    /// 调用方必须先对 MIME 做规范化（见 <see cref="MimeTypeHelper"/>）：
+    /// <c>image/svg+xml; charset=utf-8</c> 或带尾空格的变体未经规范化会绕过
+    /// 精确匹配、落入 <c>image/</c> 内联分支。
     /// </summary>
-    private static bool CanServeInline(string mimeType)
+    internal static bool CanServeInline(string mimeType)
     {
-        if (mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase))
+        var normalized = MimeTypeHelper.Normalize(mimeType);
+        if (MimeTypeHelper.IsSvg(normalized))
         {
             return false;
         }
 
-        return mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-               || mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
-               || mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+        return normalized.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+               || normalized.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+               || normalized.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -580,12 +580,15 @@ public sealed class ShareService(
 
     private static ShareContentType ResolveContentType(string mimeType)
     {
-        if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        // 先规范化：带参数的 "image/png; charset=x" 之类不应影响分类，
+        // 且入库的 MimeType 与服务端内联判断用同一份规范化结果。
+        var normalized = MimeTypeHelper.Normalize(mimeType);
+        if (normalized.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
             return ShareContentType.Image;
         }
 
-        if (mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        if (normalized.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
         {
             return ShareContentType.Video;
         }

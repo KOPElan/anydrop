@@ -94,6 +94,9 @@ public class ShareItemEndpointsDownloadTests : IDisposable
     [Theory]
     [InlineData("text/html", "evil.html")]
     [InlineData("image/svg+xml", "evil.svg")]              // SVG 可内嵌脚本
+    [InlineData("image/svg+xml; charset=utf-8", "evil2.svg")] // S0-02：参数变体不得绕过
+    [InlineData("image/svg+xml ", "evil3.svg")]           // S0-02：尾空格变体不得绕过
+    [InlineData("IMAGE/SVG+XML", "evil4.svg")]           // S0-02：大小写变体不得绕过
     [InlineData("application/xhtml+xml", "evil.xhtml")]    // 旧黑名单漏掉的类型
     [InlineData("application/javascript", "evil.js")]
     [InlineData("text/javascript", "evil2.js")]
