@@ -116,7 +116,6 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.AutoFetchLinkPreview).HasDefaultValue(true);
-            entity.Property(e => e.TimeZoneId).HasMaxLength(100).HasDefaultValue("UTC");
             entity.Property(e => e.BurnAfterReadingMinutes).HasDefaultValue(10);
             entity.Property(e => e.Language).HasMaxLength(10).HasDefaultValue("zh-CN");
             entity.Property(e => e.AutoCleanupEnabled).HasDefaultValue(false);
@@ -131,7 +130,6 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
             {
                 Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 AutoFetchLinkPreview = true,
-                TimeZoneId = "UTC",
                 BurnAfterReadingMinutes = 10,
                 Language = "zh-CN",
                 AutoCleanupEnabled = false,

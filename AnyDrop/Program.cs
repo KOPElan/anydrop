@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
 using System.Net;
@@ -77,6 +78,9 @@ builder.Services.Configure<HttpsRedirectionOptions>(options =>
 // 统一的时间源。业务代码一律通过 TimeProvider 取当前时间，
 // 从而可以在测试中用假时钟确定性地验证限流冷却、令牌过期、阅后即焚等时间相关逻辑。
 builder.Services.AddSingleton(TimeProvider.System);
+// S1-07（D6）：后台任务统一调度时区（配置 BackgroundTasks:TimeZoneId，
+// 未配置时用当前计算机时区）。单例，构造时即记启动日志。
+builder.Services.AddSingleton<BackgroundTaskTimeZone>();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<ITopicStateService, TopicStateService>();
@@ -318,6 +322,10 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+// S1-07（D6）：显式解析后台任务时区，让生效时区与来源一定出现在启动日志里，
+// 而不是等第一个后台任务启动时才出现。
+app.Services.GetRequiredService<BackgroundTaskTimeZone>();
+
 // 必须放在管道最前面：任何读取 RemoteIpAddress 或 Request.Scheme 的中间件
 // （限流、访问日志、Cookie 的 Secure 判定）都要看到代理转发的真实值。
 // 注意 UseForwardedHeaders 只信任上面配置过的代理，未知来源的 X-Forwarded-For 会被丢弃。
@@ -485,6 +493,24 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AllowAnonymous();
 
-await app.Services.MigrateDatabaseAsync();
+// S1-04（DAT-10）：迁移失败时启动即失败并记一条致命日志，然后以非零码退出，
+// 而不是带着坏库/半截表结构继续跑。顶层语句里 return int 即进程退出码，
+// 容器编排器能看到非零退出并按重启策略处理。
+try
+{
+    await app.Services.MigrateDatabaseAsync();
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Startup");
+    logger.LogCritical(
+        ex,
+        "数据库迁移失败，服务端拒绝启动。请先备份 data/anydrop.db，再按 README「数据库迁移」一节修复；切勿删除数据库文件重建——会丢失全部用户与消息。");
+    return 1;
+}
 
 app.Run();
+
+// 正常关机时退出码 0（上面迁移失败分支已 return 1）。
+return 0;

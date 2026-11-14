@@ -434,13 +434,49 @@ E2E 会自行以**独立的临时数据目录**启动服务端，不会触碰本
 
 ### 数据库迁移
 
+仓库里只有一个迁移：**基线迁移**（`AnyDrop/Migrations/*_Baseline.cs`），包含当前模型的
+完整建表（5 张表、全部索引、默认设置行）。历史上的 13 个旧迁移已在 Stage 1（S1-04）
+删除——其中一个（`20260513141000_AddScheduledThumbnailGenerationFlag`）文件缺失，
+EF Core 从未应用过它，`SystemSettings.ScheduledThumbnailGenerationEnabled` 列一直靠
+启动补丁创建；基线迁移终结了这个双轨：新库由基线直接建列，旧库由升级门接过去。
+
 ```bash
-# 添加新迁移
-dotnet ef migrations add <MigrationName> --project AnyDrop
+# 添加新迁移（基线之后的新改动正常走这条路）
+dotnet ef migrations add <MigrationName> --project AnyDrop --startup-project AnyDrop
 
 # 应用迁移
-dotnet ef database update --project AnyDrop
+dotnet ef database update --project AnyDrop --startup-project AnyDrop
 ```
+
+服务端启动时会自动应用迁移。**迁移失败时服务端拒绝启动**：记一条 `crit: Startup`
+致命日志后以非零码退出，容器编排器会按重启策略处理——不要带着坏库继续跑，
+也**切勿删除数据库文件重建**（会丢失全部用户与消息）。
+
+#### 旧库升级（从基线之前的版本升上来）
+
+启动时服务端会检查 `__EFMigrationsHistory`：
+
+- 全新库（无历史表）：正常应用基线迁移建表。
+- 停在最后一版旧迁移（`20261114181120_AddPendingDeletionAndDeleteAfter`）的库：
+  校验 5 张表与设置种子行完整、补齐历史上由启动补丁创建的那一列后，
+  把基线迁移记入历史，**不重建表、不动数据**，随后启动。日志里会有一条
+  `warn: AnyDrop.Data.DatabaseMigrationExtensions` 标明这次接管。
+- 停在中间版本、或历史无法识别的库：**直接拒绝启动**，日志写明已应用的记录。
+  此时先备份 `data/anydrop.db`，再升到最后一版旧发布（即含
+  `20261114181120_AddPendingDeletionAndDeleteAfter` 的版本）后重新升级，
+  或从备份恢复。不要手动改 `__EFMigrationsHistory`——除非你清楚自己在做什么。
+
+升级前请先按「数据备份与恢复」一节备份（在线备份或停机备份均可）。
+
+#### 后台任务时区
+
+孤儿对账、过期清理、缩略图批处理按同一时区调度（D6），配置
+`BackgroundTasks:TimeZoneId`（环境变量 `BackgroundTasks__TimeZoneId`，IANA ID，
+例如 `Asia/Shanghai`）。留空时用当前计算机时区；ID 无效时记 Error 并回退本机时区，
+永不静默用 UTC。启动日志里有一条 `后台任务时区：…` 写明生效值与来源。
+容器内本机时区通常是 UTC，要与宿主机一致请显式配置本项（`docker-compose.yml` 与
+`.env.example` 里有 `ANYDROP_BACKGROUND_TIMEZONE`），或透传宿主机 `TZ`。
+Web 界面展示用的浏览器时区是另一回事，与此无关。
 
 ### 构建容器镜像
 

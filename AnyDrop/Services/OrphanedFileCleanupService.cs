@@ -11,10 +11,9 @@ public sealed class OrphanedFileCleanupService(
     IServiceProvider serviceProvider,
     IConfiguration configuration,
     TimeProvider timeProvider,
+    BackgroundTaskTimeZone taskTimeZone,
     ILogger<OrphanedFileCleanupService> logger) : BackgroundService
 {
-    private static readonly TimeSpan ScanInterval = TimeSpan.FromHours(24);
-
     /// <summary>
     /// 启动后延迟首次扫描，避免与迁移、缩略图批处理抢 IO。
     /// 取 1 分钟而非更久：报告模式下的扫描成本很低，而每次启动都能在日志里
@@ -24,6 +23,9 @@ public sealed class OrphanedFileCleanupService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // S1-07：首轮失败不再终止本服务。旧代码里 InitialDelay + 首次 RunOnceAsync
+        // 在 try/catch 之外（只有 PeriodicTimer 循环内有 catch），首轮抛错会让
+        // ExecuteAsync 直接退出、之后再也不对账。改为捕获并继续走每日锚定循环。
         try
         {
             await Task.Delay(InitialDelay, timeProvider, stoppingToken);
@@ -33,19 +35,35 @@ public sealed class OrphanedFileCleanupService(
         {
             return;
         }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "孤儿文件对账首轮失败，宿主继续运行，将在下一锚定时刻重试。");
+        }
 
-        using var timer = new PeriodicTimer(ScanInterval, timeProvider);
-
-        while (!stoppingToken.IsCancellationRequested
-               && await timer.WaitForNextTickAsync(stoppingToken))
+        // 此后锚定到后台任务时区（D6）的每日凌晨 3 点执行，而不是「启动后每 24 小时」——
+        // 这样三个后台任务的触发时间都按同一时区对齐，日志里的时刻也与运维者的本地时间一致。
+        // 每次都重新算下一次锚点，夏令时跳变日也不会漂移。
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                var delay = taskTimeZone.GetDelayUntilNextDailyRun(
+                    BackgroundTaskTimeZone.DailyAnchorHour, timeProvider.GetUtcNow());
+                logger.LogDebug(
+                    "孤儿文件对账：下次在后台任务时区 {TimeZoneId} 凌晨 {Hour} 点执行（{Minutes:F0} 分钟后）。",
+                    taskTimeZone.TimeZone.Id,
+                    BackgroundTaskTimeZone.DailyAnchorHour,
+                    delay.TotalMinutes);
+                await Task.Delay(delay, timeProvider, stoppingToken);
                 await RunOnceAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
             {
-                logger.LogWarning(ex, "孤儿文件对账任务失败。");
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "孤儿文件对账任务失败，将在下一锚定时刻重试。");
             }
         }
     }

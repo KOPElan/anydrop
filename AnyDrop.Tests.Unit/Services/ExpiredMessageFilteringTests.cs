@@ -217,9 +217,12 @@ public class ExpiredMessageFilteringTests : IDisposable
         services.AddSingleton(NullLogger<ExpiredMessageCleanupService>.Instance);
         // 清理服务用工厂建短寿命上下文；注册与播种共用同一个 InMemory 库名的工厂。
         services.AddSingleton<IDbContextFactory<AnyDropDbContext>>(factory);
+        services.AddSingleton<BackgroundTaskTimeZone>(_ => new BackgroundTaskTimeZone(
+            new ConfigurationBuilder().Build(), NullLogger<BackgroundTaskTimeZone>.Instance));
         var provider = services.BuildServiceProvider();
         var sut = new ExpiredMessageCleanupService(
             provider, new FakeTimeProvider(Now), new DbWriteGate(),
+            provider.GetRequiredService<BackgroundTaskTimeZone>(),
             NullLogger<ExpiredMessageCleanupService>.Instance);
 
         await sut.CleanupExpiredAsync(CancellationToken.None);

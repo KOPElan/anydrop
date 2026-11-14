@@ -152,13 +152,6 @@ namespace AnyDrop.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(2);
 
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("UTC");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
@@ -177,7 +170,6 @@ namespace AnyDrop.Migrations
                             Language = "zh-CN",
                             ScheduledThumbnailGenerationEnabled = false,
                             ThumbnailGenerationHour = 2,
-                            TimeZoneId = "UTC",
                             UpdatedAt = new DateTime(2026, 4, 19, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });

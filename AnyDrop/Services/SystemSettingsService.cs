@@ -168,7 +168,6 @@ public sealed class SystemSettingsService(IDbContextFactory<AnyDropDbContext> db
         {
             Id = SettingsId,
             AutoFetchLinkPreview = true,
-            TimeZoneId = "UTC",
             BurnAfterReadingMinutes = 10,
             Language = "zh-CN",
             UpdatedAt = DateTimeOffset.UtcNow
