@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AnyDrop.Services;
 
 /// <summary>
-/// 后台服务：每分钟检查并标记已到期的"阅后即焚"消息；
+/// 后台服务：每分钟检查并标记已到期的"定时销毁"消息；
 /// 同时每天（UTC 日期变更后）检查是否需要执行自动清理旧消息任务。
 /// 标记（<c>DeleteAfter</c>）一提交消息即不可见，文件由 Stage 1 的清扫任务
 /// 在到期后物理删除（D5）；本服务不再直接删文件。
@@ -54,7 +54,11 @@ public sealed class ExpiredMessageCleanupService(
         }
     }
 
-    private async Task CleanupExpiredAsync(CancellationToken ct)
+    /// <summary>
+    /// 执行一轮过期清理。internal 以便测试直接验证标记 + 广播行为
+    /// （后台循环本身用 PeriodicTimer 驱动，不适合在单元测试里跑）。
+    /// </summary>
+    internal async Task CleanupExpiredAsync(CancellationToken ct)
     {
         // S0-04：后台写操作串行化——与缩略图批处理互斥写库，避免两个定时任务争写锁。
         using var _ = await dbWriteGate.AcquireAsync(ct);
@@ -90,7 +94,13 @@ public sealed class ExpiredMessageCleanupService(
         }
 
         await db.SaveChangesWithRetryAsync(ct);
-        logger.LogInformation("Marked {Count} expired burn-after-reading message(s) for delayed deletion.", expired.Count);
+        logger.LogInformation("Marked {Count} expired timed-deletion message(s) for delayed deletion.", expired.Count);
+
+        // S0-06：广播被标记的消息 ID，让已打开的页面立即移除对应气泡，
+        // 不必等下一轮清理或手动刷新。读过滤（S0-06）已让新请求看不到它们，
+        // 但已打开的页面只有收到广播才会同步消失。
+        var markedIds = expired.Select(x => x.Id).ToList();
+        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", markedIds, CancellationToken.None);
 
         // 更新受影响主题的 LastMessageAt/LastMessagePreview 并广播
         if (affectedTopicIds.Count > 0)
@@ -101,7 +111,10 @@ public sealed class ExpiredMessageCleanupService(
 
             foreach (var topic in topics)
             {
+                // S0-06：主题预览不取已到期的消息（本批刚标记的已被全局过滤器排除，
+                // 这里再叠加过期过滤，覆盖标记前一刻刚好到期的消息）。
                 var latest = await db.ShareItems
+                    .NotExpired(timeProvider.GetUtcNow())
                     .Where(x => x.TopicId == topic.Id)
                     .OrderByDescending(x => x.CreatedAt)
                     .FirstOrDefaultAsync(ct);

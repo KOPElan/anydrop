@@ -17,10 +17,10 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
 
     public async Task<AuthResult<SecuritySettingsDto>> UpdateSecuritySettingsAsync(UpdateSecuritySettingsRequest request, CancellationToken ct = default)
     {
-        // 验证阅后即焚时长范围（1–43200 分钟，即 1 分钟到 30 天）
+        // 验证定时销毁时长范围（1–43200 分钟，即 1 分钟到 30 天）
         if (request.BurnAfterReadingMinutes is < 1 or > 43200)
         {
-            return AuthResult<SecuritySettingsDto>.Failure("阅后即焚时长必须在 1–43200 分钟之间。", StatusCodes.Status400BadRequest);
+            return AuthResult<SecuritySettingsDto>.Failure("定时销毁时长必须在 1–43200 分钟之间。", StatusCodes.Status400BadRequest);
         }
 
         // 验证语言代码

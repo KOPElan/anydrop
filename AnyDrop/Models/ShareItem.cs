@@ -22,7 +22,7 @@ public sealed class ShareItem
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
-    /// <summary>阅后即焚：消息自动删除的时间，为 null 表示永久保留。</summary>
+    /// <summary>定时销毁：消息自动删除的时间，为 null 表示永久保留。注意是按时间到期销毁，不是阅读后销毁。</summary>
     public DateTimeOffset? ExpiresAt { get; set; }
 
     /// <summary>

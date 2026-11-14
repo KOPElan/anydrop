@@ -242,8 +242,10 @@ public sealed class ShareService(
         var normalizedCount = count <= 0 ? 50 : count;
         var safeCount = Math.Clamp(normalizedCount, 1, 200);
 
+        // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
         return await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .OrderByDescending(x => x.CreatedAt)
             .Take(safeCount)
             .Select(x => x.ToDto())
@@ -290,6 +292,7 @@ public sealed class ShareService(
         // 这与 README 宣称的「全文搜索」不符。
         var queryable = dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId
                         && (EF.Functions.Like(x.Content.ToLower(), likePattern, @"\")
                             || (x.FileName != null
@@ -331,8 +334,10 @@ public sealed class ShareService(
     {
         var (startUtc, endUtc) = GetUtcRange(date, date, timeZone);
 
+        // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
         return await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
             .OrderBy(x => x.CreatedAt)
             .Select(x => x.ToDto())
@@ -349,8 +354,10 @@ public sealed class ShareService(
         var (startUtc, endUtc) = GetUtcRange(start, end, timeZone);
 
         // 只拉取 CreatedAt 列，再按调用方时区归属到具体日期
+        // S0-06：已到期的定时销毁消息不产生活跃日期。
         var timestamps = await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
             .Select(x => x.CreatedAt)
             .ToListAsync(ct);
@@ -409,6 +416,7 @@ public sealed class ShareService(
 
         var queryable = dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId && x.ContentType == contentType);
 
         if (before.HasValue)
@@ -562,7 +570,9 @@ public sealed class ShareService(
             .ToListAsync(ct);
 
         // 一次性加载所有受影响主题的全部剩余消息并在内存中取最新一条，避免 foreach 内逐主题查询（N+1）
+        // S0-06：主题预览不取已到期的消息。
         var remainingItems = await dbContext.ShareItems
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId.HasValue && topicIds.Contains(x.TopicId.Value))
             .OrderByDescending(x => x.CreatedAt)
             .ThenByDescending(x => x.Id)

@@ -56,8 +56,8 @@
   <data name="Settings_UpdatePassword"><value>更新密码</value></data>
   <data name="Settings_Security"><value>系统设置</value></data>
   <data name="Settings_AutoFetchLink"><value>自动获取链接预览</value></data>
-  <data name="Settings_BurnDuration"><value>阅后即焚时长（分钟）</value></data>
-  <data name="Settings_BurnDurationHint"><value>新建阅后即焚消息时默认保留的分钟数（1–43200）</value></data>
+  <data name="Settings_BurnDuration"><value>定时销毁时长（分钟）</value></data>
+  <data name="Settings_BurnDurationHint"><value>新建定时销毁消息时默认保留的分钟数（1–43200）</value></data>
   <data name="Settings_DarkMode"><value>暗色主题</value></data>
   <data name="Settings_DarkModeHint"><value>启用后将切换为暗色界面</value></data>
   <data name="Settings_Language"><value>界面语言</value></data>
@@ -209,8 +209,8 @@
   <data name="Home_ConfirmDeleteAction"><value>确认删除</value></data>
   <data name="Home_UploadImageOrVideo"><value>上传图片或视频</value></data>
   <data name="Home_UploadAttachment"><value>上传附件</value></data>
-  <data name="Home_BurnOnHint"><value>阅后即焚已开启（10分钟后自动删除）</value></data>
-  <data name="Home_BurnOffHint"><value>开启阅后即焚</value></data>
+  <data name="Home_BurnOnHint"><value>定时销毁已开启（10分钟后自动删除）</value></data>
+  <data name="Home_BurnOffHint"><value>开启定时销毁</value></data>
   <data name="Home_InputPlaceholder"><value>输入消息，或拖入文件到聊天区域…（Ctrl+Enter 发送）</value></data>
   <data name="Home_MessageRequired"><value>消息内容不能为空。</value></data>
   <data name="Home_SelectTopicFirst"><value>请先选择主题。</value></data>

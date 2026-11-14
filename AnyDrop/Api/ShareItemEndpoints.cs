@@ -84,6 +84,12 @@ public static class ShareItemEndpoints
             return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息不存在"));
         }
 
+        // S0-06：已到期的定时销毁消息不可下载，不等清理任务。
+        if (item.ExpiresAt is not null && item.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期"));
+        }
+
         if (item.ContentType is not (ShareContentType.File or ShareContentType.Image or ShareContentType.Video))
         {
             return TypedResults.BadRequest(ApiEnvelope<object>.Fail("该消息不包含文件"));
@@ -107,7 +113,7 @@ public static class ShareItemEndpoints
     }
 
     /// <summary>
-    /// 手动清理指定月数前的消息，同时清理相关文件资源。
+    /// 手动清理指定月数前的消息：只写延迟删除标记（7 天后物理删除），消息立即不可见。
     /// </summary>
     public static async Task<Results<Ok<ApiEnvelope<CleanupResult>>, BadRequest<ApiEnvelope<object>>>> CleanupOldMessagesAsync(
         int months,
@@ -124,7 +130,7 @@ public static class ShareItemEndpoints
     }
 
     /// <summary>
-    /// 批量删除指定 ID 的消息，同时清理相关文件资源。
+    /// 批量删除指定 ID 的消息：先提交数据库删除，再删文件。
     /// </summary>
     public static async Task<Results<Ok<ApiEnvelope<object>>, BadRequest<ApiEnvelope<object>>>> BatchDeleteAsync(
         [FromBody] BatchDeleteRequest request,
@@ -157,12 +163,18 @@ public static class ShareItemEndpoints
         var item = await dbContext.ShareItems
             .AsNoTracking()
             .Where(x => x.Id == id)
-            .Select(x => new { x.ThumbnailPath })
+            .Select(x => new { x.ThumbnailPath, x.ExpiresAt })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (item is null || string.IsNullOrWhiteSpace(item.ThumbnailPath))
         {
             return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图尚未生成"));
+        }
+
+        // S0-06：已到期的定时销毁消息的缩略图也不可访问。
+        if (item.ExpiresAt is not null && item.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期"));
         }
 
         try
