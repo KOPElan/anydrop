@@ -1,5 +1,6 @@
 ﻿using AnyDrop.App.Infrastructure;
 using Foundation;
+using Microsoft.Extensions.DependencyInjection;
 using UIKit;
 
 namespace AnyDrop.App
@@ -16,7 +17,13 @@ namespace AnyDrop.App
             {
                 var host = url.Host;
                 if (host == "topic" && Guid.TryParse(url.Path?.TrimStart('/'), out var topicId))
-                    PendingShareStore.NotificationTopicId = topicId;
+                {
+                    var store = MauiUIApplicationDelegate.Current?.Services.GetService<IPendingShareStore>();
+                    if (store is not null)
+                    {
+                        store.NotificationTopicId = topicId;
+                    }
+                }
             }
             return true;
         }

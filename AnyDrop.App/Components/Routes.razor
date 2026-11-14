@@ -1,5 +1,6 @@
 @inject ISecureTokenStorage TokenStorage
 @inject IServerConfigService ServerConfig
+@inject IPendingShareStore PendingShare
 @inject NavigationManager Nav
 @inject IStringLocalizer<AppStrings> L
 
@@ -27,8 +28,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        // 检测外部分享内容
-        if (PendingShareStore.HasContent)
+        // 检测外部分享内容（S2-06：已落盘，进程被杀重启后仍能恢复）
+        if (PendingShare.HasContent)
         {
             if (await TokenStorage.IsAuthenticatedAsync())
                 Nav.NavigateTo("/share");
@@ -39,10 +40,10 @@ else
         }
 
         // 检测通知深链接
-        if (PendingShareStore.NotificationTopicId.HasValue)
+        if (PendingShare.NotificationTopicId.HasValue)
         {
-            var topicId = PendingShareStore.NotificationTopicId.Value;
-            PendingShareStore.NotificationTopicId = null;
+            var topicId = PendingShare.NotificationTopicId.Value;
+            PendingShare.NotificationTopicId = null;
             if (await TokenStorage.IsAuthenticatedAsync())
             {
                 Nav.NavigateTo($"/?topicId={topicId}");

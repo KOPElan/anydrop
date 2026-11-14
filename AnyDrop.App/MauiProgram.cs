@@ -3,6 +3,7 @@ using AnyDrop.App.Infrastructure;
 using AnyDrop.App.Platform;
 using AnyDrop.App.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Storage;
 
 namespace AnyDrop.App
 {
@@ -76,6 +77,11 @@ namespace AnyDrop.App
             // S2-05：离线发件箱（Singleton，JSON 文件持久化到 AppDataDirectory）。
             builder.Services.AddSingleton<IOutboxService>(_ =>
                 new OutboxService(FileSystem.AppDataDirectory));
+
+            // S2-06：待分享内容持久化存储（Singleton，JSON 文件持久化到 AppDataDirectory；
+            // 消费后删除的缓存文件限定在 FileSystem.CacheDirectory 内）。
+            builder.Services.AddSingleton<IPendingShareStore>(_ =>
+                new FilePendingShareStore(FileSystem.AppDataDirectory, FileSystem.CacheDirectory));
 
             // 命名 HttpClient "api"，挂载 AuthDelegatingHandler
             builder.Services.AddHttpClient("api", (sp, client) =>

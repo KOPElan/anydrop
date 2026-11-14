@@ -3,6 +3,7 @@
 @inject IShareService ShareService
 @inject IFileUploadService FileUploadService
 @inject ITopicService TopicService
+@inject IPendingShareStore PendingShare
 @inject IConnectivityService Connectivity
 @inject NavigationManager Nav
 @inject IStringLocalizer<AppStrings> L
@@ -33,11 +34,11 @@
                 {
                     <pre class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">@_content.Text</pre>
                 }
-                @foreach (var path in _content.FilePaths)
+                @foreach (var file in _content.Files)
                 {
                     <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mt-2">
                         <span>📎</span>
-                        <span class="truncate">@System.IO.Path.GetFileName(path)</span>
+                        <span class="truncate">@System.IO.Path.GetFileName(file.Path)</span>
                     </div>
                 }
             </div>
@@ -78,7 +79,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _content = PendingShareStore.Content;
+        _content = PendingShare.Content;
         _topics = (await TopicService.GetTopicsAsync()).ToList();
         if (_topics.Count > 0) _selectedTopicId = _topics[0].Id.ToString();
     }
@@ -96,15 +97,16 @@
             if (_content?.Text is not null)
                 await ShareService.SendTextAsync(new CreateTextShareItemRequest(_content.Text!, topicId));
 
-            foreach (var path in _content?.FilePaths ?? [])
+            // S2-06：文件已是接收时复制进缓存的本地路径，每文件用真实 MIME 类型上传。
+            foreach (var file in _content?.Files ?? [])
             {
-                using var stream = File.OpenRead(path);
-                var fileName = System.IO.Path.GetFileName(path);
-                var mime = _content?.MimeType ?? "application/octet-stream";
-                await FileUploadService.UploadFileAsync(stream, fileName, mime, topicId);
+                using var stream = File.OpenRead(file.Path);
+                var fileName = System.IO.Path.GetFileName(file.Path);
+                await FileUploadService.UploadFileAsync(stream, fileName, file.MimeType, topicId);
             }
 
-            PendingShareStore.Clear();
+            // 消费成功后清除待分享记录，并删除已复制的缓存文件（失败则保留，可重试）。
+            await PendingShare.ClearAsync();
             Nav.NavigateTo("/");
         }
         catch (Exception ex)
