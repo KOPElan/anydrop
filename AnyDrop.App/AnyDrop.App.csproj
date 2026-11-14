@@ -17,7 +17,7 @@
 
         <ApplicationTitle>AnyDrop</ApplicationTitle>
         <ApplicationId>com.kopelan.anydrop</ApplicationId>
-        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
         <WindowsPackageType>None</WindowsPackageType>
 

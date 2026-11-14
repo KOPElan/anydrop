@@ -1,15 +1,20 @@
 # 请参阅 https://aka.ms/customizecontainer 以了解如何自定义调试容器，以及 Visual Studio 如何使用此 Dockerfile 生成映像以更快地进行调试。
 
-# 此阶段用于在快速模式(默认为调试配置)下从 VS 运行时
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+# S3-01（ENG-02）：基础镜像钉死具体补丁版本，不再拉 latest / 10.0 浮动标签。
+# 升级补丁时只改这里两行；digest 钉死需 docker buildx imagetools inspect
+# 查当前 digest，见 docs/release.md（本机无 Docker 未在此验证）。
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15 AS base
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 
 
 # 此阶段用于生成服务项目
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS build
 ARG BUILD_CONFIGURATION=Release
+# S3-01：发布版本号由 Git 标签传入（release 工作流传 VERSION=<tag 去掉 v>）；
+# 未传入时按 Directory.Build.props 默认 0.0.0-dev。
+ARG VERSION=0.0.0-dev
 WORKDIR /src
 COPY ["AnyDrop/AnyDrop.csproj", "AnyDrop/"]
 RUN dotnet restore "./AnyDrop/AnyDrop.csproj"
@@ -20,7 +25,8 @@ RUN dotnet build "./AnyDrop.csproj" -c $BUILD_CONFIGURATION -o /app/build
 # 此阶段用于发布要复制到最终阶段的服务项目
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./AnyDrop.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+ARG VERSION=0.0.0-dev
+RUN dotnet publish "./AnyDrop.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false /p:Version=$VERSION
 
 # 此阶段在生产中使用，或在常规模式下从 VS 运行时使用(在不使用调试配置时为默认值)
 FROM base AS final

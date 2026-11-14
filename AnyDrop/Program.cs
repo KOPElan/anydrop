@@ -351,6 +351,9 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+// S3-01：启动即记版本号，日志里能直接认出这是哪个标签的构建。
+app.Logger.LogInformation("AnyDrop {Version} starting in {Environment}.", AppVersion.Current, app.Environment.EnvironmentName);
+
 // S1-07（D6）：显式解析后台任务时区，让生效时区与来源一定出现在启动日志里，
 // 而不是等第一个后台任务启动时才出现。
 app.Services.GetRequiredService<BackgroundTaskTimeZone>();

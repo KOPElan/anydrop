@@ -2,14 +2,23 @@ services:
   anydrop:
     # 使用已发布的镜像：可固定版本、可回滚。
     #   固定版本：在 .env 中设置 ANYDROP_VERSION=v1.2.3，然后 docker compose pull && docker compose up -d --no-build
-    #   跟随最新：保持默认 latest
+    #   默认跟随当前正式版本，不再拉 latest（S3-01：latest 浮动不可复现）。
     # 下方保留 build 段以便从源码构建；docker compose up -d --build 仍可用。
-    image: ghcr.io/kopelan/anydrop:${ANYDROP_VERSION:-latest}
+    image: ghcr.io/kopelan/anydrop:${ANYDROP_VERSION:-v1.0.0}
     build:
       context: .
       dockerfile: AnyDrop/Dockerfile
     container_name: anydrop
     restart: unless-stopped
+    # S3-01：容器内存上限。缩略图大图解码是内存峰值来源（S1-02 已限流），
+    # 再叠加并发上传时仍可能冲高；上限防拖垮宿主机，超限时容器会被 OOM
+    # 杀掉并按 restart 策略重起，而不是把宿主机拖死。
+    deploy:
+      resources:
+        limits:
+          memory: 1024m
+        reservations:
+          memory: 256m
     ports:
       - "8080:8080"
     volumes:
