@@ -118,7 +118,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         };
 
         dbContext.Topics.Add(topic);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         await BroadcastTopicsUpdatedAsync(ct);
 
@@ -134,7 +134,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
 
         topic.Name = ValidateName(request.Name);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
@@ -150,7 +150,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
 
         topic.Icon = NormalizeAndValidateIcon(request.Icon);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
@@ -178,7 +178,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
 
         dbContext.Topics.Remove(topic);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         return true;
@@ -241,7 +241,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
                 topics[item.TopicId].SortOrder = item.SortOrder;
             }
 
-            await dbContext.SaveChangesAsync(ct);
+            await dbContext.SaveChangesWithRetryAsync(ct);
             if (tx is not null)
             {
                 await tx.CommitAsync(ct);
@@ -275,7 +275,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         topic.IsPinned = isPinned;
         topic.PinnedAt = isPinned ? DateTimeOffset.UtcNow : null;
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
@@ -297,7 +297,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             topic.PinnedAt = null;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);

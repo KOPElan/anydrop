@@ -63,7 +63,7 @@ public sealed class AuthService(
 
         try
         {
-            await dbContext.SaveChangesAsync(ct);
+            await dbContext.SaveChangesWithRetryAsync(ct);
         }
         catch (DbUpdateException)
         {
@@ -105,7 +105,6 @@ public sealed class AuthService(
         loginRateLimiter.Reset(rateLimitKey);
         user.LastLoginAt = DateTimeOffset.UtcNow;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-
         // 存储的哈希参数已过时（旧格式，或迭代次数低于当前要求）：
         // 借这次已知明文的机会就地升级，用户无感。
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
@@ -115,7 +114,7 @@ public sealed class AuthService(
             user.PasswordSalt = upgradedSalt;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         var token = tokenService.GenerateToken(user);
         var payload = new LoginResponse(new UserProfileDto(user.Nickname, user.LastLoginAt), token.AccessToken, token.ExpiresAt);
@@ -132,7 +131,7 @@ public sealed class AuthService(
 
         user.SessionVersion++;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return AuthResult<LogoutResultDto>.Success(new LogoutResultDto(true));
     }
 
@@ -176,7 +175,7 @@ public sealed class AuthService(
         user.PasswordSalt = salt;
         user.SessionVersion++;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return AuthResult<bool>.Success(true);
     }
 

@@ -6,6 +6,7 @@ namespace AnyDrop.Services;
 public sealed class ThumbnailGenerationBackgroundService(
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
+    AnyDrop.Data.DbWriteGate dbWriteGate,
     ILogger<ThumbnailGenerationBackgroundService> logger) : BackgroundService
 {
     // 保证同一时间只有一个批处理实例运行（定时触发与 API 手动触发互斥）
@@ -78,6 +79,8 @@ public sealed class ThumbnailGenerationBackgroundService(
             var thumbnailService = scope.ServiceProvider.GetRequiredService<IThumbnailService>();
 
             logger.LogInformation("ThumbnailGenerationBackgroundService: Starting thumbnail batch.");
+            // S0-04：后台写操作串行化——与过期清理互斥写库，避免两个定时任务争写锁。
+            using var _ = await dbWriteGate.AcquireAsync(ct);
             var count = await thumbnailService.ProcessPendingThumbnailsAsync(ct);
             logger.LogInformation("ThumbnailGenerationBackgroundService: Generated {Count} thumbnails.", count);
         }

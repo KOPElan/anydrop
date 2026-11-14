@@ -48,7 +48,7 @@ public sealed class ThumbnailService(
             if (thumbnailPath is not null)
             {
                 item.ThumbnailPath = thumbnailPath;
-                await dbContext.SaveChangesAsync(ct);
+                await dbContext.SaveChangesWithRetryAsync(ct);
             }
 
             return thumbnailPath;

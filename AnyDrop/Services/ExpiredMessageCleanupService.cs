@@ -14,6 +14,7 @@ namespace AnyDrop.Services;
 public sealed class ExpiredMessageCleanupService(
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
+    DbWriteGate dbWriteGate,
     ILogger<ExpiredMessageCleanupService> logger) : BackgroundService
 {
     // 记录上次执行自动清理的日期（UTC），避免一天内重复执行
@@ -54,6 +55,9 @@ public sealed class ExpiredMessageCleanupService(
 
     private async Task CleanupExpiredAsync(CancellationToken ct)
     {
+        // S0-04：后台写操作串行化——与缩略图批处理互斥写库，避免两个定时任务争写锁。
+        using var _ = await dbWriteGate.AcquireAsync(ct);
+
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
         var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
@@ -83,7 +87,7 @@ public sealed class ExpiredMessageCleanupService(
             db.ShareItems.Remove(item);
         }
 
-        await db.SaveChangesAsync(ct);
+        await db.SaveChangesWithRetryAsync(ct);
         logger.LogInformation("Deleted {Count} expired burn-after-reading message(s).", expired.Count);
 
         // 更新受影响主题的 LastMessageAt/LastMessagePreview 并广播
@@ -108,7 +112,7 @@ public sealed class ExpiredMessageCleanupService(
                         : null;
             }
 
-            await db.SaveChangesAsync(ct);
+            await db.SaveChangesWithRetryAsync(ct);
 
             // 广播 TopicsUpdated 让侧边栏刷新
             var topicService = scope.ServiceProvider.GetRequiredService<ITopicService>();
@@ -123,6 +127,9 @@ public sealed class ExpiredMessageCleanupService(
     /// </summary>
     private async Task RunAutoCleanupIfEnabledAsync(CancellationToken ct)
     {
+        // S0-04：同上，自动清理的写操作也走同一把锁。
+        using var _ = await dbWriteGate.AcquireAsync(ct);
+
         await using var scope = serviceProvider.CreateAsyncScope();
         var settingsService = scope.ServiceProvider.GetRequiredService<ISystemSettingsService>();
         var (enabled, months) = await settingsService.GetAutoCleanupSettingsAsync(ct);

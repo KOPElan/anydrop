@@ -50,7 +50,7 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         settings.ThumbnailGenerationHour = request.ThumbnailGenerationHour;
         settings.ScheduledThumbnailGenerationEnabled = request.ScheduledThumbnailGenerationEnabled;
         settings.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return AuthResult<SecuritySettingsDto>.Success(MapToDto(settings));
     }
 
@@ -157,7 +157,7 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             UpdatedAt = DateTimeOffset.UtcNow
         };
         dbContext.SystemSettings.Add(settings);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return settings;
     }
 }

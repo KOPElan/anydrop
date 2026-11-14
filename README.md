@@ -372,19 +372,32 @@ docker compose start anydrop
 
 ### 方式二：在线备份（服务不中断）
 
-使用 SQLite 自带的 `.backup` 命令导出快照，它保证读取到一个一致的事务视图：
+分两步，顺序不能反——**先给数据库拍快照，再按快照里的记录同步文件**：
 
 ```bash
 mkdir -p backup
+TS=$(date +%Y%m%d-%H%M%S)
 docker run --rm \
   -v anydrop-data:/data \
   -v "$(pwd)/backup:/backup" \
   alpine sh -c 'apk add --no-cache sqlite >/dev/null &&
     sqlite3 /data/anydrop.db ".backup /backup/anydrop.db" &&
-    tar czf /backup/anydrop-files-$(date +%Y%m%d-%H%M%S).tar.gz -C /data files'
+    sqlite3 /backup/anydrop.db "SELECT DISTINCT Content FROM ShareItems WHERE ContentType IN (1, 2, 3) UNION SELECT DISTINCT ThumbnailPath FROM ShareItems WHERE ThumbnailPath IS NOT NULL;" |
+      grep -v "^$" > /backup/files-$TS.txt &&
+    tar czf /backup/anydrop-files-$TS.tar.gz -C /data -T /backup/files-$TS.txt'
 ```
 
+为什么必须按快照里的记录打包，而不是直接 `tar` 整个 `files/` 目录：
+快照与文件打包之间有时间差，直接打包整个目录会混入快照之后才上传的
+文件（备份里的数据库没有这些记录，恢复后是孤儿文件），还可能打包到
+一半被删的文件。按快照的 `Content` / `ThumbnailPath` 清单打包，
+备份里的每个文件在备份的数据库里都有记录，两边一致。
+
 > 注意这里以**读写**方式挂载卷（没有 `:ro`）：WAL 模式下即使只读查询也需要访问 `-shm` 文件。
+>
+> 另注意：数据库运行在 WAL 模式（启动时由应用自动启用，见上），
+> `-wal` / `-shm` 文件是运行时的中间状态，**不要**单独备份它们——
+> `.backup` 命令会把已提交的数据完整导出到快照里。
 
 ### 恢复
 

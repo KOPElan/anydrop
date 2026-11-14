@@ -50,8 +50,15 @@ if (!string.IsNullOrWhiteSpace(dbDirectory))
     Directory.CreateDirectory(dbDirectory);
 }
 
+// 注意：不要往连接串里加 Journal Mode / Busy Timeout——Microsoft.Data.Sqlite
+// 根本不支持这两个关键字（会直接抛 ArgumentException）。
+// WAL 在启动时由 DatabaseMigrationExtensions.EnsureWalModeAsync 对库文件设置
+// （按文件持久化）；busy_timeout 由 SqliteBusyTimeoutInterceptor 在每次打开
+// 连接时设置（按连接生效）。见 S0-04。
 builder.Services.AddDbContext<AnyDropDbContext>(options =>
-    options.UseSqlite($"Data Source={fullDbPath}"));
+    options.UseSqlite($"Data Source={fullDbPath}")
+        .AddInterceptors(new SqliteBusyTimeoutInterceptor()));
+builder.Services.AddSingleton<DbWriteGate>();
 builder.Services.AddSignalR();
 
 // 反向代理头的可信来源统一由 ReverseProxy 节配置（见下面的 reverseProxyOptions），

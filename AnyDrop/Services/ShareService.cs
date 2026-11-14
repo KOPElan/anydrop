@@ -62,7 +62,7 @@ public sealed class ShareService(
         }
 
         dbContext.ShareItems.Add(item);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         // 先广播消息（让用户立即看到），再后台补全链接元数据
         var dto = item.ToDto();
@@ -110,7 +110,7 @@ public sealed class ShareService(
 
             item.LinkTitle = title;
             item.LinkDescription = description;
-            await db.SaveChangesAsync();
+            await db.SaveChangesWithRetryAsync();
 
             // 推送补全后的消息，让客户端更新气泡内容
             await hubContext.Clients.All.SendAsync("ReceiveShareItem", item.ToDto());
@@ -188,7 +188,7 @@ public sealed class ShareService(
         dbContext.ShareItems.Add(item);
         try
         {
-            await dbContext.SaveChangesAsync(ct);
+            await dbContext.SaveChangesWithRetryAsync(ct);
         }
         catch
         {
@@ -480,7 +480,7 @@ public sealed class ShareService(
             deletedIds.Add(item.Id);
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         // 广播被清理的消息 ID，让已打开的客户端同步移除对应气泡
         await hubContext.Clients.All.SendAsync("ShareItemsDeleted", deletedIds, CancellationToken.None);
@@ -526,7 +526,7 @@ public sealed class ShareService(
             deletedIds.Add(item.Id);
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         // 广播被删除的消息 ID，让所有客户端同步移除对应气泡；
         // 使用 CancellationToken.None 确保请求取消不影响其他客户端的同步
@@ -571,7 +571,7 @@ public sealed class ShareService(
                     : null;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         var allTopics = await topicService.GetAllTopicsAsync(ct);
         await hubContext.Clients.All.SendAsync("TopicsUpdated", allTopics, CancellationToken.None);

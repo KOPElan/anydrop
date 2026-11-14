@@ -14,9 +14,45 @@ public static class DatabaseMigrationExtensions
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
 
+        // S0-04：先开 WAL 再跑迁移（迁移本身也是写操作，同样受益）。
+        // Microsoft.Data.Sqlite 的连接串不支持 Journal Mode 关键字，
+        // 因此 WAL 只能这样按库文件设置；模式会持久化到库文件本身。
+        await EnsureWalModeAsync(db, ct);
         await db.Database.MigrateAsync(ct);
         await EnsureScheduledThumbnailGenerationColumnAsync(db, ct);
         await EnsureUserSingletonIndexAsync(db, ct);
+    }
+
+    /// <summary>
+    /// 对库文件启用 WAL 模式（S0-04，DAT-03）。
+    /// 成功时 PRAGMA 返回 <c>wal</c>；返回其他值（例如文件系统不支持）
+    /// 时直接启动失败并给出明确信息——并发写防护依赖 WAL，不能静默降级。
+    /// </summary>
+    internal static async Task EnsureWalModeAsync(AnyDropDbContext dbContext, CancellationToken ct)
+    {
+        if (!string.Equals(
+                dbContext.Database.ProviderName,
+                "Microsoft.EntityFrameworkCore.Sqlite",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var connection = (SqliteConnection)dbContext.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync(ct);
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode=WAL;";
+        var mode = (await command.ExecuteScalarAsync(ct))?.ToString();
+        if (!string.Equals(mode, "wal", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"无法为 SQLite 数据库启用 WAL 模式（PRAGMA journal_mode 返回 '{mode}'）。" +
+                "WAL 是并发写入防护的前提，请检查数据库文件所在文件系统是否支持 WAL。");
+        }
     }
 
     /// <summary>
