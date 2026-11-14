@@ -70,6 +70,9 @@ namespace AnyDrop.App
             // AuthDelegatingHandler（Transient）
             builder.Services.AddTransient<AuthDelegatingHandler>();
 
+            // S2-01：单飞刷新与 Hub 短 token 提供器（Singleton）。
+            builder.Services.AddSingleton<ITokenRefreshService, TokenRefreshService>();
+
             // 命名 HttpClient "api"，挂载 AuthDelegatingHandler
             builder.Services.AddHttpClient("api", (sp, client) =>
             {
@@ -79,6 +82,17 @@ namespace AnyDrop.App
                     client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
             }).AddHttpMessageHandler<AuthDelegatingHandler>();
+
+            // S2-01：刷新请求专用客户端，不挂 AuthDelegatingHandler，
+            // 避免刷新请求自身 401 时递归触发刷新。
+            builder.Services.AddHttpClient("auth-refresh", (sp, client) =>
+            {
+                var config = sp.GetRequiredService<IServerConfigService>();
+                var baseUrl = config.GetBaseUrl();
+                if (!string.IsNullOrEmpty(baseUrl))
+                    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
 
             // 用于 ServerConfigService 验证 URL（无 auth handler）
             builder.Services.AddHttpClient("plain");

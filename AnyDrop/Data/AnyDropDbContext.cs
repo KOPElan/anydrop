@@ -11,6 +11,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
     public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
     public DbSet<PendingFileDeletion> PendingFileDeletions => Set<PendingFileDeletion>();
     public DbSet<MissingFileReport> MissingFileReports => Set<MissingFileReport>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,6 +139,32 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 .IsUnique()
                 .HasFilter("IsResolved = 0");
             entity.HasIndex(e => new { e.IsResolved, e.LastSeenAt });
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.ReplacedByTokenHash).HasMaxLength(64);
+            entity.Property(e => e.ExpiresAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.CreatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.RevokedAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.Property(e => e.LastUsedAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.FamilyId });
+            entity.HasIndex(e => e.ExpiresAt);
         });
 
         modelBuilder.Entity<SystemSettings>(entity =>

@@ -15,11 +15,12 @@ public class SignalRServiceTests
         var serverConfig = new Mock<IServerConfigService>();
         serverConfig.Setup(s => s.GetHubUrl()).Returns("http://localhost:0/hubs/share");
 
-        var tokenStorage = new Mock<ISecureTokenStorage>();
-        tokenStorage.Setup(t => t.GetTokenAsync()).ReturnsAsync((string?)null);
+        var refreshService = new Mock<ITokenRefreshService>();
+        refreshService.Setup(r => r.GetHubTokenAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
 
         var eventBus = new AppEventBus();
-        var manager = new HubConnectionManager(serverConfig.Object, tokenStorage.Object);
+        var manager = new HubConnectionManager(serverConfig.Object, refreshService.Object);
 
         return (new SignalRService(manager, eventBus), manager, eventBus);
     }
@@ -117,7 +118,7 @@ public class SignalRServiceTests
     }
 
     [Fact]
-    public async Task Closed_WithUnauthorizedError_RaisesAuthExpired()
+    public async Task Closed_WithUnauthorizedStatusCode_RaisesAuthExpired()
     {
         var (sut, manager, eventBus) = CreateSut();
         bool authExpiredRaised = false;
@@ -135,7 +136,10 @@ public class SignalRServiceTests
             var closedDelegate = (Func<Exception?, Task>?)closedField.GetValue(conn);
             if (closedDelegate is not null)
             {
-                var unauthorizedException = new Exception("Connection failed with 401 Unauthorized");
+                // S2-02：过期判断改用状态码——带 401 状态码的 HttpRequestException 才触发。
+                var unauthorizedException = new HttpRequestException(
+                    "Response status code does not indicate success: 401 (Unauthorized).",
+                    null, System.Net.HttpStatusCode.Unauthorized);
                 await closedDelegate.Invoke(unauthorizedException);
                 authExpiredRaised.Should().BeTrue();
             }
@@ -144,6 +148,31 @@ public class SignalRServiceTests
         {
             // 反射不可用时跳过（完整验证需集成测试）
             authExpiredRaised.Should().BeFalse(); // 当 handlers 未触发时为 false
+        }
+    }
+
+    [Fact]
+    public async Task Closed_WithPlainExceptionMentioning401_DoesNotRaiseAuthExpired()
+    {
+        var (sut, manager, eventBus) = CreateSut();
+        bool authExpiredRaised = false;
+        eventBus.AuthExpired += () => authExpiredRaised = true;
+
+        await RegisterHandlersAsync(sut);
+
+        var conn = manager.Connection;
+        var closedField = typeof(HubConnection)
+            .GetField("Closed", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        if (closedField is not null)
+        {
+            var closedDelegate = (Func<Exception?, Task>?)closedField.GetValue(conn);
+            if (closedDelegate is not null)
+            {
+                // 旧逻辑靠消息含 "401" 字符串猜过期；S2-02 起普通异常即使提到 401 也不触发。
+                await closedDelegate.Invoke(new Exception("Connection failed with 401 Unauthorized"));
+                authExpiredRaised.Should().BeFalse();
+            }
         }
     }
 

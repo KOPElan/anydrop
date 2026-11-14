@@ -78,6 +78,13 @@ public sealed class AuthService : IAuthService
             if (envelope?.Data is { } data)
             {
                 await _tokenStorage.SaveTokenAsync(data.AccessToken, data.ExpiresAt).ConfigureAwait(false);
+                // S2-01：服务端双发 Refresh Token；旧服务端不返回时保持只有 Access Token。
+                if (data.RefreshToken is not null && data.RefreshTokenExpiresAt.HasValue)
+                {
+                    await _tokenStorage.SaveRefreshTokenAsync(data.RefreshToken, data.RefreshTokenExpiresAt.Value)
+                        .ConfigureAwait(false);
+                }
+
                 return new AppAuthResult(true, null, data.AccessToken, data.ExpiresAt, data.User);
             }
 

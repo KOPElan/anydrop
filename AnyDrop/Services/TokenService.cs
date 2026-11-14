@@ -11,6 +11,34 @@ public sealed class TokenService(IOptions<AuthOptions> authOptions, TimeProvider
 {
     private readonly AuthOptions _authOptions = authOptions.Value;
 
+    public string GenerateRefreshToken() => RefreshToken.GenerateRawToken();
+
+    public (string AccessToken, DateTimeOffset ExpiresAt) GenerateHubToken(User user)
+    {
+        var now = timeProvider.GetUtcNow();
+        var expiresAt = now.AddMinutes(Math.Clamp(_authOptions.HubTokenExpiryMinutes, 1, 60));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_authOptions.JwtSecret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.Nickname),
+            new Claim("nickname", user.Nickname),
+            new Claim("sessionVersion", user.SessionVersion.ToString()),
+            new Claim("token_kind", "hub")
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _authOptions.JwtIssuer,
+            audience: _authOptions.JwtAudience,
+            claims: claims,
+            notBefore: now.UtcDateTime,
+            expires: expiresAt.UtcDateTime,
+            signingCredentials: credentials);
+
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
     public (string AccessToken, DateTimeOffset ExpiresAt) GenerateToken(User user)
     {
         var now = timeProvider.GetUtcNow();

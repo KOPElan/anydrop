@@ -23,8 +23,14 @@ public sealed record SetupRequest(string Nickname, string Password, string Confi
 /// <summary>登录请求。ReturnUrl 仅 Web 端使用，移动端可忽略。</summary>
 public sealed record LoginRequest(string Password, string? ReturnUrl = null);
 
-/// <summary>登录/初始化成功后的响应体（data 字段）。</summary>
-public sealed record LoginResponse(UserProfileDto User, string AccessToken, DateTimeOffset ExpiresAt);
+/// <summary>登录/初始化成功后的响应体（data 字段）。RefreshToken 为空表示服务端未签发（旧客户端兼容：仍可凭 AccessToken 使用）。</summary>
+public sealed record LoginResponse(UserProfileDto User, string AccessToken, DateTimeOffset ExpiresAt, string? RefreshToken = null, DateTimeOffset? RefreshTokenExpiresAt = null);
+
+/// <summary>刷新 Access Token 的请求。</summary>
+public sealed record RefreshTokenRequest(string RefreshToken);
+
+/// <summary>Hub 专用短 token 响应。</summary>
+public sealed record HubTokenResponse(string AccessToken, DateTimeOffset ExpiresAt);
 
 /// <summary>当前用户信息。</summary>
 public sealed record UserProfileDto(string Nickname, DateTimeOffset? LastLoginAt = null);

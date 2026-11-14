@@ -58,8 +58,13 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
         conn.Closed += ex =>
         {
             StateChanged?.Invoke(HubConnectionState.Disconnected);
-            if (ex?.Message?.Contains("401") == true || ex?.Message?.Contains("Unauthorized") == true)
+            // S2-02：过期判断改用状态码，不再靠异常消息里是否含「401」字符串猜。
+            if (ex is HttpRequestException httpEx
+                && httpEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
                 _eventBus.RaiseAuthExpired();
+            }
+
             return Task.CompletedTask;
         };
 

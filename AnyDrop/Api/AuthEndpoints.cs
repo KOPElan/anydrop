@@ -18,6 +18,8 @@ public static class AuthEndpoints
         group.MapGet("/setup-status", GetSetupStatusAsync).AllowAnonymous();
         group.MapPost("/setup", SetupAsync).AllowAnonymous();
         group.MapPost("/login", LoginAsync).AllowAnonymous();
+        group.MapPost("/refresh", RefreshAsync).AllowAnonymous();
+        group.MapGet("/hub-token", GetHubTokenAsync).RequireAuthorization();
 
         group.MapPost("/logout", LogoutAsync).RequireAuthorization();
         group.MapGet("/me", MeAsync).RequireAuthorization();
@@ -51,6 +53,65 @@ public static class AuthEndpoints
     {
         var result = await authService.LoginAsync(request, BuildRateLimitKey(httpContext, "login"), ct);
         return await BuildAuthResultAsync(httpContext, result);
+    }
+
+    /// <summary>
+    /// S2-01：用 Refresh Token 换新 Access Token（旋转：旧 refresh token 作废，
+    /// 返回新的 refresh token）。重放已撤销的 token 会吊销整族——响应与普通
+    /// 无效 token 无异，不向调用方透露是否触发了重放检测。
+    /// </summary>
+    public static async Task<IResult> RefreshAsync(
+        RefreshTokenRequest request,
+        IRefreshTokenService refreshTokenService,
+        CancellationToken ct)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            return Results.Json(
+                ApiEnvelope<LoginResponse>.Fail("刷新令牌无效。"),
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await refreshTokenService.RotateAsync(request.RefreshToken, ct);
+        if (!result.Succeeded || result.Payload is null)
+        {
+            return Results.Json(
+                ApiEnvelope<LoginResponse>.Fail(result.Error ?? "刷新令牌无效。"),
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        return Results.Ok(ApiEnvelope<LoginResponse>.Ok(result.Payload));
+    }
+
+    /// <summary>
+    /// S2-02：签发 Hub 专用短 token（默认 5 分钟）。MAUI 的 Hub 连接用它协商，
+    /// 不再把 24 小时长效 Access Token 交给 SignalR 传输层。
+    /// Web 端仍在服务端直接签发（ResolveHubAccessTokenAsync），不走本接口。
+    /// </summary>
+    public static async Task<IResult> GetHubTokenAsync(
+        HttpContext httpContext,
+        ITokenService tokenService,
+        IUserService userService,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return Results.Json(
+                ApiEnvelope<HubTokenResponse>.Fail("未授权。"),
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var user = await userService.GetByIdAsync(userId.Value, ct);
+        if (user is null)
+        {
+            return Results.Json(
+                ApiEnvelope<HubTokenResponse>.Fail("用户不存在。"),
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        var (token, expiresAt) = tokenService.GenerateHubToken(user);
+        return Results.Ok(ApiEnvelope<HubTokenResponse>.Ok(new HubTokenResponse(token, expiresAt)));
     }
 
     public static async Task<IResult> LogoutAsync(
