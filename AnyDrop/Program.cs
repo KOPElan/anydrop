@@ -82,6 +82,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 // 未配置时用当前计算机时区）。单例，构造时即记启动日志。
 builder.Services.AddSingleton<BackgroundTaskTimeZone>();
 builder.Services.AddScoped<IShareService, ShareService>();
+builder.Services.AddScoped<StorageHealthService>();
 builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<ITopicStateService, TopicStateService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -488,6 +489,7 @@ app.MapFileEndpoints();
 app.MapTopicEndpoints();
 app.MapAuthEndpoints();
 app.MapSettingsEndpoints();
+app.MapStorageEndpoints();
 app.MapHealthEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()

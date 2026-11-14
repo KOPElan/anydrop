@@ -33,6 +33,12 @@ public partial class Settings
     private int _pendingCleanupMonths;
     private bool _isCleaningUp;
 
+    // 存储健康（S1-01 缺失引用修复入口）
+    private const string DeleteMessageAction = "delete-message";
+    private const string DismissAction = "dismiss";
+    private List<MissingFileReportItem>? _missingFiles;
+    private bool _isResolvingMissingFile;
+
     /// <summary>返回首页。</summary>
     private void GoBack() => NavigationManager.NavigateTo("/");
 
@@ -93,6 +99,67 @@ public partial class Settings
         // 从 localStorage 读取主题设置
         try { _isDarkMode = await JSRuntime.InvokeAsync<bool>("AnyDropTheme.get"); }
         catch { _isDarkMode = false; }
+
+        await LoadMissingFilesAsync();
+    }
+
+    /// <summary>加载未解决的缺失引用记录。</summary>
+    private async Task LoadMissingFilesAsync()
+    {
+        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/storage/missing-files");
+        if (!result.ok || result.body?.data.ValueKind != JsonValueKind.Array)
+        {
+            _missingFiles = [];
+            return;
+        }
+
+        var list = new List<MissingFileReportItem>();
+        foreach (var element in result.body.data.EnumerateArray())
+        {
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            list.Add(new MissingFileReportItem(
+                element.TryGetProperty("id", out var id) && id.TryGetGuid(out var guid) ? guid : Guid.Empty,
+                element.TryGetProperty("shareItemId", out var itemId) && itemId.TryGetGuid(out var itemGuid) ? itemGuid : Guid.Empty,
+                element.TryGetProperty("storagePath", out var path) ? path.GetString() ?? string.Empty : string.Empty,
+                element.TryGetProperty("kind", out var kind) ? kind.GetString() ?? "content" : "content",
+                element.TryGetProperty("fileName", out var fileName) ? fileName.GetString() : null,
+                element.TryGetProperty("topicName", out var topicName) ? topicName.GetString() : null,
+                element.TryGetProperty("firstDetectedAt", out var first) && first.TryGetDateTimeOffset(out var firstDetected)
+                    ? firstDetected
+                    : DateTimeOffset.MinValue));
+        }
+
+        _missingFiles = list;
+    }
+
+    /// <summary>处理一条缺失引用记录：delete-message 删除对应消息，dismiss 标记已处理。</summary>
+    private async Task ResolveMissingFileAsync(Guid reportId, string action)
+    {
+        ResetMessages();
+        _isResolvingMissingFile = true;
+        try
+        {
+            var result = await JSRuntime.InvokeAsync<JsApiResult>(
+                "authInterop.postJson",
+                $"/api/v1/storage/missing-files/{reportId}/resolve",
+                new { action });
+            if (!result.ok)
+            {
+                _error = result.body?.error ?? L["Settings_StorageHealthFailed"];
+                return;
+            }
+
+            _message = L["Settings_StorageHealthResolved"];
+            await LoadMissingFilesAsync();
+        }
+        finally
+        {
+            _isResolvingMissingFile = false;
+        }
     }
 
     private async Task SaveNicknameAsync()
@@ -259,6 +326,16 @@ public partial class Settings
         public int status { get; set; }
         public JsApiEnvelope? body { get; set; }
     }
+
+    /// <summary>缺失引用记录（设置页存储健康区展示用）。</summary>
+    private sealed record MissingFileReportItem(
+        Guid Id,
+        Guid ShareItemId,
+        string StoragePath,
+        string Kind,
+        string? FileName,
+        string? TopicName,
+        DateTimeOffset FirstDetectedAt);
 
     private sealed class JsApiEnvelope
     {

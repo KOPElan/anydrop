@@ -39,7 +39,11 @@ public class OrphanFileReconcilerTests : IDisposable
             .Build();
 
         return new OrphanFileReconciler(
-            factory, configuration, TimeProvider.System, NullLogger<OrphanFileReconciler>.Instance);
+            factory,
+            configuration,
+            new LocalFileStorageService(configuration, TimeProvider.System),
+            TimeProvider.System,
+            NullLogger<OrphanFileReconciler>.Instance);
     }
 
     /// <summary>写入一个「足够旧」的文件，使其超出 24 小时宽限期。</summary>

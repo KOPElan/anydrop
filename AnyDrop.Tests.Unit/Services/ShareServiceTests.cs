@@ -324,10 +324,13 @@ public class ShareServiceTests
 
         await act.Should().ThrowAsync<ArgumentException>();
 
+        // 主题不存在时，连预占位行都不建、文件也不落盘
         fileStorageMock.Verify(
-            x => x.SaveFileAsync(
+            x => x.SaveFileAtPathAsync(
                 It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        await using var verifyDb = factory.CreateDbContext();
+        (await verifyDb.ShareItems.IgnoreQueryFilters().CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -427,8 +430,11 @@ public class ShareServiceTests
 
         var fileStorageServiceMock = new Mock<IFileStorageService>();
         fileStorageServiceMock
-            .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("saved/file.bin");
+            .Setup(x => x.GenerateStoragePath(It.IsAny<string>()))
+            .Returns("saved/file.bin");
+        fileStorageServiceMock
+            .Setup(x => x.SaveFileAtPathAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Stream _, string path, string _, CancellationToken _) => path);
 
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
@@ -484,8 +490,11 @@ public class ShareServiceTests
 
         fileStorageServiceMock = new Mock<IFileStorageService>();
         fileStorageServiceMock
-            .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("saved/file.bin");
+            .Setup(x => x.GenerateStoragePath(It.IsAny<string>()))
+            .Returns("saved/file.bin");
+        fileStorageServiceMock
+            .Setup(x => x.SaveFileAtPathAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Stream _, string path, string _, CancellationToken _) => path);
 
         // LinkMetadataService: 使用真实实例，但 HttpClientFactory 不会发起外部请求
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();

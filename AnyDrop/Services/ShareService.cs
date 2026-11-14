@@ -156,9 +156,13 @@ public sealed class ShareService(
 
         var contentType = ResolveContentType(mimeType);
 
-        // 先校验主题、再落盘文件。
-        // 反过来（先落盘）时，主题不存在会抛出 ArgumentException，端点转换成 400 返回，
-        // 但磁盘上的文件已经写入且永远不会被任何 ShareItem 引用，成为永久孤儿。
+        // S1-01（DAT-02）：上传改为「先建预占位行，再落盘，落盘后转正」。
+        // 旧流程是先落盘再插行：两者之间的窗口里进程被杀，磁盘上留下一个
+        // 没有任何数据库行引用的孤儿文件，且没有任何记录能定位它。
+        // 新流程把窗口反过来：先插 Uploading 预占位行（最终路径已定），
+        // 再落盘，最后转正为 Ready。任何一步崩溃都只留下一行 Uploading 记录，
+        // 对账任务按 24 小时宽限期清理（删行删文件），磁盘上不再有无主文件。
+        // 主题校验仍在插行之前：主题不存在时直接 400，不留预占位。
         Topic? topic = null;
         if (topicId.HasValue)
         {
@@ -169,7 +173,7 @@ public sealed class ShareService(
             }
         }
 
-        var storagePath = await fileStorageService.SaveFileAsync(fileStream, fileName, mimeType, ct);
+        var storagePath = fileStorageService.GenerateStoragePath(fileName);
 
         // 优先使用调用方传入的已知大小，其次尝试从流读取（仅当流支持 Seek）
         var fileSize = knownFileSize ?? (fileStream.CanSeek ? fileStream.Length : null);
@@ -185,27 +189,37 @@ public sealed class ShareService(
             MimeType = mimeType,
             CreatedAt = now,
             ExpiresAt = burnAfterReading ? now.AddMinutes(burnMinutes) : null,
-            TopicId = topicId
+            TopicId = topicId,
+            UploadState = UploadState.Uploading
         };
 
+        dbContext.ShareItems.Add(item);
+        await dbContext.SaveChangesWithRetryAsync(ct);
+
+        // 落盘。失败时删掉预占位行（已提交的行，不能靠事务回滚），
+        // .part 半截文件由存储层自行清理；删行失败也不掩盖原异常，
+        // 24 小时后对账的超期预占位清扫会兜底。
+        try
+        {
+            await fileStorageService.SaveFileAtPathAsync(fileStream, storagePath, mimeType, ct);
+        }
+        catch
+        {
+            await DeletePlaceholderAsync(item.Id, ct);
+            throw;
+        }
+
+        // 转正：行变 Ready 才可见（全局查询过滤），同时更新主题预览。
+        // 预占位阶段不碰主题：上传失败或崩溃时，主题列表不应出现一条
+        // 实际不存在的消息预览。
+        item.UploadState = UploadState.Ready;
         if (topic is not null)
         {
             topic.LastMessageAt = now;
             topic.LastMessagePreview = BuildPreview(fileName);
         }
 
-        dbContext.ShareItems.Add(item);
-        try
-        {
-            await dbContext.SaveChangesWithRetryAsync(ct);
-        }
-        catch
-        {
-            // 数据库写入失败时回收已落盘的文件，否则磁盘上会留下无人引用的孤儿文件
-            await ShareItemFileCleanup.TryDeleteAsync(
-                fileStorageService, logger, storagePath, item.Id, ct, "file upload rollback");
-            throw;
-        }
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         var shouldGenerateThumbnailInBackground = false;
         if (contentType is ShareContentType.Image or ShareContentType.Video)
@@ -232,6 +246,33 @@ public sealed class ShareService(
         }
 
         return dto;
+    }
+
+    /// <summary>
+    /// 删除落盘失败后残留的预占位行。单独的短寿命上下文、单独提交——
+    /// 调用时原行已提交，不可随原操作回滚。失败只记警告：
+    /// 对账的超期预占位清扫会在 24 小时后兜底清理。
+    /// </summary>
+    private async Task DeletePlaceholderAsync(Guid itemId, CancellationToken ct)
+    {
+        try
+        {
+            await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+            var placeholder = await db.ShareItems
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == itemId, ct);
+            if (placeholder is null)
+            {
+                return;
+            }
+
+            db.ShareItems.Remove(placeholder);
+            await db.SaveChangesWithRetryAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "删除上传失败的预占位行失败，等待对账清扫：{ItemId}", itemId);
+        }
     }
 
     private async Task GenerateThumbnailInBackgroundAsync(Guid itemId)

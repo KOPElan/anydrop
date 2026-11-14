@@ -17,6 +17,52 @@ namespace AnyDrop.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
 
+            modelBuilder.Entity("AnyDrop.Models.MissingFileReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FirstDetectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResolvedBy")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ShareItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsResolved", "LastSeenAt");
+
+                    b.HasIndex("ShareItemId", "StoragePath", "Kind")
+                        .IsUnique()
+                        .HasFilter("IsResolved = 0");
+
+                    b.ToTable("MissingFileReports");
+                });
+
             modelBuilder.Entity("AnyDrop.Models.PendingFileDeletion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -95,6 +141,11 @@ namespace AnyDrop.Migrations
 
                     b.Property<Guid?>("TopicId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UploadState")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1);
 
                     b.HasKey("Id");
 

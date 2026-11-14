@@ -34,7 +34,7 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         return new AnyDropDbContext(options);
     }
 
-    private static async Task<bool> ColumnExistsAsync(AnyDropDbContext db, string columnName)
+    private static async Task<bool> ColumnExistsAsync(AnyDropDbContext db, string columnName, string tableName = "SystemSettings")
     {
         var connection = (SqliteConnection)db.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open)
@@ -43,7 +43,7 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         }
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info(SystemSettings);";
+        command.CommandText = $"PRAGMA table_info({tableName});";
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -109,8 +109,9 @@ public class DatabaseMigrationExtensionsTests : IDisposable
     }
 
     /// <summary>
-    /// 模拟旧库：历史改写为最后一版旧迁移、删掉补丁列（模拟从未跑过补丁的旧库），
-    /// 升级门应校验通过、补齐列、把基线记入历史；随后 MigrateAsync 不再做任何事。
+    /// 模拟旧库：历史改写为最后一版旧迁移、删掉新迁移带来的结构（UploadState 列、
+    /// MissingFileReports 表）与补丁列（模拟从未跑过补丁的旧库），
+    /// 升级门应校验通过、补齐列、把基线记入历史；随后 MigrateAsync 应用新迁移。
     /// </summary>
     [Fact]
     public async Task Gate_OldHeadDb_MarksBaselineAndBackfillsColumn()
@@ -118,6 +119,8 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         await using var db = CreateContext();
         await db.Database.MigrateAsync();
         await RewriteHistoryAsync(db, DatabaseMigrationExtensions.LastPreBaselineMigrationId);
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE ShareItems DROP COLUMN UploadState;");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE MissingFileReports;");
         await db.Database.ExecuteSqlRawAsync(
             $"ALTER TABLE SystemSettings DROP COLUMN {ColumnName};");
         (await ColumnExistsAsync(db, ColumnName)).Should().BeFalse("前置条件：模拟旧库缺补丁列");
@@ -129,8 +132,11 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         (await ColumnExistsAsync(db, ColumnName)).Should().BeTrue("升级门应补齐补丁列");
         (await ReadHistoryAsync(db)).Should().Contain(DatabaseMigrationExtensions.BaselineMigrationId);
 
-        // 随后 MigrateAsync 必须是 no-op，不能因表已存在而失败
+        // 随后 MigrateAsync 应用基线之后的新迁移（UploadState 列 + 修复记录表），
+        // 不能因表已存在而失败
         await db.Database.MigrateAsync();
+        (await ColumnExistsAsync(db, "UploadState", "ShareItems")).Should().BeTrue("新迁移应补上 UploadState 列");
+        (await TableExistsAsync(db, "MissingFileReports")).Should().BeTrue("新迁移应创建修复记录表");
         (await db.SystemSettings.CountAsync()).Should().Be(1);
     }
 

@@ -143,3 +143,20 @@ public sealed record ShareItemDto(
 
 /// <summary>发送文本消息请求。BurnAfterReading=true 时按系统配置时长自动过期。</summary>
 public sealed record CreateTextShareItemRequest(string Content, Guid? TopicId = null, bool BurnAfterReading = false);
+
+// ── 存储健康 DTO（S1-01，DAT-02）──────────────────────────────────────────────
+
+/// <summary>缺失引用修复记录（未解决）。FileName 为对应消息的文件名（文本消息为 null）。</summary>
+public sealed record MissingFileReportDto(
+    Guid Id,
+    Guid ShareItemId,
+    string StoragePath,
+    string Kind,
+    string? FileName,
+    string? TopicName,
+    DateTimeOffset FirstDetectedAt,
+    DateTimeOffset LastSeenAt
+);
+
+/// <summary>处理缺失引用记录的请求。Action：delete-message（删除对应消息）或 dismiss（标记已处理）。</summary>
+public sealed record ResolveMissingFileRequest(string Action);

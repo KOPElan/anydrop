@@ -251,6 +251,17 @@
 
   <!-- 缩略图设置 / Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>缩略图与预览图</value></data>
+  <data name="Settings_StorageHealth"><value>存储健康</value></data>
+  <data name="Settings_StorageHealthHint"><value>数据库引用但磁盘上不存在的文件。对账发现后会记在这里，不会自动删除数据库行；文件恢复后自动标记已解决。</value></data>
+  <data name="Settings_StorageHealthLoading"><value>正在加载…</value></data>
+  <data name="Settings_StorageHealthNone"><value>未发现缺失引用。</value></data>
+  <data name="Settings_StorageHealthFile"><value>文件</value></data>
+  <data name="Settings_StorageHealthThumbnail"><value>缩略图</value></data>
+  <data name="Settings_StorageHealthDetected"><value>首次发现</value></data>
+  <data name="Settings_StorageHealthDeleteMessage"><value>删除消息</value></data>
+  <data name="Settings_StorageHealthDismiss"><value>标记已处理</value></data>
+  <data name="Settings_StorageHealthResolved"><value>已处理。</value></data>
+  <data name="Settings_StorageHealthFailed"><value>处理失败。</value></data>
   <data name="Settings_ThumbnailHour"><value>每日自动生成时间（0–23 时）</value></data>
   <data name="Settings_ThumbnailHourHint"><value>服务端将在每天指定时间对未处理的图片/视频生成预览图</value></data>
   <data name="Settings_ThumbnailScheduleEnabled"><value>启用计划任务批量生成</value></data>

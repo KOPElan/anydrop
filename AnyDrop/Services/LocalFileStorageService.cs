@@ -20,14 +20,20 @@ public sealed class LocalFileStorageService(
             System.Text.RegularExpressions.RegexOptions.Compiled,
             TimeSpan.FromMilliseconds(200));
 
-    public async Task<string> SaveFileAsync(Stream content, string fileName, string mimeType, CancellationToken ct = default)
+    public string GenerateStoragePath(string fileName)
     {
         var extension = GetSafeExtension(fileName);
         var safeName = $"{timeProvider.GetUtcNow():yyyyMMdd}/{Guid.NewGuid():N}{extension}";
+        return safeName.Replace('\\', '/');
+    }
+
+    public async Task<string> SaveFileAsync(Stream content, string fileName, string mimeType, CancellationToken ct = default)
+    {
+        var safeName = GenerateStoragePath(fileName);
 
         await WriteAtomicallyAsync(safeName, content, ct);
 
-        return safeName.Replace('\\', '/');
+        return safeName;
     }
 
     public async Task<string> SaveFileAtPathAsync(Stream content, string storagePath, string mimeType, CancellationToken ct = default)

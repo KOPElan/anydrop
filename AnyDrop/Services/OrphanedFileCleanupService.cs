@@ -77,7 +77,9 @@ public sealed class OrphanedFileCleanupService(
 
         var result = await reconciler.ReconcileAsync(deleteOrphans, ct);
 
-        if (result.OrphansFound == 0 && result.MissingReferencedFiles == 0)
+        if (result.OrphansFound == 0 && result.MissingReferencedFiles == 0
+            && result.StalePlaceholdersRemoved == 0 && result.SweepRowsRemoved == 0
+            && result.QueueEntriesDrained == 0 && result.QueueEntriesFailed == 0)
         {
             logger.LogDebug("孤儿文件对账完成：扫描 {Scanned} 个文件，未发现异常。", result.FilesScanned);
             return result;
@@ -85,12 +87,20 @@ public sealed class OrphanedFileCleanupService(
 
         logger.LogInformation(
             "孤儿文件对账完成：扫描 {Scanned} 个文件；孤儿 {Orphans} 个（{Bytes} 字节），已删除 {Deleted} 个；"
-            + "数据库引用了 {Missing} 个不存在的文件。模式：{Mode}。样本：{Samples}",
+            + "数据库引用了 {Missing} 个不存在的文件（未解决修复记录 {OpenReports} 个）；"
+            + "超期预占位清理 {Placeholders} 行；延迟删除清扫 {SweepRows} 行 / {SweepFiles} 个文件；"
+            + "待删队列消费 {QueueDrained} 条、失败 {QueueFailed} 条。模式：{Mode}。样本：{Samples}",
             result.FilesScanned,
             result.OrphansFound,
             result.OrphanBytes,
             result.OrphansDeleted,
             result.MissingReferencedFiles,
+            result.MissingReportsOpen,
+            result.StalePlaceholdersRemoved,
+            result.SweepRowsRemoved,
+            result.SweepFilesDeleted,
+            result.QueueEntriesDrained,
+            result.QueueEntriesFailed,
             deleteOrphans ? "删除" : "仅报告（Storage:OrphanCleanupEnabled=false）",
             result.SampleOrphans.Count == 0 ? "-" : string.Join(", ", result.SampleOrphans));
 

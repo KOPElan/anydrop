@@ -121,7 +121,11 @@ public class BackgroundTaskTimeZoneTests
                 }
 
                 return new OrphanFileReconciler(
-                    factory, config, clock, NullLogger<OrphanFileReconciler>.Instance);
+                    factory,
+                    config,
+                    new LocalFileStorageService(config, clock),
+                    clock,
+                    NullLogger<OrphanFileReconciler>.Instance);
             });
             var provider = services.BuildServiceProvider();
 

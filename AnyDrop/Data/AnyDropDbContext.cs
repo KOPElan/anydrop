@@ -10,6 +10,7 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
     public DbSet<User> Users => Set<User>();
     public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
     public DbSet<PendingFileDeletion> PendingFileDeletions => Set<PendingFileDeletion>();
+    public DbSet<MissingFileReport> MissingFileReports => Set<MissingFileReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,7 +65,9 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                     value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
             // S0-05（D5）：已标记延迟删除的消息对所有常规读路径不可见。
             // Stage 1 的清扫任务用 IgnoreQueryFilters() 才能看到它们。
-            entity.HasQueryFilter(e => e.DeleteAfter == null);
+            // S1-01：上传中的预占位行同样不可见——文件还没落盘确认，不能出现在列表里。
+            entity.Property(e => e.UploadState).HasConversion<int>().HasDefaultValue(UploadState.Ready);
+            entity.HasQueryFilter(e => e.DeleteAfter == null && e.UploadState == UploadState.Ready);
             entity.HasIndex(e => e.CreatedAt);
             entity.HasIndex(e => e.ExpiresAt);
             entity.HasIndex(e => e.DeleteAfter);
@@ -110,6 +113,31 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                     value => value.UtcDateTime,
                     value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        modelBuilder.Entity<MissingFileReport>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StoragePath).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Kind).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.ResolvedBy).HasMaxLength(20);
+            entity.Property(e => e.FirstDetectedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.LastSeenAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.ResolvedAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            // 同一消息同一路径同一时刻最多一条未解决记录；文件再次丢失可建新记录。
+            entity.HasIndex(e => new { e.ShareItemId, e.StoragePath, e.Kind })
+                .IsUnique()
+                .HasFilter("IsResolved = 0");
+            entity.HasIndex(e => new { e.IsResolved, e.LastSeenAt });
         });
 
         modelBuilder.Entity<SystemSettings>(entity =>
