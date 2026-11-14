@@ -1,5 +1,17 @@
 # Tasks: AnyDrop 移动端 App（MAUI Blazor Hybrid）
 
+## 冻结核查（S3-05，2026-11-15）
+
+本次按当前代码逐项核对：**76 项已完成、15 项以演变形式完成、4 项部分完成、
+2 项未完成**（T092、T095）。清单自此冻结为历史记录，不再作为跟踪方法；
+今后跟踪用审计 ID + 修复任务 ID（S0–S3）。冻结常量与跟踪方法见
+`docs/spec-freeze.md`。每项行尾的 `S3-05` 注释为本次核查结论
+（done = 按规格完成；evolved = 功能已实现但形式与规格不同；
+partial = 部分完成；not-done = 未完成）。
+核对时发现的两个真缺口（T076 SEND_MULTIPLE 缺失、T092 全局错误处理缺失）
+见 `docs/spec-freeze.md`，留给下一轮。
+
+
 **Input**: Design documents from `/specs/006-maui-mobile-app/`
 **Prerequisites**: plan.md ✅ spec.md ✅ data-model.md ✅ contracts/api-endpoints.md ✅ contracts/signalr-events.md ✅ research.md ✅ quickstart.md ✅
 
@@ -25,14 +37,14 @@
 
 **Purpose**: 搭建 MAUI Blazor Hybrid 工程骨架、依赖包、平台配置与 wwwroot 入口，所有后续工作的前提。
 
-- [ ] T001 配置 `AnyDrop.App/AnyDrop.App.csproj`：设置 `<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>`，引入 NuGet 包（`Microsoft.AspNetCore.Components.WebView.Maui`、`Microsoft.AspNetCore.SignalR.Client`、`Microsoft.Extensions.Http`、`Plugin.LocalNotification 10.1.x`），确认 `UseMauiApp<App>` 与 `BlazorWebView` 已启用
-- [ ] T002 创建 `AnyDrop.App/wwwroot/index.html`：BlazorWebView HTML shell，引入 Tailwind CSS Play CDN（`darkMode: 'class'`），添加 `<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">`，注入 `ThemeManager` JS 对象（`setTheme(mode)` 切换 `<html>` 上的 `dark` class），设置安全区域 meta
-- [ ] T003 [P] 创建 `AnyDrop.App/wwwroot/app.css`：自定义 CSS 层，包含 `env(safe-area-inset-*)` 安全区域 padding、iOS/Android 底部导航条高度补偿、移动端触控滚动优化（`-webkit-overflow-scrolling: touch`）、`touch-action: pinch-zoom` 全屏预览基础样式
-- [ ] T004 [P] 配置 `AnyDrop.App/Platforms/Android/AndroidManifest.xml`：添加 `android:usesCleartextTraffic="true"`（HTTP 局域网访问）、`android.permission.INTERNET`、`android.permission.POST_NOTIFICATIONS`（API 33+）权限声明骨架（Intent Filter 在 Phase 8 US6 补充完整）
-- [ ] T005 [P] 配置 `AnyDrop.App/Platforms/iOS/Info.plist`：添加 `NSPhotoLibraryUsageDescription`、`NSCameraUsageDescription`、`NSMicrophoneUsageDescription` 使用描述字符串骨架（UTTypes / CFBundleDocumentTypes 在 Phase 8 US6 补充完整）
-- [ ] T006 配置 `AnyDrop.Tests.Unit/` 测试项目：确认 `AnyDrop.Tests.Unit.csproj` 引用 `xUnit`、`FluentAssertions`、`Moq`，并添加对 `AnyDrop.App` 项目的 `ProjectReference`
-- [ ] T007 [P] 将 `AnyDrop.App` 与 `AnyDrop.Tests.Unit` 加入 `AnyDrop.slnx` 解决方案，执行 `dotnet restore AnyDrop.App/AnyDrop.App.csproj` 验证依赖可还原，执行 `dotnet build AnyDrop.App -f net10.0-android -c Debug` 确认骨架可编译
-- [ ] T008 初始化 `AnyDrop.App/MauiProgram.cs`：创建 `CreateMauiApp()` 骨架，调用 `UseMauiApp<App>()`、`ConfigureFonts()`、`AddMauiBlazorWebView()`，预留服务注册注释区块（Foundational 和各 Phase 分批填入）
+- [x] T001 配置 `AnyDrop.App/AnyDrop.App.csproj`：设置 `<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>`，引入 NuGet 包（`Microsoft.AspNetCore.Components.WebView.Maui`、`Microsoft.AspNetCore.SignalR.Client`、`Microsoft.Extensions.Http`、`Plugin.LocalNotification 10.1.x`），确认 `UseMauiApp<App>` 与 `BlazorWebView` 已启用 <!-- S3-05 [done]: TFM 为 android + 条件 ios/maccatalyst/windows（超集）；包与 UseMauiApp/BlazorWebView 均已配置 -->
+- [x] T002 创建 `AnyDrop.App/wwwroot/index.html`：BlazorWebView HTML shell，引入 Tailwind CSS Play CDN（`darkMode: 'class'`），添加 `<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">`，注入 `ThemeManager` JS 对象（`setTheme(mode)` 切换 `<html>` 上的 `dark` class），设置安全区域 meta <!-- S3-05 [done]: 本地 tailwind.css（非 CDN）+ viewport + ThemeManager；drift：无 user-scalable=yes -->
+- [x] T003 [P] 创建 `AnyDrop.App/wwwroot/app.css`：自定义 CSS 层，包含 `env(safe-area-inset-*)` 安全区域 padding、iOS/Android 底部导航条高度补偿、移动端触控滚动优化（`-webkit-overflow-scrolling: touch`）、`touch-action: pinch-zoom` 全屏预览基础样式 <!-- S3-05 [done]: app.css 含 safe-area/overscroll/touch-action -->
+- [x] T004 [P] 配置 `AnyDrop.App/Platforms/Android/AndroidManifest.xml`：添加 `android:usesCleartextTraffic="true"`（HTTP 局域网访问）、`android.permission.INTERNET`、`android.permission.POST_NOTIFICATIONS`（API 33+）权限声明骨架（Intent Filter 在 Phase 8 US6 补充完整） <!-- S3-05 [done]: usesCleartextTraffic + INTERNET + POST_NOTIFICATIONS 齐全 -->
+- [x] T005 [P] 配置 `AnyDrop.App/Platforms/iOS/Info.plist`：添加 `NSPhotoLibraryUsageDescription`、`NSCameraUsageDescription`、`NSMicrophoneUsageDescription` 使用描述字符串骨架（UTTypes / CFBundleDocumentTypes 在 Phase 8 US6 补充完整） <!-- S3-05 [done]: 三项使用描述齐全；CFBundleDocumentTypes 见 T077 -->
+- [x] T006 配置 `AnyDrop.Tests.Unit/` 测试项目：确认 `AnyDrop.Tests.Unit.csproj` 引用 `xUnit`、`FluentAssertions`、`Moq`，并添加对 `AnyDrop.App` 项目的 `ProjectReference` <!-- S3-05 [evolved]: 测试项目引用 App.Core 而非 App（App 壳不可单元测试；可测逻辑移入 Core） -->
+- [x] T007 [P] 将 `AnyDrop.App` 与 `AnyDrop.Tests.Unit` 加入 `AnyDrop.slnx` 解决方案，执行 `dotnet restore AnyDrop.App/AnyDrop.App.csproj` 验证依赖可还原，执行 `dotnet build AnyDrop.App -f net10.0-android -c Debug` 确认骨架可编译 <!-- S3-05 [done]: slnx 含 App/App.Core/Tests.Unit；Android 构建仅 CI 可验 -->
+- [x] T008 初始化 `AnyDrop.App/MauiProgram.cs`：创建 `CreateMauiApp()` 骨架，调用 `UseMauiApp<App>()`、`ConfigureFonts()`、`AddMauiBlazorWebView()`，预留服务注册注释区块（Foundational 和各 Phase 分批填入） <!-- S3-05 [done]: MauiProgram 骨架齐全 -->
 
 ---
 
@@ -44,38 +56,38 @@
 
 ### 数据模型（Models/）
 
-- [ ] T009 创建 `AnyDrop.App/Models/AuthModels.cs`：定义 `SetupStatusDto`、`SetupRequest`、`LoginRequest`、`LoginResponse`、`UserProfileDto`（均为 `sealed record`，命名空间 `AnyDrop.App.Models`）
-- [ ] T010 [P] 创建 `AnyDrop.App/Models/TopicModels.cs`：定义 `TopicDto`、`CreateTopicRequest`、`UpdateTopicRequest`、`UpdateTopicIconRequest`、`PinTopicRequest`、`ArchiveTopicRequest`、`ReorderTopicsRequest`、`TopicOrderItem`、`TopicMessagesResponse`（含 `HasMore`、`NextCursor`）
-- [ ] T011 [P] 创建 `AnyDrop.App/Models/ShareItemModels.cs`：定义 `ShareContentType` 枚举（Text=0, File=1, Image=2, Video=3, Link=4）、`ShareItemDto`（含 `LinkTitle`、`LinkDescription`、`ExpiresAt`）、`CreateTextShareItemRequest`、`ActiveDatesResponse`
-- [ ] T012 [P] 创建 `AnyDrop.App/Models/SettingsModels.cs`：定义 `SecuritySettingsDto`、`UpdateSecuritySettingsRequest`、`UpdateNicknameRequest`、`UpdatePasswordRequest`
-- [ ] T013 [P] 创建 `AnyDrop.App/Models/ApiResponse.cs`：定义泛型 `ApiResponse<T>(bool Success, T? Data, string? Error)` 用于统一解析服务端 `{ success, data, error }` envelope；添加 `SharedContent(string? Text, IReadOnlyList<string> FilePaths, string? MimeType)` 跨平台分享数据记录
+- [x] T009 创建 `AnyDrop.App/Models/AuthModels.cs`：定义 `SetupStatusDto`、`SetupRequest`、`LoginRequest`、`LoginResponse`、`UserProfileDto`（均为 `sealed record`，命名空间 `AnyDrop.App.Models`） <!-- S3-05 [done]: 模型在 AnyDrop.App.Core/Models/（非 AnyDrop.App/Models/） -->
+- [x] T010 [P] 创建 `AnyDrop.App/Models/TopicModels.cs`：定义 `TopicDto`、`CreateTopicRequest`、`UpdateTopicRequest`、`UpdateTopicIconRequest`、`PinTopicRequest`、`ArchiveTopicRequest`、`ReorderTopicsRequest`、`TopicOrderItem`、`TopicMessagesResponse`（含 `HasMore`、`NextCursor`） <!-- S3-05 [done]: 模型在 AnyDrop.App.Core/Models/ -->
+- [x] T011 [P] 创建 `AnyDrop.App/Models/ShareItemModels.cs`：定义 `ShareContentType` 枚举（Text=0, File=1, Image=2, Video=3, Link=4）、`ShareItemDto`（含 `LinkTitle`、`LinkDescription`、`ExpiresAt`）、`CreateTextShareItemRequest`、`ActiveDatesResponse` <!-- S3-05 [done]: 模型在 AnyDrop.App.Core/Models/ -->
+- [x] T012 [P] 创建 `AnyDrop.App/Models/SettingsModels.cs`：定义 `SecuritySettingsDto`、`UpdateSecuritySettingsRequest`、`UpdateNicknameRequest`、`UpdatePasswordRequest` <!-- S3-05 [done]: 模型在 AnyDrop.App.Core/Models/ -->
+- [x] T013 [P] 创建 `AnyDrop.App/Models/ApiResponse.cs`：定义泛型 `ApiResponse<T>(bool Success, T? Data, string? Error)` 用于统一解析服务端 `{ success, data, error }` envelope；添加 `SharedContent(string? Text, IReadOnlyList<string> FilePaths, string? MimeType)` 跨平台分享数据记录 <!-- S3-05 [evolved]: ApiResponse<T> → ApiEnvelope<T>，位于 AnyDrop.Shared/SharedDtos.cs -->
 
 ### 基础设施（Infrastructure/）
 
-- [ ] T014 创建 `AnyDrop.App/Infrastructure/AppEventBus.cs`：Singleton 事件总线，暴露 `event Action? AuthExpired`、`event Action<bool>? ConnectivityChanged`，提供 `RaiseAuthExpired()` 和 `RaiseConnectivityChanged(bool isOnline)` 方法
-- [ ] T015 [P] 创建 `AnyDrop.App/Services/ISecureTokenStorage.cs` + `SecureTokenStorage.cs`：接口含 `SaveTokenAsync(string token, DateTimeOffset expiresAt)`、`GetTokenAsync()` (null if expired/absent, 提前 30s 判定过期)、`IsAuthenticatedAsync()`、`ClearTokenAsync()`；实现用 `SecureStorage` (Android Keystore / iOS Keychain)，读写加 `SemaphoreSlim(1,1)` 保护，iOS Keychain 异常 try-catch fallback
-- [ ] T016 [P] 创建 `AnyDrop.App/Services/IServerConfigService.cs` + `ServerConfigService.cs`：`GetBaseUrl()`、`SetBaseUrlAsync(string url)`、`HasBaseUrl()`、`GetHubUrl()` (拼接 `/hubs/share`)，底层存 `Preferences["anydrop_base_url"]`，`GetBaseUrl()` 确保结尾无多余斜杠
-- [ ] T017 [P] 创建 `AnyDrop.App/Services/IConnectivityService.cs` + `ConnectivityService.cs`：`bool IsOnline { get; }`，订阅 `Connectivity.ConnectivityChanged`，变更时触发 `AppEventBus.RaiseConnectivityChanged()`；Singleton 生命周期
-- [ ] T018 创建 `AnyDrop.App/Infrastructure/AuthDelegatingHandler.cs`：Transient DelegatingHandler；`SendAsync` 中从 `ISecureTokenStorage.GetTokenAsync()` 获取 Token 注入 `Authorization: Bearer` 头；响应 401 时调用 `ISecureTokenStorage.ClearTokenAsync()` + `AppEventBus.RaiseAuthExpired()`，返回原始 response 不抛异常（让调用方感知 401 而不崩溃）
-- [ ] T019 创建 `AnyDrop.App/Infrastructure/HubConnectionManager.cs`：Singleton；构造时用 `HubConnectionBuilder` 配置 Hub URL（来自 `IServerConfigService.GetHubUrl()`）、`AccessTokenProvider`（`ISecureTokenStorage.GetTokenAsync`）、`WithAutomaticReconnect(ExponentialBackoffRetryPolicy)`（0ms→2s→10s→30s cap）；实现 `IAsyncDisposable`；提供 `HubConnection Connection { get; }` 属性；BaseUrl 变更后需调用 `DisposeAsync()` + 重建（由 `ISignalRService` 处理）
+- [x] T014 创建 `AnyDrop.App/Infrastructure/AppEventBus.cs`：Singleton 事件总线，暴露 `event Action? AuthExpired`、`event Action<bool>? ConnectivityChanged`，提供 `RaiseAuthExpired()` 和 `RaiseConnectivityChanged(bool isOnline)` 方法 <!-- S3-05 [done]: AppEventBus 在 Core/Infrastructure/ -->
+- [x] T015 [P] 创建 `AnyDrop.App/Services/ISecureTokenStorage.cs` + `SecureTokenStorage.cs`：接口含 `SaveTokenAsync(string token, DateTimeOffset expiresAt)`、`GetTokenAsync()` (null if expired/absent, 提前 30s 判定过期)、`IsAuthenticatedAsync()`、`ClearTokenAsync()`；实现用 `SecureStorage` (Android Keystore / iOS Keychain)，读写加 `SemaphoreSlim(1,1)` 保护，iOS Keychain 异常 try-catch fallback <!-- S3-05 [evolved]: refresh-token 链（S2-01），签名与规格不同 -->
+- [x] T016 [P] 创建 `AnyDrop.App/Services/IServerConfigService.cs` + `ServerConfigService.cs`：`GetBaseUrl()`、`SetBaseUrlAsync(string url)`、`HasBaseUrl()`、`GetHubUrl()` (拼接 `/hubs/share`)，底层存 `Preferences["anydrop_base_url"]`，`GetBaseUrl()` 确保结尾无多余斜杠 <!-- S3-05 [done]: ServerConfigService 在 Core；ValidateUrlAsync 见 T032 -->
+- [x] T017 [P] 创建 `AnyDrop.App/Services/IConnectivityService.cs` + `ConnectivityService.cs`：`bool IsOnline { get; }`，订阅 `Connectivity.ConnectivityChanged`，变更时触发 `AppEventBus.RaiseConnectivityChanged()`；Singleton 生命周期 <!-- S3-05 [done]: 实现在 AnyDrop.App/Services/（壳内平台代码） -->
+- [x] T018 创建 `AnyDrop.App/Infrastructure/AuthDelegatingHandler.cs`：Transient DelegatingHandler；`SendAsync` 中从 `ISecureTokenStorage.GetTokenAsync()` 获取 Token 注入 `Authorization: Bearer` 头；响应 401 时调用 `ISecureTokenStorage.ClearTokenAsync()` + `AppEventBus.RaiseAuthExpired()`，返回原始 response 不抛异常（让调用方感知 401 而不崩溃） <!-- S3-05 [done]: AuthDelegatingHandler 在 Core/ -->
+- [x] T019 创建 `AnyDrop.App/Infrastructure/HubConnectionManager.cs`：Singleton；构造时用 `HubConnectionBuilder` 配置 Hub URL（来自 `IServerConfigService.GetHubUrl()`）、`AccessTokenProvider`（`ISecureTokenStorage.GetTokenAsync`）、`WithAutomaticReconnect(ExponentialBackoffRetryPolicy)`（0ms→2s→10s→30s cap）；实现 `IAsyncDisposable`；提供 `HubConnection Connection { get; }` 属性；BaseUrl 变更后需调用 `DisposeAsync()` + 重建（由 `ISignalRService` 处理） <!-- S3-05 [evolved]: WithAutomaticReconnect 仍在，Closed 后另有手动重连（S2-04） -->
 
 ### MauiProgram.cs 服务注册
 
-- [ ] T020 完善 `AnyDrop.App/MauiProgram.cs`：注册全部基础设施服务：`AppEventBus` (Singleton)、`ISecureTokenStorage` (Singleton)、`IServerConfigService` (Singleton)、`IConnectivityService` (Singleton)；配置命名 HttpClient `"api"`（BaseAddress 动态从 `IServerConfigService.GetBaseUrl()` 取，Timeout 30s），挂载 `AuthDelegatingHandler` (Transient)；注册 `HubConnectionManager` (Singleton)；调用 `builder.UseLocalNotification()`
-- [ ] T021 [P] 注册 Blazor/Scoped 服务占位到 `AnyDrop.App/MauiProgram.cs`：`IAppStateService` (Scoped) 占位注释，各业务 Service 在对应 Phase 内按故事分批补入（避免因缺少实现类导致编译失败）
+- [x] T020 完善 `AnyDrop.App/MauiProgram.cs`：注册全部基础设施服务：`AppEventBus` (Singleton)、`ISecureTokenStorage` (Singleton)、`IServerConfigService` (Singleton)、`IConnectivityService` (Singleton)；配置命名 HttpClient `"api"`（BaseAddress 动态从 `IServerConfigService.GetBaseUrl()` 取，Timeout 30s），挂载 `AuthDelegatingHandler` (Transient)；注册 `HubConnectionManager` (Singleton)；调用 `builder.UseLocalNotification()` <!-- S3-05 [evolved]: 全部注册齐全；无 UseLocalNotification（改平台原生通知服务，见 T083） -->
+- [x] T021 [P] 注册 Blazor/Scoped 服务占位到 `AnyDrop.App/MauiProgram.cs`：`IAppStateService` (Scoped) 占位注释，各业务 Service 在对应 Phase 内按故事分批补入（避免因缺少实现类导致编译失败） <!-- S3-05 [done]: IAppStateService 已真实注册，非占位 -->
 
 ### Blazor 路由与布局骨架
 
-- [ ] T022 创建 `AnyDrop.App/Components/_Imports.razor`：全局 `@using` 指令（`AnyDrop.App.Models`、`AnyDrop.App.Services`、`AnyDrop.App.Infrastructure`、`Microsoft.AspNetCore.Components`、`Microsoft.AspNetCore.Components.Routing`）
-- [ ] T023 创建 `AnyDrop.App/Components/Routes.razor`：Blazor Router 配置（`AppAssembly`、`NotFound` fallback），用 `<AuthorizeRouteView>` 或自定义 `<RouteGuard>` 检查 `ISecureTokenStorage.IsAuthenticatedAsync()`，未认证时重定向至 `/login`；保留 `PendingSharedContent` 检测占位（Phase 8 补全）
-- [ ] T024 创建 `AnyDrop.App/Components/Layout/AuthLayout.razor`：无底部导航栏的纯白布局，用于 `/setup`、`/login`、`/setup-account` 页面，居中显示 App Logo + 标题
-- [ ] T025 创建 `AnyDrop.App/Components/Layout/MainLayout.razor`：包含：① 顶部/底部 SignalR 连接状态横幅（初始隐藏）② 底部导航栏三标签（主页 `/`、搜索 `/search`、设置 `/settings`，含激活态高亮）③ `@Body` 内容区 ④ 订阅 `AppEventBus.AuthExpired` → `NavigationManager.NavigateTo("/login")` ⑤ 订阅 `AppEventBus.ConnectivityChanged` → 显示/隐藏离线横幅
-- [ ] T026 创建 `AnyDrop.App/Services/IAppStateService.cs` + `AppStateService.cs`（Scoped）：字段参见 data-model.md Section 5：`CurrentTopicId`、`Topics`、`Messages`、`HasMoreMessages`、`MessageCursor`、`SignalRState`、`event Action? OnChange`、`NotifyStateChanged()`
+- [x] T022 创建 `AnyDrop.App/Components/_Imports.razor`：全局 `@using` 指令（`AnyDrop.App.Models`、`AnyDrop.App.Services`、`AnyDrop.App.Infrastructure`、`Microsoft.AspNetCore.Components`、`Microsoft.AspNetCore.Components.Routing`） <!-- S3-05 [done]: Components/_Imports.razor 已存在 -->
+- [x] T023 创建 `AnyDrop.App/Components/Routes.razor`：Blazor Router 配置（`AppAssembly`、`NotFound` fallback），用 `<AuthorizeRouteView>` 或自定义 `<RouteGuard>` 检查 `ISecureTokenStorage.IsAuthenticatedAsync()`，未认证时重定向至 `/login`；保留 `PendingSharedContent` 检测占位（Phase 8 补全） <!-- S3-05 [evolved]: 手动 IsAuthenticatedAsync 检查，非 AuthorizeRouteView/RouteGuard 组件 -->
+- [x] T024 创建 `AnyDrop.App/Components/Layout/AuthLayout.razor`：无底部导航栏的纯白布局，用于 `/setup`、`/login`、`/setup-account` 页面，居中显示 App Logo + 标题 <!-- S3-05 [done]: AuthLayout 已存在 -->
+- [x] T025 创建 `AnyDrop.App/Components/Layout/MainLayout.razor`：包含：① 顶部/底部 SignalR 连接状态横幅（初始隐藏）② 底部导航栏三标签（主页 `/`、搜索 `/search`、设置 `/settings`，含激活态高亮）③ `@Body` 内容区 ④ 订阅 `AppEventBus.AuthExpired` → `NavigationManager.NavigateTo("/login")` ⑤ 订阅 `AppEventBus.ConnectivityChanged` → 显示/隐藏离线横幅 <!-- S3-05 [done]: MainLayout：横幅 + 底部导航 + AuthExpired/ConnectivityChanged 订阅 -->
+- [x] T026 创建 `AnyDrop.App/Services/IAppStateService.cs` + `AppStateService.cs`（Scoped）：字段参见 data-model.md Section 5：`CurrentTopicId`、`Topics`、`Messages`、`HasMoreMessages`、`MessageCursor`、`SignalRState`、`event Action? OnChange`、`NotifyStateChanged()` <!-- S3-05 [done]: IAppStateService + AppStateService 在 Core/ -->
 
 ### 启动路由
 
-- [ ] T027 实现 `AnyDrop.App/App.xaml.cs` `OnStart()` 启动路由决策：调用 `ISecureTokenStorage.IsAuthenticatedAsync()`→ 有效 Token → `Shell.Current.GoToAsync("//home")`；无 BaseUrl → `"//setup"`；有 BaseUrl 无 Token → `"//login"`
-- [ ] T028 配置 `AnyDrop.App/MainPage.xaml` / `MainPage.xaml.cs`：BlazorWebView 宿主 MAUI 页面，`HostPage="wwwroot/index.html"`，`RootComponent ComponentType="typeof(Routes)"` 绑定至 `#app` 选择器
+- [x] T027 实现 `AnyDrop.App/App.xaml.cs` `OnStart()` 启动路由决策：调用 `ISecureTokenStorage.IsAuthenticatedAsync()`→ 有效 Token → `Shell.Current.GoToAsync("//home")`；无 BaseUrl → `"//setup"`；有 BaseUrl 无 Token → `"//login"` <!-- S3-05 [evolved]: 无 Shell；NavigateOnStartupAsync 做启动路由 -->
+- [x] T028 配置 `AnyDrop.App/MainPage.xaml` / `MainPage.xaml.cs`：BlazorWebView 宿主 MAUI 页面，`HostPage="wwwroot/index.html"`，`RootComponent ComponentType="typeof(Routes)"` 绑定至 `#app` 选择器 <!-- S3-05 [done]: MainPage.xaml 已存在 -->
 
 **Checkpoint**: Foundation ready — 执行 `dotnet build -f net10.0-android`，确认 0 错误。用户故事实现可开始。
 
@@ -89,18 +101,18 @@
 
 ### 单元测试（US1）— 先写后实现
 
-- [ ] T029 [P] [US1] 创建 `AnyDrop.Tests.Unit/AuthServiceTests.cs`：覆盖 `GetSetupStatusAsync`（requiresSetup true/false 两路）、`SetupAsync`（成功保存 Token）、`LoginAsync`（密码正确保存 Token / 密码错误返回错误 / 401 事件触发）、`LogoutAsync`（调用 API + 清除 Token）、`GetCurrentUserAsync`，通过 `Moq` Mock `IHttpClientFactory` / `ISecureTokenStorage`
-- [ ] T030 [P] [US1] 创建 `AnyDrop.Tests.Unit/ServerConfigServiceTests.cs`：覆盖 `HasBaseUrl`（有/无 Preferences）、`SetBaseUrlAsync`（去尾斜杠、写入 Preferences）、`GetHubUrl`（正确拼接 `/hubs/share`）
+- [x] T029 [P] [US1] 创建 `AnyDrop.Tests.Unit/AuthServiceTests.cs`：覆盖 `GetSetupStatusAsync`（requiresSetup true/false 两路）、`SetupAsync`（成功保存 Token）、`LoginAsync`（密码正确保存 Token / 密码错误返回错误 / 401 事件触发）、`LogoutAsync`（调用 API + 清除 Token）、`GetCurrentUserAsync`，通过 `Moq` Mock `IHttpClientFactory` / `ISecureTokenStorage` <!-- S3-05 [done]: Tests.Unit/App/AuthServiceTests.cs -->
+- [x] T030 [P] [US1] 创建 `AnyDrop.Tests.Unit/ServerConfigServiceTests.cs`：覆盖 `HasBaseUrl`（有/无 Preferences）、`SetBaseUrlAsync`（去尾斜杠、写入 Preferences）、`GetHubUrl`（正确拼接 `/hubs/share`） <!-- S3-05 [done]: Tests.Unit/App/ServerConfigServiceTests.cs -->
 
 ### 实现（US1）
 
-- [ ] T031 [P] [US1] 创建 `AnyDrop.App/Services/IAuthService.cs` + `AuthService.cs`：方法：`GetSetupStatusAsync()→SetupStatusDto`、`SetupAsync(SetupRequest)→LoginResponse`、`LoginAsync(LoginRequest)→LoginResponse`、`LogoutAsync()`、`GetCurrentUserAsync()→UserProfileDto`；注入 `IHttpClientFactory`（取命名 Client `"api"`）+ `ISecureTokenStorage`；登录/Setup 成功后调用 `_tokenStorage.SaveTokenAsync()`
-- [ ] T032 [US1] 完善 `AnyDrop.App/Services/ServerConfigService.cs`：在 `SetBaseUrlAsync` 中标准化 URL（trim trailing slash、补 `http://` 前缀校验），提供 `ValidateUrlAsync()` 方法（发起 `HEAD {baseUrl}/api/v1/auth/setup-status`，成功则有效）
-- [ ] T033 [US1] 创建 `AnyDrop.App/Components/Pages/Setup/ServerSetupPage.razor`：`@page "/setup"`，`@layout AuthLayout`；输入框绑定服务端 URL，格式校验（必须含协议前缀）；点击"连接"调用 `ServerConfigService.ValidateUrlAsync()`，成功 → 保存 → `NavigationManager.NavigateTo("/login")`；失败显示"无法连接到服务端"内联错误提示；加载状态 spinner
-- [ ] T034 [P] [US1] 创建 `AnyDrop.App/Components/Pages/Auth/LoginPage.razor`：`@page "/login"`，`@layout AuthLayout`；`OnInitializedAsync` 调用 `IAuthService.GetSetupStatusAsync()`，`requiresSetup=true` → redirect `/setup-account`；密码输入框 + 登录按钮；调用 `LoginAsync` → 成功：启动 SignalR（`ISignalRService.StartAsync()`）→ `NavigationManager.NavigateTo("/")`；失败：显示友好错误文字，保持页面，不清除 Token
-- [ ] T035 [P] [US1] 创建 `AnyDrop.App/Components/Pages/Auth/SetupAccountPage.razor`：`@page "/setup-account"`，`@layout AuthLayout`；昵称 + 密码 + 确认密码表单；调用 `AuthService.SetupAsync()` → 成功保存 Token → `NavigationManager.NavigateTo("/")`；前端校验密码一致性；服务端错误显示 `error` 字段内容
-- [ ] T036 [US1] 在 `AnyDrop.App/MauiProgram.cs` 注册 `IAuthService`（Scoped）；更新 `App.xaml.cs` `OnStart()` 完整逻辑（调用 `IServerConfigService.HasBaseUrl()` 条件分支）
-- [ ] T037 [US1] 验证 `AuthDelegatingHandler.cs` 中 401 → `AppEventBus.RaiseAuthExpired()` → `MainLayout.razor` 订阅 → `NavigationManager.NavigateTo("/login", forceLoad: false)` 端到端流程（手动测试：用过期 Token 访问任意 API 端点，应跳转登录页）
+- [x] T031 [P] [US1] 创建 `AnyDrop.App/Services/IAuthService.cs` + `AuthService.cs`：方法：`GetSetupStatusAsync()→SetupStatusDto`、`SetupAsync(SetupRequest)→LoginResponse`、`LoginAsync(LoginRequest)→LoginResponse`、`LogoutAsync()`、`GetCurrentUserAsync()→UserProfileDto`；注入 `IHttpClientFactory`（取命名 Client `"api"`）+ `ISecureTokenStorage`；登录/Setup 成功后调用 `_tokenStorage.SaveTokenAsync()` <!-- S3-05 [done]: IAuthService + AuthService 在 Core/ -->
+- [x] T032 [US1] 完善 `AnyDrop.App/Services/ServerConfigService.cs`：在 `SetBaseUrlAsync` 中标准化 URL（trim trailing slash、补 `http://` 前缀校验），提供 `ValidateUrlAsync()` 方法（发起 `HEAD {baseUrl}/api/v1/auth/setup-status`，成功则有效） <!-- S3-05 [done]: ValidateUrlAsync + NormalizeUrl（去尾斜杠） -->
+- [x] T033 [US1] 创建 `AnyDrop.App/Components/Pages/Setup/ServerSetupPage.razor`：`@page "/setup"`，`@layout AuthLayout`；输入框绑定服务端 URL，格式校验（必须含协议前缀）；点击"连接"调用 `ServerConfigService.ValidateUrlAsync()`，成功 → 保存 → `NavigationManager.NavigateTo("/login")`；失败显示"无法连接到服务端"内联错误提示；加载状态 spinner <!-- S3-05 [done]: ServerSetupPage 已存在 -->
+- [x] T034 [P] [US1] 创建 `AnyDrop.App/Components/Pages/Auth/LoginPage.razor`：`@page "/login"`，`@layout AuthLayout`；`OnInitializedAsync` 调用 `IAuthService.GetSetupStatusAsync()`，`requiresSetup=true` → redirect `/setup-account`；密码输入框 + 登录按钮；调用 `LoginAsync` → 成功：启动 SignalR（`ISignalRService.StartAsync()`）→ `NavigationManager.NavigateTo("/")`；失败：显示友好错误文字，保持页面，不清除 Token <!-- S3-05 [done]: LoginPage 已存在 -->
+- [x] T035 [P] [US1] 创建 `AnyDrop.App/Components/Pages/Auth/SetupAccountPage.razor`：`@page "/setup-account"`，`@layout AuthLayout`；昵称 + 密码 + 确认密码表单；调用 `AuthService.SetupAsync()` → 成功保存 Token → `NavigationManager.NavigateTo("/")`；前端校验密码一致性；服务端错误显示 `error` 字段内容 <!-- S3-05 [done]: SetupAccountPage 已存在 -->
+- [x] T036 [US1] 在 `AnyDrop.App/MauiProgram.cs` 注册 `IAuthService`（Scoped）；更新 `App.xaml.cs` `OnStart()` 完整逻辑（调用 `IServerConfigService.HasBaseUrl()` 条件分支） <!-- S3-05 [done]: MauiProgram 注册 IAuthService；App.xaml.cs 启动逻辑完整 -->
+- [x] T037 [US1] 验证 `AuthDelegatingHandler.cs` 中 401 → `AppEventBus.RaiseAuthExpired()` → `MainLayout.razor` 订阅 → `NavigationManager.NavigateTo("/login", forceLoad: false)` 端到端流程（手动测试：用过期 Token 访问任意 API 端点，应跳转登录页） <!-- S3-05 [evolved]: 401→AuthExpired→登录页链路已实现；真机手动验证待 S2-11 设备门 -->
 
 **Checkpoint**: US1 完成 — 新设备安装后完整登录流程可走通，主界面可见。**MVP 路径 1/2 达成。**
 
@@ -114,25 +126,25 @@
 
 ### 单元测试（US2）— 先写后实现
 
-- [ ] T038 [P] [US2] 创建 `AnyDrop.Tests.Unit/SignalRServiceTests.cs`：覆盖 `StartAsync`（首次连接）、`StopAsync`、`StateChanged` 事件触发（Connected / Reconnecting / Disconnected）、`TopicsUpdated` 事件正确 invoke；通过 `Moq` Mock `HubConnectionManager` 的 `HubConnection`
-- [ ] T039 [P] [US2] 创建 `AnyDrop.Tests.Unit/ShareServiceTests.cs`：覆盖 `GetMessagesAsync`（首次加载、分页 `before` 参数、`hasMore=false` 停止）、`SendTextAsync`（201 返回正确 DTO）、`DownloadFileAsync`（返回流），通过 Moq Mock `IHttpClientFactory`
-- [ ] T040 [P] [US2] 创建 `AnyDrop.Tests.Unit/FileUploadServiceTests.cs`：覆盖上传成功返回 `ShareItemDto`、`IProgress<double>` 回调被正确调用、文件流式上传（不读入 MemoryStream），通过 Moq Mock `IHttpClientFactory` + `IPickerService`
+- [x] T038 [P] [US2] 创建 `AnyDrop.Tests.Unit/SignalRServiceTests.cs`：覆盖 `StartAsync`（首次连接）、`StopAsync`、`StateChanged` 事件触发（Connected / Reconnecting / Disconnected）、`TopicsUpdated` 事件正确 invoke；通过 `Moq` Mock `HubConnectionManager` 的 `HubConnection` <!-- S3-05 [done]: SignalRServiceTests + SignalRReconnectTests -->
+- [x] T039 [P] [US2] 创建 `AnyDrop.Tests.Unit/ShareServiceTests.cs`：覆盖 `GetMessagesAsync`（首次加载、分页 `before` 参数、`hasMore=false` 停止）、`SendTextAsync`（201 返回正确 DTO）、`DownloadFileAsync`（返回流），通过 Moq Mock `IHttpClientFactory` <!-- S3-05 [done]: Tests.Unit/App/ShareServiceTests.cs -->
+- [x] T040 [P] [US2] 创建 `AnyDrop.Tests.Unit/FileUploadServiceTests.cs`：覆盖上传成功返回 `ShareItemDto`、`IProgress<double>` 回调被正确调用、文件流式上传（不读入 MemoryStream），通过 Moq Mock `IHttpClientFactory` + `IPickerService` <!-- S3-05 [done]: Tests.Unit/App/FileUploadServiceTests.cs -->
 
 ### 实现（US2）
 
-- [ ] T041 [P] [US2] 创建 `AnyDrop.App/Services/ISignalRService.cs` + `SignalRService.cs`：`StartAsync(CancellationToken ct)`（调用 `HubConnectionManager.Connection.StartAsync()`）、`StopAsync()`、`HubConnectionState State { get; }`、`event Action<HubConnectionState>? StateChanged`（订阅 `Reconnecting` / `Reconnected` / `Closed` 委托）、`event Action<IReadOnlyList<TopicDto>>? TopicsUpdated`（注册 `connection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", ...)`）；Closed 时若因 401 触发 `AppEventBus.RaiseAuthExpired()`
-- [ ] T042 [P] [US2] 创建 `AnyDrop.App/Services/IShareService.cs` + `ShareService.cs`：`GetMessagesAsync(Guid topicId, string? before, int limit=30)→TopicMessagesResponse`、`SendTextAsync(CreateTextShareItemRequest)→ShareItemDto`、`DownloadFileAsync(Guid id)→Stream`（`GET /api/v1/share-items/{id}/file?download=true`）
-- [ ] T043 [P] [US2] 创建 `AnyDrop.App/Services/IFileUploadService.cs` + `FileUploadService.cs`：`UploadFileAsync(Stream fileStream, string fileName, string mimeType, Guid topicId, IProgress<double>? progress)→ShareItemDto`；使用 `StreamContent` + `MultipartFormDataContent` 构造 multipart 请求至 `POST /api/v1/files`；大文件流式上传不缓存 MemoryStream
-- [ ] T044 [P] [US2] 创建 `AnyDrop.App/Services/IPickerService.cs` + `PickerService.cs`：`PickFileAsync()→(Stream, string fileName, string mimeType)?`（`FilePicker.PickAsync`）、`PickPhotoAsync()→(Stream, string fileName, string mimeType)?`（`MediaPicker.PickPhotoAsync`）、`PickVideoAsync()→(Stream, string fileName, string mimeType)?`（`MediaPicker.PickVideoAsync`）；必须在 UI 线程调用（Blazor 事件处理器天然满足）
-- [ ] T045 [US2] 在 `AnyDrop.App/MauiProgram.cs` 补充注册：`ISignalRService` (Singleton)、`IShareService` (Scoped)、`IFileUploadService` (Scoped)、`IPickerService` (Singleton)
-- [ ] T046 [US2] 创建 `AnyDrop.App/Components/Pages/Home/HomePage.razor`：`@page "/"`，`@layout MainLayout`；`OnInitializedAsync` 加载主题列表（`ITopicService.GetTopicsAsync()`，TopicService 在 US3 完整实现，此处先用 `IShareService` 获取首条消息作占位）；启动 SignalR（若 State=Disconnected）；响应式布局：手机竖屏时 TopicSidebar 抽屉式显示，横屏/平板时侧边栏常驻
-- [ ] T047 [US2] 创建 `AnyDrop.App/Components/Pages/Home/TopicSidebar.razor`：渲染置顶主题区块 + 普通主题区块；每项显示图标 + 名称 + 未读/最新消息预览；点击主题 → 更新 `AppStateService.CurrentTopicId` → 触发消息列表加载；长按触发 `TopicActionMenu`（US3 补全）
-- [ ] T048 [US2] 创建 `AnyDrop.App/Components/Pages/Home/MessageList.razor`：`OnParametersSetAsync` 中当 `CurrentTopicId` 变更时调用 `IShareService.GetMessagesAsync()` 重置消息列表；滚动容器用 `overflow-y: auto` + 初始滚动至底部（`JS interop scrollTo`）；在列表顶部放置"加载更多"触发区（Intersection Observer 或手动按钮），加载时附带 `AppStateService.MessageCursor` 作为 `before` 参数，`HasMore=false` 时隐藏按钮；订阅 `ISignalRService.TopicsUpdated` → 比较 `MessageCount` → 按需拉取新消息尾部；`IAsyncDisposable` 中取消订阅
-- [ ] T049 [US2] 创建 `AnyDrop.App/Components/Pages/Home/MessageItem.razor`：接收 `ShareItemDto` 参数；依 `ContentType` 分支渲染：Text（`<pre>` 保留换行）、Image（`<img>` 缩略图 + 点击导航 `/image-preview/{id}`）、Video（缩略图 + 播放图标 + 点击 `Launcher.OpenAsync`）、File（文件图标 + 文件名 + 大小 + 下载按钮调 `IShareService.DownloadFileAsync`）、Link（OGP 卡片：LinkTitle + LinkDescription + 域名，点击 `Browser.OpenAsync`）；所有需认证的图片 URL 通过 `{BaseUrl}/api/v1/share-items/{id}/file` 带 Authorization 头请求（使用 JS fetch + Blob URL 或服务端代理 Token）
-- [ ] T050 [US2] 创建 `AnyDrop.App/Components/Pages/Home/MessageInput.razor`：文本输入框（`textarea` + `@bind`）+ 发送按钮（点击调 `IShareService.SendTextAsync`，成功追加至 `AppStateService.Messages` + `NotifyStateChanged`）；文件/图片/视频选择按钮（调 `IPickerService`，取到流后调 `IFileUploadService.UploadFileAsync`）；上传进度条（`<progress value>` 绑定 `IProgress<double>` 回调更新的状态值）；上传期间禁用发送按钮
-- [ ] T051 [US2] 创建 `AnyDrop.App/Components/Pages/Home/ImagePreview.razor`：`@page "/image-preview/{Id}"` + `@layout AuthLayout`（全屏，无底部导航）；用 CSS `position:fixed; inset:0; background:black; touch-action:pinch-zoom` 覆盖全屏；`<img>` 加载 `{BaseUrl}/api/v1/share-items/{Id}/file`；右上角关闭按钮 / 系统返回手势退出预览
-- [ ] T052 [US2] 实现 `AppStateService` 消息去重逻辑：`TopicsUpdated` 到达时，若当前主题 `MessageCount > Messages.Count`，调用 `GetMessagesAsync(currentTopicId, before: null)` 拉取最新一批，过滤已存在 `Id` 后 `AddRange`，调用 `NotifyStateChanged()`
-- [ ] T053 [US2] 完善 `MainLayout.razor` SignalR 状态横幅：订阅 `ISignalRService.StateChanged`；`Reconnecting` → 顶部黄色横幅"正在重新连接…"；`Disconnected` → 红色横幅"已断开连接"+ 手动重试按钮（调 `ISignalRService.StartAsync()`）；`Connected` → 隐藏横幅
+- [x] T041 [P] [US2] 创建 `AnyDrop.App/Services/ISignalRService.cs` + `SignalRService.cs`：`StartAsync(CancellationToken ct)`（调用 `HubConnectionManager.Connection.StartAsync()`）、`StopAsync()`、`HubConnectionState State { get; }`、`event Action<HubConnectionState>? StateChanged`（订阅 `Reconnecting` / `Reconnected` / `Closed` 委托）、`event Action<IReadOnlyList<TopicDto>>? TopicsUpdated`（注册 `connection.On<IReadOnlyList<TopicDto>>("TopicsUpdated", ...)`）；Closed 时若因 401 触发 `AppEventBus.RaiseAuthExpired()` <!-- S3-05 [evolved]: 手动重连 + 断线回补（S2-04/05），非纯 WithAutomaticReconnect -->
+- [x] T042 [P] [US2] 创建 `AnyDrop.App/Services/IShareService.cs` + `ShareService.cs`：`GetMessagesAsync(Guid topicId, string? before, int limit=30)→TopicMessagesResponse`、`SendTextAsync(CreateTextShareItemRequest)→ShareItemDto`、`DownloadFileAsync(Guid id)→Stream`（`GET /api/v1/share-items/{id}/file?download=true`） <!-- S3-05 [done]: IShareService + ShareService 在 Core/ -->
+- [x] T043 [P] [US2] 创建 `AnyDrop.App/Services/IFileUploadService.cs` + `FileUploadService.cs`：`UploadFileAsync(Stream fileStream, string fileName, string mimeType, Guid topicId, IProgress<double>? progress)→ShareItemDto`；使用 `StreamContent` + `MultipartFormDataContent` 构造 multipart 请求至 `POST /api/v1/files`；大文件流式上传不缓存 MemoryStream <!-- S3-05 [evolved]: 分片上传（S2-07），非单 multipart -->
+- [x] T044 [P] [US2] 创建 `AnyDrop.App/Services/IPickerService.cs` + `PickerService.cs`：`PickFileAsync()→(Stream, string fileName, string mimeType)?`（`FilePicker.PickAsync`）、`PickPhotoAsync()→(Stream, string fileName, string mimeType)?`（`MediaPicker.PickPhotoAsync`）、`PickVideoAsync()→(Stream, string fileName, string mimeType)?`（`MediaPicker.PickVideoAsync`）；必须在 UI 线程调用（Blazor 事件处理器天然满足） <!-- S3-05 [done]: 接口在 Core，实现在壳内 PickerService -->
+- [x] T045 [US2] 在 `AnyDrop.App/MauiProgram.cs` 补充注册：`ISignalRService` (Singleton)、`IShareService` (Scoped)、`IFileUploadService` (Scoped)、`IPickerService` (Singleton) <!-- S3-05 [done]: MauiProgram 注册齐全 -->
+- [x] T046 [US2] 创建 `AnyDrop.App/Components/Pages/Home/HomePage.razor`：`@page "/"`，`@layout MainLayout`；`OnInitializedAsync` 加载主题列表（`ITopicService.GetTopicsAsync()`，TopicService 在 US3 完整实现，此处先用 `IShareService` 获取首条消息作占位）；启动 SignalR（若 State=Disconnected）；响应式布局：手机竖屏时 TopicSidebar 抽屉式显示，横屏/平板时侧边栏常驻 <!-- S3-05 [done]: HomePage 已存在 -->
+- [x] T047 [US2] 创建 `AnyDrop.App/Components/Pages/Home/TopicSidebar.razor`：渲染置顶主题区块 + 普通主题区块；每项显示图标 + 名称 + 未读/最新消息预览；点击主题 → 更新 `AppStateService.CurrentTopicId` → 触发消息列表加载；长按触发 `TopicActionMenu`（US3 补全） <!-- S3-05 [done]: TopicSidebar 已存在 -->
+- [x] T048 [US2] 创建 `AnyDrop.App/Components/Pages/Home/MessageList.razor`：`OnParametersSetAsync` 中当 `CurrentTopicId` 变更时调用 `IShareService.GetMessagesAsync()` 重置消息列表；滚动容器用 `overflow-y: auto` + 初始滚动至底部（`JS interop scrollTo`）；在列表顶部放置"加载更多"触发区（Intersection Observer 或手动按钮），加载时附带 `AppStateService.MessageCursor` 作为 `before` 参数，`HasMore=false` 时隐藏按钮；订阅 `ISignalRService.TopicsUpdated` → 比较 `MessageCount` → 按需拉取新消息尾部；`IAsyncDisposable` 中取消订阅 <!-- S3-05 [done]: MessageList：before 分页 + HasMore + Virtualize + SignalR 更新 -->
+- [x] T049 [US2] 创建 `AnyDrop.App/Components/Pages/Home/MessageItem.razor`：接收 `ShareItemDto` 参数；依 `ContentType` 分支渲染：Text（`<pre>` 保留换行）、Image（`<img>` 缩略图 + 点击导航 `/image-preview/{id}`）、Video（缩略图 + 播放图标 + 点击 `Launcher.OpenAsync`）、File（文件图标 + 文件名 + 大小 + 下载按钮调 `IShareService.DownloadFileAsync`）、Link（OGP 卡片：LinkTitle + LinkDescription + 域名，点击 `Browser.OpenAsync`）；所有需认证的图片 URL 通过 `{BaseUrl}/api/v1/share-items/{id}/file` 带 Authorization 头请求（使用 JS fetch + Blob URL 或服务端代理 Token） <!-- S3-05 [done]: MessageItem 已存在 -->
+- [x] T050 [US2] 创建 `AnyDrop.App/Components/Pages/Home/MessageInput.razor`：文本输入框（`textarea` + `@bind`）+ 发送按钮（点击调 `IShareService.SendTextAsync`，成功追加至 `AppStateService.Messages` + `NotifyStateChanged`）；文件/图片/视频选择按钮（调 `IPickerService`，取到流后调 `IFileUploadService.UploadFileAsync`）；上传进度条（`<progress value>` 绑定 `IProgress<double>` 回调更新的状态值）；上传期间禁用发送按钮 <!-- S3-05 [done]: MessageInput 已存在 -->
+- [x] T051 [US2] 创建 `AnyDrop.App/Components/Pages/Home/ImagePreview.razor`：`@page "/image-preview/{Id}"` + `@layout AuthLayout`（全屏，无底部导航）；用 CSS `position:fixed; inset:0; background:black; touch-action:pinch-zoom` 覆盖全屏；`<img>` 加载 `{BaseUrl}/api/v1/share-items/{Id}/file`；右上角关闭按钮 / 系统返回手势退出预览 <!-- S3-05 [done]: ImagePreview 已存在 -->
+- [x] T052 [US2] 实现 `AppStateService` 消息去重逻辑：`TopicsUpdated` 到达时，若当前主题 `MessageCount > Messages.Count`，调用 `GetMessagesAsync(currentTopicId, before: null)` 拉取最新一批，过滤已存在 `Id` 后 `AddRange`，调用 `NotifyStateChanged()` <!-- S3-05 [evolved]: 去重在 MessageList（按 Id），不在 AppStateService -->
+- [ ] T053 [US2] 完善 `MainLayout.razor` SignalR 状态横幅：订阅 `ISignalRService.StateChanged`；`Reconnecting` → 顶部黄色横幅"正在重新连接…"；`Disconnected` → 红色横幅"已断开连接"+ 手动重试按钮（调 `ISignalRService.StartAsync()`）；`Connected` → 隐藏横幅 <!-- S3-05 [partial]: 断开横幅有；手动重试按钮缺失（自动重连循环兜底） -->
 
 **Checkpoint**: US2 完成 — 完整消息收发 + 实时推送可测试。**MVP 路径 2/2 达成。P1 用户故事全部完成。**
 
@@ -146,16 +158,16 @@
 
 ### 单元测试（US3）— 先写后实现
 
-- [ ] T054 [P] [US3] 创建 `AnyDrop.Tests.Unit/TopicServiceTests.cs`：覆盖 `GetTopicsAsync`（返回列表 + 置顶/普通分区）、`GetArchivedTopicsAsync`、`CreateTopicAsync`（201 返回 DTO）、`UpdateTopicAsync`（rename）、`UpdateTopicIconAsync`、`PinTopicAsync`（isPinned=true/false）、`ArchiveTopicAsync`、`ReorderTopicsAsync`（批量 PUT）、`DeleteTopicAsync`（204/200），通过 Moq Mock `IHttpClientFactory`
+- [x] T054 [P] [US3] 创建 `AnyDrop.Tests.Unit/TopicServiceTests.cs`：覆盖 `GetTopicsAsync`（返回列表 + 置顶/普通分区）、`GetArchivedTopicsAsync`、`CreateTopicAsync`（201 返回 DTO）、`UpdateTopicAsync`（rename）、`UpdateTopicIconAsync`、`PinTopicAsync`（isPinned=true/false）、`ArchiveTopicAsync`、`ReorderTopicsAsync`（批量 PUT）、`DeleteTopicAsync`（204/200），通过 Moq Mock `IHttpClientFactory` <!-- S3-05 [done]: Tests.Unit/App/TopicServiceTests.cs -->
 
 ### 实现（US3）
 
-- [ ] T055 [P] [US3] 创建 `AnyDrop.App/Services/ITopicService.cs` + `TopicService.cs`：`GetTopicsAsync()→IReadOnlyList<TopicDto>`（`GET /api/v1/topics`）、`GetArchivedTopicsAsync()→IReadOnlyList<TopicDto>`（`GET /api/v1/topics/archived`）、`CreateTopicAsync(CreateTopicRequest)→TopicDto`、`UpdateTopicAsync(Guid, UpdateTopicRequest)`、`UpdateTopicIconAsync(Guid, UpdateTopicIconRequest)`、`PinTopicAsync(Guid, PinTopicRequest)`、`ArchiveTopicAsync(Guid, ArchiveTopicRequest)`、`ReorderTopicsAsync(ReorderTopicsRequest)`、`DeleteTopicAsync(Guid)`
-- [ ] T056 [US3] 在 `AnyDrop.App/MauiProgram.cs` 补充注册 `ITopicService`（Scoped）；更新 `HomePage.razor` 的 `OnInitializedAsync` 改用 `ITopicService.GetTopicsAsync()` 填充 `AppStateService.Topics`
-- [ ] T057 [US3] 创建 `AnyDrop.App/Components/Pages/Home/TopicActionMenu.razor`：长按主题项弹出底部操作表（Bottom Sheet）或下拉菜单，选项：重命名（内联编辑输入框 → `UpdateTopicAsync`）、更改图标（Emoji 选择器 → `UpdateTopicIconAsync`）、置顶/取消置顶（`PinTopicAsync`）、归档/取消归档（`ArchiveTopicAsync`）、删除（弹二次确认 dialog → `DeleteTopicAsync` → 从 `AppStateService.Topics` 移除 + `NotifyStateChanged`）
-- [ ] T058 [US3] 在 `HomePage.razor` / `TopicSidebar.razor` 添加"新建主题"入口（"+" 按钮）：弹出 Bottom Sheet 含名称输入框 → `ITopicService.CreateTopicAsync()` → 将新 TopicDto prepend/append 至 `AppStateService.Topics` → `NotifyStateChanged`
-- [ ] T059 [US3] 在 `TopicSidebar.razor` 实现拖拽排序：用 HTML5 `draggable` 属性 + `ondragover` / `ondrop` 事件（或 touch `touchstart`/`touchmove`/`touchend`）；拖拽完成后收集新 `SortOrder` 序列 → 调 `ITopicService.ReorderTopicsAsync()` → 更新 `AppStateService.Topics` 本地顺序
-- [ ] T060 [US3] 在 `TopicSidebar.razor` 底部添加"已归档主题"入口：点击展开/折叠归档列表（调 `ITopicService.GetArchivedTopicsAsync()`，懒加载），每项支持"取消归档"操作（`ArchiveTopicAsync(id, IsArchived: false)`）
+- [x] T055 [P] [US3] 创建 `AnyDrop.App/Services/ITopicService.cs` + `TopicService.cs`：`GetTopicsAsync()→IReadOnlyList<TopicDto>`（`GET /api/v1/topics`）、`GetArchivedTopicsAsync()→IReadOnlyList<TopicDto>`（`GET /api/v1/topics/archived`）、`CreateTopicAsync(CreateTopicRequest)→TopicDto`、`UpdateTopicAsync(Guid, UpdateTopicRequest)`、`UpdateTopicIconAsync(Guid, UpdateTopicIconRequest)`、`PinTopicAsync(Guid, PinTopicRequest)`、`ArchiveTopicAsync(Guid, ArchiveTopicRequest)`、`ReorderTopicsAsync(ReorderTopicsRequest)`、`DeleteTopicAsync(Guid)` <!-- S3-05 [done]: ITopicService + TopicService 在 Core/ -->
+- [x] T056 [US3] 在 `AnyDrop.App/MauiProgram.cs` 补充注册 `ITopicService`（Scoped）；更新 `HomePage.razor` 的 `OnInitializedAsync` 改用 `ITopicService.GetTopicsAsync()` 填充 `AppStateService.Topics` <!-- S3-05 [done]: MauiProgram 注册；HomePage 调 GetTopicsAsync -->
+- [x] T057 [US3] 创建 `AnyDrop.App/Components/Pages/Home/TopicActionMenu.razor`：长按主题项弹出底部操作表（Bottom Sheet）或下拉菜单，选项：重命名（内联编辑输入框 → `UpdateTopicAsync`）、更改图标（Emoji 选择器 → `UpdateTopicIconAsync`）、置顶/取消置顶（`PinTopicAsync`）、归档/取消归档（`ArchiveTopicAsync`）、删除（弹二次确认 dialog → `DeleteTopicAsync` → 从 `AppStateService.Topics` 移除 + `NotifyStateChanged`） <!-- S3-05 [done]: TopicActionMenu 已存在 -->
+- [x] T058 [US3] 在 `HomePage.razor` / `TopicSidebar.razor` 添加"新建主题"入口（"+" 按钮）：弹出 Bottom Sheet 含名称输入框 → `ITopicService.CreateTopicAsync()` → 将新 TopicDto prepend/append 至 `AppStateService.Topics` → `NotifyStateChanged` <!-- S3-05 [done]: TopicSidebar 新建主题入口已存在 -->
+- [x] T059 [US3] 在 `TopicSidebar.razor` 实现拖拽排序：用 HTML5 `draggable` 属性 + `ondragover` / `ondrop` 事件（或 touch `touchstart`/`touchmove`/`touchend`）；拖拽完成后收集新 `SortOrder` 序列 → 调 `ITopicService.ReorderTopicsAsync()` → 更新 `AppStateService.Topics` 本地顺序 <!-- S3-05 [done]: TopicSidebar 拖拽排序（draggable + ReorderTopicsAsync） -->
+- [x] T060 [US3] 在 `TopicSidebar.razor` 底部添加"已归档主题"入口：点击展开/折叠归档列表（调 `ITopicService.GetArchivedTopicsAsync()`，懒加载），每项支持"取消归档"操作（`ArchiveTopicAsync(id, IsArchived: false)`） <!-- S3-05 [done]: 已归档入口调真实 GetArchivedTopicsAsync（S2-08） -->
 
 **Checkpoint**: US3 完成 — 主题全生命周期管理可验证。
 
@@ -169,15 +181,15 @@
 
 ### 单元测试（US4）— 先写后实现
 
-- [ ] T061 [P] [US4] 创建 `AnyDrop.Tests.Unit/SearchServiceTests.cs`：覆盖 `SearchAsync`（有结果 / 无结果空列表 / 分页 before 参数）、`GetByDateAsync`（返回指定日消息）、`GetActiveDatesAsync`（year+month 参数、返回 DateOnly 列表）、`GetByTypeAsync`（Image/File 等类型筛选 + 分页），通过 Moq Mock `IHttpClientFactory`
+- [x] T061 [P] [US4] 创建 `AnyDrop.Tests.Unit/SearchServiceTests.cs`：覆盖 `SearchAsync`（有结果 / 无结果空列表 / 分页 before 参数）、`GetByDateAsync`（返回指定日消息）、`GetActiveDatesAsync`（year+month 参数、返回 DateOnly 列表）、`GetByTypeAsync`（Image/File 等类型筛选 + 分页），通过 Moq Mock `IHttpClientFactory` <!-- S3-05 [done]: Tests.Unit/App/SearchServiceTests.cs -->
 
 ### 实现（US4）
 
-- [ ] T062 [P] [US4] 创建 `AnyDrop.App/Services/ISearchService.cs` + `SearchService.cs`：`SearchAsync(Guid topicId, string q, int limit=20, string? before=null)→IReadOnlyList<ShareItemDto>`（`GET /api/v1/topics/{id}/messages/search?q=&limit=&before=`）；`GetByDateAsync(Guid topicId, DateOnly date)→IReadOnlyList<ShareItemDto>`；`GetActiveDatesAsync(Guid topicId, int year, int month)→IReadOnlyList<DateOnly>`；`GetByTypeAsync(Guid topicId, ShareContentType type, int limit=20, string? before=null)→IReadOnlyList<ShareItemDto>`
-- [ ] T063 [US4] 在 `AnyDrop.App/MauiProgram.cs` 补充注册 `ISearchService`（Scoped）
-- [ ] T064 [US4] 创建 `AnyDrop.App/Components/Pages/Search/SearchPage.razor`：`@page "/search"`，`@layout MainLayout`；顶部搜索模式 Tab（关键词 / 日期 / 类型）；关键词模式：`<input>` 输入触发 `ISearchService.SearchAsync`（debounce 300ms）+ 分页加载更多；日期模式：嵌入 `ActiveDateCalendar.razor`，选中日期调 `GetByDateAsync`；类型模式：5 个类型 Tab（文本/图片/视频/文件/链接）→ `GetByTypeAsync`；无结果时展示"未找到相关内容"空状态插图
-- [ ] T065 [P] [US4] 创建 `AnyDrop.App/Components/Pages/Search/SearchResultItem.razor`：复用 `MessageItem.razor` 内容结构，但增加所属主题名称显示；点击跳转至 `HomePage` 并选中对应主题（通过 `AppStateService.CurrentTopicId` + NavigationManager）
-- [ ] T066 [P] [US4] 创建 `AnyDrop.App/Components/Pages/Search/ActiveDateCalendar.razor`：月份视图网格；`OnParametersSetAsync` 中调 `ISearchService.GetActiveDatesAsync` 获取当月有消息日期并高亮（CSS 圆点标记）；左右箭头切换月份（每次切换重新获取高亮日期）；点击高亮日期触发 `OnDateSelected` 回调供父组件使用
+- [x] T062 [P] [US4] 创建 `AnyDrop.App/Services/ISearchService.cs` + `SearchService.cs`：`SearchAsync(Guid topicId, string q, int limit=20, string? before=null)→IReadOnlyList<ShareItemDto>`（`GET /api/v1/topics/{id}/messages/search?q=&limit=&before=`）；`GetByDateAsync(Guid topicId, DateOnly date)→IReadOnlyList<ShareItemDto>`；`GetActiveDatesAsync(Guid topicId, int year, int month)→IReadOnlyList<DateOnly>`；`GetByTypeAsync(Guid topicId, ShareContentType type, int limit=20, string? before=null)→IReadOnlyList<ShareItemDto>` <!-- S3-05 [done]: ISearchService + SearchService 在 Core/ -->
+- [x] T063 [US4] 在 `AnyDrop.App/MauiProgram.cs` 补充注册 `ISearchService`（Scoped） <!-- S3-05 [done]: MauiProgram 注册 -->
+- [x] T064 [US4] 创建 `AnyDrop.App/Components/Pages/Search/SearchPage.razor`：`@page "/search"`，`@layout MainLayout`；顶部搜索模式 Tab（关键词 / 日期 / 类型）；关键词模式：`<input>` 输入触发 `ISearchService.SearchAsync`（debounce 300ms）+ 分页加载更多；日期模式：嵌入 `ActiveDateCalendar.razor`，选中日期调 `GetByDateAsync`；类型模式：5 个类型 Tab（文本/图片/视频/文件/链接）→ `GetByTypeAsync`；无结果时展示"未找到相关内容"空状态插图 <!-- S3-05 [done]: SearchPage：关键词/日期/类型三模式 -->
+- [x] T065 [P] [US4] 创建 `AnyDrop.App/Components/Pages/Search/SearchResultItem.razor`：复用 `MessageItem.razor` 内容结构，但增加所属主题名称显示；点击跳转至 `HomePage` 并选中对应主题（通过 `AppStateService.CurrentTopicId` + NavigationManager） <!-- S3-05 [done]: SearchResultItem 已存在 -->
+- [x] T066 [P] [US4] 创建 `AnyDrop.App/Components/Pages/Search/ActiveDateCalendar.razor`：月份视图网格；`OnParametersSetAsync` 中调 `ISearchService.GetActiveDatesAsync` 获取当月有消息日期并高亮（CSS 圆点标记）；左右箭头切换月份（每次切换重新获取高亮日期）；点击高亮日期触发 `OnDateSelected` 回调供父组件使用 <!-- S3-05 [done]: ActiveDateCalendar 已存在 -->
 
 **Checkpoint**: US4 完成 — 搜索功能三种模式独立可验证。
 
@@ -191,20 +203,20 @@
 
 ### 单元测试（US5）— 先写后实现
 
-- [ ] T067 [P] [US5] 创建 `AnyDrop.Tests.Unit/SettingsServiceTests.cs`：覆盖 `GetSecuritySettingsAsync`（返回 DTO）、`UpdateSecuritySettingsAsync`（PUT 请求正确构造）、`UpdateNicknameAsync`（PUT /settings/profile）、`UpdatePasswordAsync`（成功 / 400 当前密码错误）、`CleanupOldMessagesAsync`（返回 deletedCount）
+- [x] T067 [P] [US5] 创建 `AnyDrop.Tests.Unit/SettingsServiceTests.cs`：覆盖 `GetSecuritySettingsAsync`（返回 DTO）、`UpdateSecuritySettingsAsync`（PUT 请求正确构造）、`UpdateNicknameAsync`（PUT /settings/profile）、`UpdatePasswordAsync`（成功 / 400 当前密码错误）、`CleanupOldMessagesAsync`（返回 deletedCount） <!-- S3-05 [done]: Tests.Unit/App/SettingsServiceTests.cs -->
 
 ### 实现（US5）
 
-- [ ] T068 [P] [US5] 创建 `AnyDrop.App/Services/ISettingsService.cs` + `SettingsService.cs`：`GetSecuritySettingsAsync()→SecuritySettingsDto`（`GET /api/v1/settings/security`）、`UpdateSecuritySettingsAsync(UpdateSecuritySettingsRequest)`（`PUT /api/v1/settings/security`）、`UpdateNicknameAsync(UpdateNicknameRequest)`（`PUT /api/v1/settings/profile`）、`UpdatePasswordAsync(UpdatePasswordRequest)`（`PUT /api/v1/settings/password`）、`CleanupOldMessagesAsync(int months)→int`（`DELETE /api/v1/share-items/cleanup?months={months}`，返回 `deletedCount`）
-- [ ] T069 [US5] 在 `AnyDrop.App/MauiProgram.cs` 补充注册 `ISettingsService`（Scoped）
-- [ ] T070 [US5] 创建 `AnyDrop.App/Components/Pages/Settings/SettingsPage.razor`：`@page "/settings"`，`@layout MainLayout`；`OnInitializedAsync` 加载当前用户信息（`IAuthService.GetCurrentUserAsync`）与安全设置（`ISettingsService.GetSecuritySettingsAsync`）；按功能分组：个人资料、安全设置、外观与语言、危险区域
-- [ ] T071 [US5] 实现设置页"个人资料"区域：昵称内联编辑（点击进入 edit 模式 → 修改 → 调 `UpdateNicknameAsync` → 更新 `Preferences["anydrop_nickname"]` + 顶部显示新昵称）；密码修改表单（currentPassword + newPassword + confirmPassword → `UpdatePasswordAsync`，错误文字高亮）
-- [ ] T072 [US5] 实现设置页"安全设置"区域：自动获取链接预览 Toggle、阅后即焚时长 Select（0/1/5/10/30 分钟）、自动清理 Toggle + 保留月数 Select → 表单修改后点"保存" → `UpdateSecuritySettingsAsync`；手动清理按钮 → 输入保留月数 → 确认 dialog → `CleanupOldMessagesAsync` → Toast 反馈（共删除 N 条）
-- [ ] T073 [US5] 实现设置页"外观与语言"区域：
+- [x] T068 [P] [US5] 创建 `AnyDrop.App/Services/ISettingsService.cs` + `SettingsService.cs`：`GetSecuritySettingsAsync()→SecuritySettingsDto`（`GET /api/v1/settings/security`）、`UpdateSecuritySettingsAsync(UpdateSecuritySettingsRequest)`（`PUT /api/v1/settings/security`）、`UpdateNicknameAsync(UpdateNicknameRequest)`（`PUT /api/v1/settings/profile`）、`UpdatePasswordAsync(UpdatePasswordRequest)`（`PUT /api/v1/settings/password`）、`CleanupOldMessagesAsync(int months)→int`（`DELETE /api/v1/share-items/cleanup?months={months}`，返回 `deletedCount`） <!-- S3-05 [done]: ISettingsService + SettingsService 在 Core/ -->
+- [x] T069 [US5] 在 `AnyDrop.App/MauiProgram.cs` 补充注册 `ISettingsService`（Scoped） <!-- S3-05 [done]: MauiProgram 注册 -->
+- [x] T070 [US5] 创建 `AnyDrop.App/Components/Pages/Settings/SettingsPage.razor`：`@page "/settings"`，`@layout MainLayout`；`OnInitializedAsync` 加载当前用户信息（`IAuthService.GetCurrentUserAsync`）与安全设置（`ISettingsService.GetSecuritySettingsAsync`）；按功能分组：个人资料、安全设置、外观与语言、危险区域 <!-- S3-05 [done]: SettingsPage 已存在 -->
+- [x] T071 [US5] 实现设置页"个人资料"区域：昵称内联编辑（点击进入 edit 模式 → 修改 → 调 `UpdateNicknameAsync` → 更新 `Preferences["anydrop_nickname"]` + 顶部显示新昵称）；密码修改表单（currentPassword + newPassword + confirmPassword → `UpdatePasswordAsync`，错误文字高亮） <!-- S3-05 [done]: 昵称内联编辑 + 改密表单 -->
+- [x] T072 [US5] 实现设置页"安全设置"区域：自动获取链接预览 Toggle、阅后即焚时长 Select（0/1/5/10/30 分钟）、自动清理 Toggle + 保留月数 Select → 表单修改后点"保存" → `UpdateSecuritySettingsAsync`；手动清理按钮 → 输入保留月数 → 确认 dialog → `CleanupOldMessagesAsync` → Toast 反馈（共删除 N 条） <!-- S3-05 [evolved]: 焚毁时长为数字输入（1–43200 分钟），非 0/1/5/10/30 下拉；D1 定时销毁语义 -->
+- [x] T073 [US5] 实现设置页"外观与语言"区域： <!-- S3-05 [done]: 三语（zh-CN/zh-TW/en）+ 主题切换 -->
   - 语言 Toggle（中文/English）→ `Preferences["anydrop_language"]` → `CultureInfo.CurrentCulture`/`CurrentUICulture` 切换 → `IStringLocalizer` 或资源字典重载（含中英文 JSON 资源文件 `AnyDrop.App/Resources/Strings/zh-CN.resx` + `en.resx`）
   - 深色/浅色主题 Toggle → `Preferences["anydrop_theme"]` → `JSRuntime.InvokeVoidAsync("ThemeManager.setTheme", mode)`
-- [ ] T074 [US5] 实现设置页"危险区域"：修改服务端地址（输入框预填当前 URL → 保存 → `IServerConfigService.SetBaseUrlAsync` → `ISignalRService.StopAsync` → `ISecureTokenStorage.ClearTokenAsync` → `NavigationManager.NavigateTo("/setup")`）；退出登录（确认 dialog → `IAuthService.LogoutAsync` → `ISecureTokenStorage.ClearTokenAsync` → `NavigationManager.NavigateTo("/login")`）
-- [ ] T075 [US5] 创建本地化资源文件 `AnyDrop.App/Resources/Strings/AppStrings.zh-CN.resx` + `AppStrings.en.resx`，覆盖所有静态 UI 文本（页面标题、按钮标签、错误提示、Toast 消息），在 `MauiProgram.cs` 注册 `IStringLocalizer<AppStrings>`
+- [x] T074 [US5] 实现设置页"危险区域"：修改服务端地址（输入框预填当前 URL → 保存 → `IServerConfigService.SetBaseUrlAsync` → `ISignalRService.StopAsync` → `ISecureTokenStorage.ClearTokenAsync` → `NavigationManager.NavigateTo("/setup")`）；退出登录（确认 dialog → `IAuthService.LogoutAsync` → `ISecureTokenStorage.ClearTokenAsync` → `NavigationManager.NavigateTo("/login")`） <!-- S3-05 [done]: 危险区域：改服务端地址 + 退出登录 -->
+- [x] T075 [US5] 创建本地化资源文件 `AnyDrop.App/Resources/Strings/AppStrings.zh-CN.resx` + `AppStrings.en.resx`，覆盖所有静态 UI 文本（页面标题、按钮标签、错误提示、Toast 消息），在 `MauiProgram.cs` 注册 `IStringLocalizer<AppStrings>` <!-- S3-05 [done]: resx 在 Resources/（默认 + zh-TW + en），AddLocalization 已注册 -->
 
 **Checkpoint**: US5 完成 — 设置页所有子功能独立可验证。
 
@@ -216,13 +228,13 @@
 
 **Independent Test**: 系统相册选择图片 → 分享给 AnyDrop → 选择目标主题 → 发送成功消息出现在主题列表，即为完整路径。
 
-- [ ] T076 [P] [US6] 完善 `AnyDrop.App/Platforms/Android/AndroidManifest.xml`：在 `<activity>` 上添加 `android:launchMode="singleTask"`；声明 `ACTION_SEND`（`text/*`）、`ACTION_SEND`（`image/*`、`video/*`、`application/*`）、`ACTION_SEND_MULTIPLE`（`image/*`、`application/*`）Intent Filter
-- [ ] T077 [P] [US6] 完善 `AnyDrop.App/Platforms/iOS/Info.plist`：添加 `CFBundleDocumentTypes`（`public.image`、`public.movie`、`public.data`）和对应 UTI，使 App 在 iOS Share Sheet 的"Open In"菜单中出现
-- [ ] T078 [US6] 实现 `AnyDrop.App/Platforms/Android/MainActivity.cs` `OnNewIntent`：解析 `Intent.Action.Send` / `SendMultiple`；文字内容取 `Intent.GetStringExtra("android.intent.extra.TEXT")`；文件/图片取 `intent.GetParcelableExtra(Intent.ExtraStream)` 的 `Uri`，用 `ContentResolver.OpenInputStream(uri)` 读取后 copy 到 `CacheDir`；将结果存入 `PendingSharedContent`（全局静态字段），触发 App 前台 + Blazor 检测
-- [ ] T079 [US6] 实现 `AnyDrop.App/Platforms/iOS/AppDelegate.cs` `OpenUrl` / `ContinueUserActivity`：接收文件 URL，copy 到 App 沙盒 Cache 目录，填充 `PendingSharedContent`
-- [ ] T080 [US6] 创建 `AnyDrop.App/Components/Pages/Share/ExternalSharePage.razor`：`@page "/share"`，`@layout AuthLayout`；`OnInitializedAsync` 读取 `PendingSharedContent`：显示内容预览（文字 `<pre>` 或图片缩略图或文件名+大小）+ 主题下拉选择器（从 `ITopicService.GetTopicsAsync()` 加载）+ "发送"按钮；点击发送：文字 → `IShareService.SendTextAsync`，文件 → `IFileUploadService.UploadFileAsync`；发送成功后清空 `PendingSharedContent`，关闭界面（`NavigationManager.NavigateTo("/")`）；发送失败显示错误 Toast，允许重试
-- [ ] T081 [US6] 在 `AnyDrop.App/Components/Routes.razor` `OnInitializedAsync` 中检测 `PendingSharedContent != null`：已认证 → `NavigationManager.NavigateTo("/share")`；未认证 → 存储 `returnTo="/share"` 标志，跳转 `/login`，登录成功后自动导航至 `/share`（在 `LoginPage.razor` 补充 returnTo 逻辑）
-- [ ] T082 [US6] 处理分享时 App 处于离线状态：`ExternalSharePage.razor` 检查 `IConnectivityService.IsOnline`，离线时显示"无网络连接，内容已暂存"提示，"重试"按钮（重连后重新发送，`PendingSharedContent` 保持有效直到发送成功）
+- [ ] T076 [P] [US6] 完善 `AnyDrop.App/Platforms/Android/AndroidManifest.xml`：在 `<activity>` 上添加 `android:launchMode="singleTask"`；声明 `ACTION_SEND`（`text/*`）、`ACTION_SEND`（`image/*`、`video/*`、`application/*`）、`ACTION_SEND_MULTIPLE`（`image/*`、`application/*`）Intent Filter <!-- S3-05 [partial]: SEND 过滤器有三条，缺 SEND_MULTIPLE；activity 也无 launchMode="singleTask"（真缺口，见 spec-freeze.md） -->
+- [x] T077 [P] [US6] 完善 `AnyDrop.App/Platforms/iOS/Info.plist`：添加 `CFBundleDocumentTypes`（`public.image`、`public.movie`、`public.data`）和对应 UTI，使 App 在 iOS Share Sheet 的"Open In"菜单中出现 <!-- S3-05 [done]: Info.plist 含 CFBundleDocumentTypes -->
+- [x] T078 [US6] 实现 `AnyDrop.App/Platforms/Android/MainActivity.cs` `OnNewIntent`：解析 `Intent.Action.Send` / `SendMultiple`；文字内容取 `Intent.GetStringExtra("android.intent.extra.TEXT")`；文件/图片取 `intent.GetParcelableExtra(Intent.ExtraStream)` 的 `Uri`，用 `ContentResolver.OpenInputStream(uri)` 读取后 copy 到 `CacheDir`；将结果存入 `PendingSharedContent`（全局静态字段），触发 App 前台 + Blazor 检测 <!-- S3-05 [done]: MainActivity.OnNewIntent（S2-06） -->
+- [x] T079 [US6] 实现 `AnyDrop.App/Platforms/iOS/AppDelegate.cs` `OpenUrl` / `ContinueUserActivity`：接收文件 URL，copy 到 App 沙盒 Cache 目录，填充 `PendingSharedContent` <!-- S3-05 [done]: iOS AppDelegate OpenUrl + ContinueUserActivity -->
+- [x] T080 [US6] 创建 `AnyDrop.App/Components/Pages/Share/ExternalSharePage.razor`：`@page "/share"`，`@layout AuthLayout`；`OnInitializedAsync` 读取 `PendingSharedContent`：显示内容预览（文字 `<pre>` 或图片缩略图或文件名+大小）+ 主题下拉选择器（从 `ITopicService.GetTopicsAsync()` 加载）+ "发送"按钮；点击发送：文字 → `IShareService.SendTextAsync`，文件 → `IFileUploadService.UploadFileAsync`；发送成功后清空 `PendingSharedContent`，关闭界面（`NavigationManager.NavigateTo("/")`）；发送失败显示错误 Toast，允许重试 <!-- S3-05 [done]: ExternalSharePage 已存在 -->
+- [x] T081 [US6] 在 `AnyDrop.App/Components/Routes.razor` `OnInitializedAsync` 中检测 `PendingSharedContent != null`：已认证 → `NavigationManager.NavigateTo("/share")`；未认证 → 存储 `returnTo="/share"` 标志，跳转 `/login`，登录成功后自动导航至 `/share`（在 `LoginPage.razor` 补充 returnTo 逻辑） <!-- S3-05 [done]: Routes.razor 检测 PendingShare，returnTo=/share -->
+- [x] T082 [US6] 处理分享时 App 处于离线状态：`ExternalSharePage.razor` 检查 `IConnectivityService.IsOnline`，离线时显示"无网络连接，内容已暂存"提示，"重试"按钮（重连后重新发送，`PendingSharedContent` 保持有效直到发送成功） <!-- S3-05 [done]: ExternalSharePage 离线提示 -->
 
 **Checkpoint**: US6 完成 — Android + iOS 外部分享流程可验证。
 
@@ -234,12 +246,12 @@
 
 **Independent Test**: App 切换后台 → 另一设备发送消息 → 本机通知栏出现消息通知，点击跳转对应主题，即为可测路径。
 
-- [ ] T083 [P] [US7] 确认 `AnyDrop.App/AnyDrop.App.csproj` 已包含 `Plugin.LocalNotification` (10.1.x) 并在 `MauiProgram.cs` 调用了 `builder.UseLocalNotification()`（T001/T020 已预置，此处验证并激活）
-- [ ] T084 [P] [US7] 完善 `AnyDrop.App/Platforms/Android/AndroidManifest.xml`：确认 `android.permission.POST_NOTIFICATIONS` 权限存在；在 `MainActivity.cs` `OnCreate` 中加入运行时权限请求：`await Permissions.RequestAsync<Permissions.PostNotifications>()`（仅在 API 33+ 执行）
-- [ ] T085 [US7] 创建 `AnyDrop.App/Services/INotificationService.cs` + `NotificationService.cs`：`RequestPermissionAsync()→bool`（调用 `Plugin.LocalNotification` 权限 API）；`ShowMessageNotificationAsync(string topicName, string preview, Guid topicId)`（构造 `NotificationRequest`，`BadgeNumber`、`Title=topicName`、`Description=preview`，通知点击 Action 携带 `topicId`）；`CancelAllAsync()`；权限被拒绝时静默失败不抛异常
-- [ ] T086 [US7] 在 `AnyDrop.App/MauiProgram.cs` 注册 `INotificationService`（Singleton）；在用户登录成功后（`LoginPage.razor` / `SetupAccountPage.razor` 登录回调中）调用 `INotificationService.RequestPermissionAsync()`
-- [ ] T087 [US7] 在 `SignalRService.cs` `TopicsUpdated` 事件处理中注入并调用 `INotificationService`：当 App 处于后台（`AppState == ApplicationState.Background`，通过 MAUI `ILifecycleBuilder` / `Application.Current.MainPage` 可见性判断）且消息数增加时，调用 `ShowMessageNotificationAsync(topicName, lastMessagePreview, topicId)`
-- [ ] T088 [US7] 处理通知点击深链接：在 `Platforms/Android/MainActivity.cs` `OnNewIntent` 和 `Platforms/iOS/AppDelegate.cs` 中解析通知点击携带的 `topicId`，存入全局静态字段；`Routes.razor` `OnInitializedAsync` 检测后设置 `AppStateService.CurrentTopicId` 并 `NavigationManager.NavigateTo("/")`
+- [x] T083 [P] [US7] 确认 `AnyDrop.App/AnyDrop.App.csproj` 已包含 `Plugin.LocalNotification` (10.1.x) 并在 `MauiProgram.cs` 调用了 `builder.UseLocalNotification()`（T001/T020 已预置，此处验证并激活） <!-- S3-05 [evolved]: 平台原生通知服务，非 Plugin.LocalNotification -->
+- [x] T084 [P] [US7] 完善 `AnyDrop.App/Platforms/Android/AndroidManifest.xml`：确认 `android.permission.POST_NOTIFICATIONS` 权限存在；在 `MainActivity.cs` `OnCreate` 中加入运行时权限请求：`await Permissions.RequestAsync<Permissions.PostNotifications>()`（仅在 API 33+ 执行） <!-- S3-05 [evolved]: 运行时权限请求在 NotificationService，不在 MainActivity.OnCreate -->
+- [x] T085 [US7] 创建 `AnyDrop.App/Services/INotificationService.cs` + `NotificationService.cs`：`RequestPermissionAsync()→bool`（调用 `Plugin.LocalNotification` 权限 API）；`ShowMessageNotificationAsync(string topicName, string preview, Guid topicId)`（构造 `NotificationRequest`，`BadgeNumber`、`Title=topicName`、`Description=preview`，通知点击 Action 携带 `topicId`）；`CancelAllAsync()`；权限被拒绝时静默失败不抛异常 <!-- S3-05 [done]: INotificationService + 平台原生实现 -->
+- [x] T086 [US7] 在 `AnyDrop.App/MauiProgram.cs` 注册 `INotificationService`（Singleton）；在用户登录成功后（`LoginPage.razor` / `SetupAccountPage.razor` 登录回调中）调用 `INotificationService.RequestPermissionAsync()` <!-- S3-05 [done]: MauiProgram 注册；登录成功调 RequestPermissionAsync -->
+- [x] T087 [US7] 在 `SignalRService.cs` `TopicsUpdated` 事件处理中注入并调用 `INotificationService`：当 App 处于后台（`AppState == ApplicationState.Background`，通过 MAUI `ILifecycleBuilder` / `Application.Current.MainPage` 可见性判断）且消息数增加时，调用 `ShowMessageNotificationAsync(topicName, lastMessagePreview, topicId)` <!-- S3-05 [evolved]: 通知在 MessageList（非当前话题消息），无前后台区分；未接 SignalRService.TopicsUpdated -->
+- [x] T088 [US7] 处理通知点击深链接：在 `Platforms/Android/MainActivity.cs` `OnNewIntent` 和 `Platforms/iOS/AppDelegate.cs` 中解析通知点击携带的 `topicId`，存入全局静态字段；`Routes.razor` `OnInitializedAsync` 检测后设置 `AppStateService.CurrentTopicId` 并 `NavigationManager.NavigateTo("/")` <!-- S3-05 [done]: Routes.NotificationTopicId + MainActivity 处理 topic_id -->
 
 **Checkpoint**: US7 完成 — 后台通知能力可验证。
 
@@ -249,15 +261,15 @@
 
 **Purpose**: 跨故事的代码质量、性能、安全性与可维护性提升。
 
-- [ ] T089 [P] 完善 `AnyDrop.App/Components/Layout/MainLayout.razor` 离线横幅交互：`IConnectivityService` 恢复网络时自动隐藏横幅 + 触发 `ISignalRService.StartAsync()`（若处于 Disconnected 状态）；横幅动画过渡（CSS `transition: max-height 0.3s ease`）
-- [ ] T090 [P] 完善 `AnyDrop.App/wwwroot/app.css`：iOS notch/Dynamic Island 兼容（`padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)`）；底部导航栏 `padding-bottom: env(safe-area-inset-bottom)` 避免 Home Indicator 遮挡；`MessageList` 滚动容器 `overscroll-behavior: contain` 防止穿透
-- [ ] T091 [P] 创建 `AnyDrop.Tests.Unit/AuthDelegatingHandlerTests.cs`：覆盖 Token 注入到 Authorization 头、Token 为 null 时不注入、401 响应触发 `AppEventBus.AuthExpired` 事件、非 401 响应不触发事件，通过 `DelegatingHandlerTestHelper` + Moq
-- [ ] T092 [P] 全局错误处理：在 `MainLayout.razor` 或 Blazor `<ErrorBoundary>` 中捕获未处理异常，显示友好 Toast（"操作失败，请重试"），不暴露原始堆栈信息；为所有 `HttpClient` 调用添加统一 `try-catch(HttpRequestException)` → `ConnectivityService.IsOnline` 判断并显示离线或网络错误提示
-- [ ] T093 实现 Tailwind CSS 生产构建：安装 Tailwind CLI，扫描 `AnyDrop.App/Components/**/*.razor` 生成 `wwwroot/app-production.css`；在 `wwwroot/index.html` 生产构建时替换 CDN `<script>` 为本地 `<link rel="stylesheet" href="app-production.css">`；更新 `.csproj` 构建脚本（`BeforeBuild` Target）
-- [ ] T094 [P] 性能优化：在 `Components/Routes.razor` 为非首次导航页（Search、Settings）添加 Blazor 懒加载（`@using Microsoft.AspNetCore.Components.WebAssembly.Services` 或 MAUI 等效方式）；`MessageList.razor` 超过 200 条消息时启用 `Virtualize<ShareItemDto>` 组件替代直接渲染
-- [ ] T095 [P] 为 `AnyDrop.App/Services/` 所有公共接口和实现类添加 XML doc 注释（`/// <summary>`），方便 IDE 智能提示
-- [ ] T096 执行 `quickstart.md` 验证清单：① `dotnet build AnyDrop.App -f net10.0-android -c Debug` 0 error ② `dotnet test AnyDrop.Tests.Unit` 全部通过 ③ 在 Android 模拟器上运行 App，验证冷启动 → ServerSetupPage 显示 ④ 输入本地服务端地址 → 登录 → 发送消息 → SignalR 收到推送 ⑤ 所有 FR-001 至 FR-036 逐一核对完成状态
-- [ ] T097 安全合规终审：确认 JWT 仅存 `SecureStorage`（grep `Preferences.Set` 不含 token 字样）；确认 `AuthDelegatingHandler` 无硬编码凭证；文件上传前 MIME 类型与大小在 `FileUploadService` 中校验（大小 > 0、非空 MIME）；`SecureStorage` 异常 try-catch 已覆盖（iOS Keychain 锁定场景）
+- [x] T089 [P] 完善 `AnyDrop.App/Components/Layout/MainLayout.razor` 离线横幅交互：`IConnectivityService` 恢复网络时自动隐藏横幅 + 触发 `ISignalRService.StartAsync()`（若处于 Disconnected 状态）；横幅动画过渡（CSS `transition: max-height 0.3s ease`） <!-- S3-05 [done]: 横幅自动隐藏（MainLayout）+ 网络恢复重连（SignalRService） -->
+- [x] T090 [P] 完善 `AnyDrop.App/wwwroot/app.css`：iOS notch/Dynamic Island 兼容（`padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)`）；底部导航栏 `padding-bottom: env(safe-area-inset-bottom)` 避免 Home Indicator 遮挡；`MessageList` 滚动容器 `overscroll-behavior: contain` 防止穿透 <!-- S3-05 [done]: app.css 安全区域规则齐全 -->
+- [x] T091 [P] 创建 `AnyDrop.Tests.Unit/AuthDelegatingHandlerTests.cs`：覆盖 Token 注入到 Authorization 头、Token 为 null 时不注入、401 响应触发 `AppEventBus.AuthExpired` 事件、非 401 响应不触发事件，通过 `DelegatingHandlerTestHelper` + Moq <!-- S3-05 [done]: Tests.Unit/App/AuthDelegatingHandlerTests.cs -->
+- [ ] T092 [P] 全局错误处理：在 `MainLayout.razor` 或 Blazor `<ErrorBoundary>` 中捕获未处理异常，显示友好 Toast（"操作失败，请重试"），不暴露原始堆栈信息；为所有 `HttpClient` 调用添加统一 `try-catch(HttpRequestException)` → `ConnectivityService.IsOnline` 判断并显示离线或网络错误提示 <!-- S3-05 [not-done]: App 组件无 ErrorBoundary；无统一全局错误处理 -->
+- [x] T093 实现 Tailwind CSS 生产构建：安装 Tailwind CLI，扫描 `AnyDrop.App/Components/**/*.razor` 生成 `wwwroot/app-production.css`；在 `wwwroot/index.html` 生产构建时替换 CDN `<script>` 为本地 `<link rel="stylesheet" href="app-production.css">`；更新 `.csproj` 构建脚本（`BeforeBuild` Target） <!-- S3-05 [done]: Tailwind CLI 本地构建（README npm 脚本），index.html 引本地 css，无 CDN -->
+- [ ] T094 [P] 性能优化：在 `Components/Routes.razor` 为非首次导航页（Search、Settings）添加 Blazor 懒加载（`@using Microsoft.AspNetCore.Components.WebAssembly.Services` 或 MAUI 等效方式）；`MessageList.razor` 超过 200 条消息时启用 `Virtualize<ShareItemDto>` 组件替代直接渲染 <!-- S3-05 [partial]: Virtualize 已用；页面懒加载未做（MAUI Blazor Hybrid 无对应模式在用） -->
+- [ ] T095 [P] 为 `AnyDrop.App/Services/` 所有公共接口和实现类添加 XML doc 注释（`/// <summary>`），方便 IDE 智能提示 <!-- S3-05 [not-done]: XML 注释只覆盖部分服务（Topic/Search/Settings 为 0） -->
+- [ ] T096 执行 `quickstart.md` 验证清单：① `dotnet build AnyDrop.App -f net10.0-android -c Debug` 0 error ② `dotnet test AnyDrop.Tests.Unit` 全部通过 ③ 在 Android 模拟器上运行 App，验证冷启动 → ServerSetupPage 显示 ④ 输入本地服务端地址 → 登录 → 发送消息 → SignalR 收到推送 ⑤ 所有 FR-001 至 FR-036 逐一核对完成状态 <!-- S3-05 [partial]: 构建 0 错 + 测试 552/552；模拟器运行与 FR-001..036 核对待 S2-11 设备门 -->
+- [x] T097 安全合规终审：确认 JWT 仅存 `SecureStorage`（grep `Preferences.Set` 不含 token 字样）；确认 `AuthDelegatingHandler` 无硬编码凭证；文件上传前 MIME 类型与大小在 `FileUploadService` 中校验（大小 > 0、非空 MIME）；`SecureStorage` 异常 try-catch 已覆盖（iOS Keychain 锁定场景） <!-- S3-05 [done]: 审计 + S3-02 覆盖：token 不进 Preferences、无硬编码凭证、上传 MIME/大小校验、SecureStorage try-catch -->
 
 ---
 
