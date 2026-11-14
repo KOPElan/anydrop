@@ -18,7 +18,11 @@
         若将来新增依赖 import map 的同位 JS，E2E 的控制台错误断言会立刻发现。
     *@
     <HeadOutlet @rendermode="InteractiveServer" />
-    @* 尽早恢复主题，避免出现白色/暗色闪烁（FOUC）。独立同源脚本，使 CSP 可以保持 script-src 'self' *@
+    <script src="/js/auth-interop.js"></script>
+    @* 尽早恢复主题，避免出现白色/暗色闪烁（FOUC）。theme-init.js 只是同源薄壳，
+       真正的恢复逻辑在 auth-interop.js 的 window.AnyDropTheme 块里（存储键
+       anydrop_theme，与 MAUI 共用契约，见 ThemeContractTests）；不用内联
+       <script>，CSP 得以保持 script-src 'self' *@
     <script src="/js/theme-init.js"></script>
     @* 图片失败回退：在捕获阶段监听，替代原先的内联 onerror 属性 *@
     <script src="/js/image-fallback.js"></script>
@@ -32,7 +36,6 @@
     <script src="/js/sortable.min.js"></script>
     <script src="/js/sortable-interop.js"></script>
     <script src="/js/dragdrop-interop.js"></script>
-    <script src="/js/auth-interop.js"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 

@@ -33,24 +33,34 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
 
     private readonly HubConnectionManager _manager;
     private readonly AppEventBus _eventBus;
+    private readonly IConnectivityService _connectivity;
     private HubConnection? _registeredConnection;
     private bool _stopping;
     private bool _hasEverConnected;
+    private ConnectionState _lastNotifiedConnectionState = ConnectionState.NeverConnected;
     private CancellationTokenSource? _reconnectCts;
     private Task? _reconnectLoopTask;
     private readonly SemaphoreSlim _startLock = new(1, 1);
     private readonly object _reconnectLock = new();
 
-    public SignalRService(HubConnectionManager manager, AppEventBus eventBus)
+    public SignalRService(HubConnectionManager manager, AppEventBus eventBus, IConnectivityService connectivity)
     {
         _manager = manager;
         _eventBus = eventBus;
+        _connectivity = connectivity;
         _eventBus.ConnectivityChanged += OnConnectivityChanged;
     }
 
     public HubConnectionState State => _manager.Connection.State;
 
+    /// <summary>S3-06：应用级连接状态，实时推导（Hub 状态 + 网络连通性 + 是否曾经连通过）。</summary>
+    public ConnectionState ConnectionState =>
+        ConnectionStateRules.Derive(_connectivity.IsOnline, State, _hasEverConnected);
+
     public event Action<HubConnectionState>? StateChanged;
+
+    /// <summary>S3-06：应用级连接状态变化时触发（仅在推导值真正变化时触发）。</summary>
+    public event Action<ConnectionState>? ConnectionStateChanged;
     public event Action<IReadOnlyList<TopicDto>>? TopicsUpdated;
     public event Action<ShareItemDto>? ShareItemReceived;
     public event Action<IReadOnlyList<Guid>>? ShareItemsDeleted;
@@ -78,6 +88,7 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
             {
                 await conn.StartAsync(ct).ConfigureAwait(false);
                 _hasEverConnected = true;
+                RaiseConnectionStateChangedIfChanged();
             }
         }
         finally
@@ -114,10 +125,23 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
         _registeredConnection = null;
         _hasEverConnected = false;
         _stopping = false;
+        RaiseConnectionStateChangedIfChanged();
+    }
+
+    /// <summary>S3-06：推导值变化时才触发 <see cref="ConnectionStateChanged"/>，避免重复通知。</summary>
+    private void RaiseConnectionStateChangedIfChanged()
+    {
+        var derived = ConnectionState;
+        if (derived == _lastNotifiedConnectionState) return;
+        _lastNotifiedConnectionState = derived;
+        ConnectionStateChanged?.Invoke(derived);
     }
 
     private void OnConnectivityChanged(bool isOnline)
     {
+        // 网络状态本身就是应用级状态的输入之一：先通知推导值变化，再处理重连。
+        RaiseConnectionStateChangedIfChanged();
+
         if (!isOnline || _stopping)
         {
             return;
@@ -135,18 +159,21 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
         conn.Reconnecting += _ =>
         {
             StateChanged?.Invoke(HubConnectionState.Reconnecting);
+            RaiseConnectionStateChangedIfChanged();
             return Task.CompletedTask;
         };
         conn.Reconnected += _ =>
         {
             _hasEverConnected = true;
             StateChanged?.Invoke(HubConnectionState.Connected);
+            RaiseConnectionStateChangedIfChanged();
             Reconnected?.Invoke();
             return Task.CompletedTask;
         };
         conn.Closed += ex =>
         {
             StateChanged?.Invoke(HubConnectionState.Disconnected);
+            RaiseConnectionStateChangedIfChanged();
             // S2-02：过期判断改用状态码，不再靠异常消息里是否含「401」字符串猜。
             if (ex is HttpRequestException httpEx
                 && httpEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -237,6 +264,7 @@ public sealed class SignalRService : ISignalRService, IAsyncDisposable
                     }
 
                     StateChanged?.Invoke(HubConnectionState.Connected);
+                    RaiseConnectionStateChangedIfChanged();
                     return;
                 }
             }

@@ -2,6 +2,7 @@
 using AnyDrop.App.Infrastructure;
 using AnyDrop.App.Platform;
 using AnyDrop.App.Services;
+using AnyDrop.Shared;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Storage;
 
@@ -108,6 +109,8 @@ namespace AnyDrop.App
             builder.Services.AddHttpClient("plain");
 
             // Scoped 业务服务
+            // S3-06：主题切换共享服务（IThemeService 直通 window.AnyDropTheme + Preferences 镜像）。
+            builder.Services.AddScoped<IThemeService, JsThemeService>();
             builder.Services.AddScoped<IAppStateService, AppStateService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IShareService, ShareService>();

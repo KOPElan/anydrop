@@ -1,5 +1,6 @@
 using AnyDrop.Data;
 using AnyDrop.Models;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,7 +25,7 @@ public sealed class AuthService(
     {
         if (await userService.HasUserAsync(ct))
         {
-            return AuthResult<LoginResponse>.Failure("初始化已完成。", StatusCodes.Status409Conflict);
+            return AuthResult<LoginResponse>.Failure("初始化已完成。", StatusCodes.Status409Conflict, ApiErrorCodes.SetupAlreadyDone);
         }
 
         // S0-03：初始化接口同样按来源限流。初始化只能成功一次，但不限流时
@@ -32,14 +33,14 @@ public sealed class AuthService(
         // 注意：429 与 409 的顺序——已初始化时直接返回 409，不消耗限流额度。
         if (loginRateLimiter.IsLocked(rateLimitKey, out _))
         {
-            return AuthResult<LoginResponse>.Failure("操作过于频繁，请稍后再试。", StatusCodes.Status429TooManyRequests);
+            return AuthResult<LoginResponse>.Failure("操作过于频繁，请稍后再试。", StatusCodes.Status429TooManyRequests, ApiErrorCodes.TooManyRequests);
         }
 
         var nickname = request.Nickname.Trim();
         if (string.IsNullOrWhiteSpace(nickname) || nickname.Length > 50)
         {
             loginRateLimiter.RegisterFailure(rateLimitKey);
-            return AuthResult<LoginResponse>.Failure("昵称不能为空且不能超过 50 个字符。", StatusCodes.Status400BadRequest);
+            return AuthResult<LoginResponse>.Failure("昵称不能为空且不能超过 50 个字符。", StatusCodes.Status400BadRequest, ApiErrorCodes.InvalidNickname);
         }
 
         // S3-02（SEC-03）：新密码最低 10 位（见 PasswordPolicy）。
@@ -48,13 +49,13 @@ public sealed class AuthService(
         if (passwordError is not null)
         {
             loginRateLimiter.RegisterFailure(rateLimitKey);
-            return AuthResult<LoginResponse>.Failure(passwordError, StatusCodes.Status400BadRequest);
+            return AuthResult<LoginResponse>.Failure(passwordError, StatusCodes.Status400BadRequest, ApiErrorCodes.PasswordTooShort);
         }
 
         if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
         {
             loginRateLimiter.RegisterFailure(rateLimitKey);
-            return AuthResult<LoginResponse>.Failure("两次输入的密码不一致。", StatusCodes.Status400BadRequest);
+            return AuthResult<LoginResponse>.Failure("两次输入的密码不一致。", StatusCodes.Status400BadRequest, ApiErrorCodes.PasswordMismatch);
         }
 
         var (passwordHash, passwordSalt) = passwordHasherService.HashPassword(request.Password);
@@ -79,7 +80,7 @@ public sealed class AuthService(
         }
         catch (DbUpdateException)
         {
-            return AuthResult<LoginResponse>.Failure("初始化已完成。", StatusCodes.Status409Conflict);
+            return AuthResult<LoginResponse>.Failure("初始化已完成。", StatusCodes.Status409Conflict, ApiErrorCodes.SetupAlreadyDone);
         }
 
         loginRateLimiter.Reset(rateLimitKey);
@@ -101,6 +102,7 @@ public sealed class AuthService(
             return AuthResult<LoginResponse>.Failure(
                 $"尝试次数过多，请 {seconds} 秒后再试。",
                 StatusCodes.Status429TooManyRequests,
+                ApiErrorCodes.TooManyRequests,
                 retryAfter);
         }
 
@@ -108,14 +110,14 @@ public sealed class AuthService(
         var user = await dbContext.Users.FirstOrDefaultAsync(ct);
         if (user is null)
         {
-            return AuthResult<LoginResponse>.Failure("请先完成初始化配置。", StatusCodes.Status409Conflict);
+            return AuthResult<LoginResponse>.Failure("请先完成初始化配置。", StatusCodes.Status409Conflict, ApiErrorCodes.SetupRequired);
         }
 
         var verification = passwordHasherService.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt);
         if (verification == PasswordVerificationResult.Failed)
         {
             loginRateLimiter.RegisterFailure(rateLimitKey);
-            return AuthResult<LoginResponse>.Failure("账号或密码错误。", StatusCodes.Status401Unauthorized);
+            return AuthResult<LoginResponse>.Failure("账号或密码错误。", StatusCodes.Status401Unauthorized, ApiErrorCodes.InvalidCredentials);
         }
 
         loginRateLimiter.Reset(rateLimitKey);
@@ -144,7 +146,7 @@ public sealed class AuthService(
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
         {
-            return AuthResult<LogoutResultDto>.Failure("用户不存在。", StatusCodes.Status404NotFound);
+            return AuthResult<LogoutResultDto>.Failure("用户不存在。", StatusCodes.Status404NotFound, ApiErrorCodes.UserNotFound);
         }
 
         user.SessionVersion++;
@@ -159,7 +161,7 @@ public sealed class AuthService(
     {
         var profile = await userService.GetProfileAsync(userId, ct);
         return profile is null
-            ? AuthResult<UserProfileDto>.Failure("用户不存在。", StatusCodes.Status404NotFound)
+            ? AuthResult<UserProfileDto>.Failure("用户不存在。", StatusCodes.Status404NotFound, ApiErrorCodes.UserNotFound)
             : AuthResult<UserProfileDto>.Success(profile);
     }
 
@@ -172,32 +174,32 @@ public sealed class AuthService(
         var passwordError = PasswordPolicy.ValidateNewPassword(request.NewPassword);
         if (passwordError is not null)
         {
-            return AuthResult<bool>.Failure(passwordError, StatusCodes.Status400BadRequest);
+            return AuthResult<bool>.Failure(passwordError, StatusCodes.Status400BadRequest, ApiErrorCodes.PasswordTooShort);
         }
 
         if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
         {
-            return AuthResult<bool>.Failure("两次输入的新密码不一致。", StatusCodes.Status400BadRequest);
+            return AuthResult<bool>.Failure("两次输入的新密码不一致。", StatusCodes.Status400BadRequest, ApiErrorCodes.PasswordMismatch);
         }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
         {
-            return AuthResult<bool>.Failure("用户不存在。", StatusCodes.Status404NotFound);
+            return AuthResult<bool>.Failure("用户不存在。", StatusCodes.Status404NotFound, ApiErrorCodes.UserNotFound);
         }
 
         if (passwordHasherService.VerifyPassword(request.CurrentPassword, user.PasswordHash, user.PasswordSalt)
             == PasswordVerificationResult.Failed)
         {
-            return AuthResult<bool>.Failure("当前密码错误。", StatusCodes.Status401Unauthorized);
+            return AuthResult<bool>.Failure("当前密码错误。", StatusCodes.Status401Unauthorized, ApiErrorCodes.WrongPassword);
         }
 
         // 新旧相同直接拒绝：否则「改密码」等于没改，旧密码泄露后仍可用，
         // 还会误触 SessionVersion 递增把全部设备登出。
         if (passwordHasherService.VerifyPassword(request.NewPassword, user.PasswordHash, user.PasswordSalt))
         {
-            return AuthResult<bool>.Failure("新密码不能与当前密码相同。", StatusCodes.Status400BadRequest);
+            return AuthResult<bool>.Failure("新密码不能与当前密码相同。", StatusCodes.Status400BadRequest, ApiErrorCodes.PasswordSameAsOld);
         }
 
         var (hash, salt) = passwordHasherService.HashPassword(request.NewPassword);

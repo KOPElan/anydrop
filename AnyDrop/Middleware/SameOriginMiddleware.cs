@@ -38,7 +38,7 @@ public sealed class SameOriginMiddleware(RequestDelegate next, ILogger<SameOrigi
                     origin, context.Request.Host, context.Request.Method, context.Request.Path);
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 await context.Response.WriteAsJsonAsync(
-                    ApiEnvelope<object>.Fail("请求来源不正确。"), context.RequestAborted);
+                    ApiEnvelope<object>.Fail("请求来源不正确。", ApiErrorCodes.InvalidOrigin), context.RequestAborted);
                 return;
             }
         }

@@ -168,6 +168,27 @@ public class TopicServiceTests
     }
 
     [Fact]
+    public async Task PinTopicAsync_UsesInjectedClockForPinnedAt()
+    {
+        // S3-06：置顶时间取自注入的 TimeProvider，而非系统时钟。
+        var fakeTime = new FakeTimeProvider(new DateTimeOffset(2026, 11, 15, 10, 30, 0, TimeSpan.Zero));
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var topic = new Topic { Name = "Pin me" };
+        dbContext.Topics.Add(topic);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(factory, out _, fakeTime);
+        var result = await service.PinTopicAsync(topic.Id, true);
+
+        result.PinnedAt.Should().Be(fakeTime.UtcNow);
+
+        await using var verifyDb = factory.CreateDbContext();
+        var entity = await verifyDb.Topics.SingleAsync();
+        entity.PinnedAt.Should().Be(fakeTime.UtcNow);
+    }
+
+    [Fact]
     public async Task GetAllTopicsAsync_WhenPinned_ReturnsPinnedFirst()
     {
         var factory = CreateDbContextFactory();
@@ -211,7 +232,7 @@ public class TopicServiceTests
         return new TestDbContextFactory(options);
     }
 
-    private static TopicService CreateService(TestDbContextFactory factory, out Mock<IClientProxy> clientProxyMock)
+    private static TopicService CreateService(TestDbContextFactory factory, out Mock<IClientProxy> clientProxyMock, TimeProvider? timeProvider = null)
     {
         clientProxyMock = new Mock<IClientProxy>();
         clientProxyMock
@@ -224,6 +245,6 @@ public class TopicServiceTests
         var hubContextMock = new Mock<IHubContext<ShareHub>>();
         hubContextMock.Setup(context => context.Clients).Returns(hubClientsMock.Object);
 
-        return new TopicService(factory, hubContextMock.Object);
+        return new TopicService(factory, hubContextMock.Object, timeProvider ?? TimeProvider.System);
     }
 }

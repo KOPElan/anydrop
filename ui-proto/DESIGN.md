@@ -27,7 +27,7 @@ Depth is achieved through the physical stacking of surface tokens:
 ### The "Glass & Gradient" Rule
 To elevate the UI beyond a standard flat look:
 *   **Sidebar:** Utilize Glassmorphism. Apply a 20-40px `backdrop-blur` behind a semi-transparent `surface` or `surface_variant`. 
-*   **Primary Actions:** Main CTAs (like the "Send" button) should use a subtle linear gradient from `primary` (#0053cd) to `primary_container` (#789dff) at a 135-degree angle. This adds a "soul" and depth that flat hex codes cannot replicate.
+*   **Primary Actions:** Main CTAs (like the "Send" button) should use a subtle linear gradient from `primary` (#3578F5) to `primary_container` (#5090FF) at a 135-degree angle. This adds a "soul" and depth that flat hex codes cannot replicate.
 
 ---
 

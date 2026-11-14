@@ -40,7 +40,7 @@ public static class StorageEndpoints
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Action))
         {
-            return TypedResults.BadRequest(ApiEnvelope<bool>.Fail("必须指定处理方式 action。"));
+            return TypedResults.BadRequest(ApiEnvelope<bool>.Fail("必须指定处理方式 action。", ApiErrorCodes.ActionRequired));
         }
 
         try
@@ -48,14 +48,14 @@ public static class StorageEndpoints
             var resolved = await storageHealthService.ResolveMissingFileAsync(id, request.Action.Trim(), ct);
             if (!resolved)
             {
-                return TypedResults.NotFound(ApiEnvelope<bool>.Fail("记录不存在。"));
+                return TypedResults.NotFound(ApiEnvelope<bool>.Fail("记录不存在。", ApiErrorCodes.RecordNotFound));
             }
 
             return TypedResults.Ok(ApiEnvelope<bool>.Ok(true));
         }
         catch (ArgumentException ex)
         {
-            return TypedResults.BadRequest(ApiEnvelope<bool>.Fail(ex.Message));
+            return TypedResults.BadRequest(ApiEnvelope<bool>.Fail(ex.Message, ApiErrorCodes.ResolveFailed));
         }
     }
 }

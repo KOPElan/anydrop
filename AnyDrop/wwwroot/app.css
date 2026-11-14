@@ -8,8 +8,8 @@
     --font-label: "Inter", sans-serif;
 
     /* Primary */
-    --color-primary: #0050cb;
-    --color-primary-container: #0066ff;
+    --color-primary: #3578F5;
+    --color-primary-container: #5090FF;
     --color-primary-fixed: #dae1ff;
     --color-primary-fixed-dim: #b3c5ff;
     --color-on-primary: #ffffff;
@@ -55,8 +55,8 @@
 
     /* ─── 在线状态颜色 ─── */
     --color-status-online: #22c55e;
-    --color-brand: #0050cb;
-    --color-brand-hover: #0040a0;
+    --color-brand: #3578F5;
+    --color-brand-hover: #2563EB;
     --color-sidebar: #f3f4f5;
 
     /* ── 磨砂玻璃共用变量 ── */
@@ -227,7 +227,7 @@
         top: 0.75rem;
         bottom: 0.75rem;
         width: 4px;
-        background: linear-gradient(180deg, #6366f1, #3b82f6);
+        background: linear-gradient(180deg, #3578F5, #5090FF);
         border-radius: 0 4px 4px 0;
         transform-origin: center;
         animation: pill-expand 250ms var(--ease-bounce) both;
@@ -242,9 +242,9 @@
     }
 
     .sidebar-item--active .sidebar-item__icon {
-        background: linear-gradient(135deg, #6366f1, #3b82f6);
+        background: linear-gradient(135deg, #3578F5, #5090FF);
         color: white;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.30);
+        box-shadow: 0 4px 12px rgba(53, 120, 245, 0.30);
     }
 
     .sidebar-item__name {
@@ -594,8 +594,8 @@
 
     /* ─── 文本消息气泡 ─── */
     .bubble-text {
-        background: linear-gradient(135deg, #3b82f6, #2563eb);
-        box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.40);
+        background: linear-gradient(135deg, #3578F5, #5090FF);
+        box-shadow: 0 8px 20px -6px rgba(53, 120, 245, 0.40);
     }
 
     /* ─── 登录页面 ─── */
@@ -989,14 +989,14 @@
             align-items: center;
             justify-content: center;
             color: #fff;
-            background: linear-gradient(135deg, #6366f1, #3b82f6);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+            background: linear-gradient(135deg, #3578F5, #5090FF);
+            box-shadow: 0 6px 20px rgba(53, 120, 245, 0.45);
             transition: transform 200ms ease, box-shadow 200ms ease;
         }
 
         .mobile-fab:hover {
             transform: translateY(-2px) scale(1.04);
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.50);
+            box-shadow: 0 8px 24px rgba(53, 120, 245, 0.50);
         }
 
         .mobile-fab:active {
@@ -1030,12 +1030,12 @@
 
     /* ─── 聊天发送按钮（桌面端和移动端浮动面板共用渐变样式）─── */
     .chat-send-btn {
-        background: linear-gradient(135deg, #6366f1, #3b82f6);
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+        background: linear-gradient(135deg, #3578F5, #5090FF);
+        box-shadow: 0 4px 12px rgba(53, 120, 245, 0.35);
     }
 
     .chat-send-btn:hover:not(:disabled) {
-        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.45);
+        box-shadow: 0 6px 16px rgba(53, 120, 245, 0.45);
     }
 
     /* ─── Settings 卡片图标容器（缩略图等带图标标题的区块）─── */

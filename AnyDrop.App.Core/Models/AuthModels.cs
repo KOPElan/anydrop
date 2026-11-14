@@ -12,5 +12,7 @@ public sealed record AppAuthResult(
     string? Error = null,
     string? AccessToken = null,
     DateTimeOffset ExpiresAt = default,
-    UserProfileDto? User = null);
+    UserProfileDto? User = null,
+    /// <summary>服务端错误码（见 <see cref="ApiErrorCodes"/>）；界面按码显示本地化文案。</summary>
+    string? ErrorCode = null);
 

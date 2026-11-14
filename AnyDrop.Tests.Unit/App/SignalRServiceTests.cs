@@ -1,6 +1,7 @@
 using AnyDrop.App.Infrastructure;
 using AnyDrop.App.Models;
 using AnyDrop.App.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR.Client;
 using Moq;
@@ -10,7 +11,7 @@ namespace AnyDrop.Tests.Unit.App;
 
 public class SignalRServiceTests
 {
-    private static (SignalRService sut, HubConnectionManager manager, AppEventBus eventBus) CreateSut()
+    private static (SignalRService sut, HubConnectionManager manager, AppEventBus eventBus) CreateSut(bool isOnline = true)
     {
         var serverConfig = new Mock<IServerConfigService>();
         serverConfig.Setup(s => s.GetHubUrl()).Returns("http://localhost:0/hubs/share");
@@ -22,7 +23,7 @@ public class SignalRServiceTests
         var eventBus = new AppEventBus();
         var manager = new HubConnectionManager(serverConfig.Object, refreshService.Object);
 
-        return (new SignalRService(manager, eventBus), manager, eventBus);
+        return (new SignalRService(manager, eventBus, new FakeConnectivityService(isOnline)), manager, eventBus);
     }
 
     private static async Task RegisterHandlersAsync(SignalRService sut)
@@ -43,6 +44,22 @@ public class SignalRServiceTests
     {
         var (sut, _, _) = CreateSut();
         sut.State.Should().Be(HubConnectionState.Disconnected);
+    }
+
+    [Fact]
+    public void ConnectionState_WhenNotStarted_IsNeverConnected()
+    {
+        // S3-06：启动时尚未连通过，应用级状态为 NeverConnected（不显示横幅）。
+        var (sut, _, _) = CreateSut();
+        sut.ConnectionState.Should().Be(ConnectionState.NeverConnected);
+    }
+
+    [Fact]
+    public void ConnectionState_WhenOffline_IsOfflineEvenBeforeFirstConnect()
+    {
+        // S3-06：离线优先于一切——即使从未连通过，也显示离线横幅。
+        var (sut, _, _) = CreateSut(isOnline: false);
+        sut.ConnectionState.Should().Be(ConnectionState.Offline);
     }
 
     [Fact]

@@ -38,19 +38,19 @@ public static class FileEndpoints
     {
         if (file is null || file.Length == 0)
         {
-            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail("未提供文件或文件为空。"));
+            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail("未提供文件或文件为空。", ApiErrorCodes.FileRequired));
         }
 
         if (!topicId.HasValue)
         {
-            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail("必须指定目标主题（topicId）。"));
+            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail("必须指定目标主题（topicId）。", ApiErrorCodes.TopicRequired));
         }
 
         var maxFileSize = configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? DefaultMaxFileSizeBytes;
         if (file.Length > maxFileSize)
         {
             return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail(
-                $"文件大小（{file.Length:N0} 字节）超出限制（{maxFileSize:N0} 字节）。"));
+                $"文件大小（{file.Length:N0} 字节）超出限制（{maxFileSize:N0} 字节）。", ApiErrorCodes.UploadFailed));
         }
 
         // 磁盘写满会让文件落盘与 SQLite 写入一起失败，进而使整个实例不可用。
@@ -58,7 +58,7 @@ public static class FileEndpoints
         if (!fileStorageService.HasFreeSpace(file.Length))
         {
             return Results.Json(
-                ApiEnvelope<ShareItemDto>.Fail("服务器剩余存储空间不足，已拒绝本次上传。"),
+                ApiEnvelope<ShareItemDto>.Fail("服务器剩余存储空间不足，已拒绝本次上传。", ApiErrorCodes.StorageFull),
                 statusCode: StatusCodes.Status507InsufficientStorage);
         }
 
@@ -87,7 +87,7 @@ public static class FileEndpoints
         }
         catch (ArgumentException ex)
         {
-            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail(ex.Message));
+            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail(ex.Message, ApiErrorCodes.UploadFailed));
         }
     }
 }

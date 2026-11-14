@@ -40,6 +40,7 @@ public class AuthServiceTests
     }
 
     [Fact]
+    [Fact]
     public async Task LoginAsync_AfterTooManyFailures_Returns429WithRetryAfter()
     {
         // 被限流时必须返回 429 并给出可等待时长，而不是伪装成「密码错误」：
@@ -65,6 +66,20 @@ public class AuthServiceTests
         blocked.RetryAfter.Should().NotBeNull();
         blocked.RetryAfter!.Value.Should().BeGreaterThan(TimeSpan.Zero);
         blocked.Error.Should().Contain("尝试次数过多");
+    }
+
+    [Fact]
+    public async Task LoginAsync_WrongPassword_ReturnsInvalidCredentialsCode()
+    {
+        // S3-06：服务端错误码（客户端按码查本地化文案，不再直显中文原文）。
+        var factory = CreateDbContextFactory();
+        var sut = CreateSut(factory);
+        await sut.SetupAsync(new SetupRequest("Admin", "Password1!", "Password1!"), "k");
+
+        var result = await sut.LoginAsync(new LoginRequest("wrong", "/"), "k");
+
+        result.ErrorCode.Should().Be("invalid_credentials");
+        result.Error.Should().Be("账号或密码错误。");
     }
 
     [Fact]
@@ -113,6 +128,7 @@ public class AuthServiceTests
         var stored = await db.Users.AsNoTracking().SingleAsync();
         // 测试用 1000 次迭代（见 CreateSut），哈希串必须记录该参数
         stored.PasswordHash.Should().StartWith("pbkdf2-sha256$1000$");
+    }
     }
 
     [Fact]

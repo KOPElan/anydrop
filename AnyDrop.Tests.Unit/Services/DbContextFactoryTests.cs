@@ -88,7 +88,7 @@ public class DbContextFactoryTests : IDisposable
         hubClients.Setup(c => c.All).Returns(new Mock<IClientProxy>().Object);
         var hubContext = new Mock<IHubContext<ShareHub>>();
         hubContext.Setup(c => c.Clients).Returns(hubClients.Object);
-        var sut = new TopicService(factory, hubContext.Object);
+        var sut = new TopicService(factory, hubContext.Object, TimeProvider.System);
 
         await sut.PinTopicAsync(topicId, true);
 

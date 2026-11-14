@@ -37,7 +37,7 @@ public static class SettingsEndpoints
         if (userId is null)
         {
             return Results.Json(
-                ApiEnvelope<UserProfileDto>.Fail("未授权，无法更新个人资料。"),
+                ApiEnvelope<UserProfileDto>.Fail("未授权，无法更新个人资料。", ApiErrorCodes.Unauthorized),
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
@@ -72,7 +72,7 @@ public static class SettingsEndpoints
 
         return result.Succeeded
             ? Results.Ok(ApiEnvelope<UserProfileDto>.Ok(result.Data!))
-            : Results.Json(ApiEnvelope<UserProfileDto>.Fail(result.Error ?? "更新昵称失败。"), statusCode: result.StatusCode);
+            : Results.Json(ApiEnvelope<UserProfileDto>.Fail(result.Error ?? "更新昵称失败。", result.ErrorCode ?? ApiErrorCodes.UpdateNicknameFailed), statusCode: result.StatusCode);
     }
 
     public static async Task<IResult> UpdatePasswordAsync(
@@ -90,7 +90,7 @@ public static class SettingsEndpoints
         var result = await authService.UpdatePasswordAsync(userId.Value, request, ct);
         if (!result.Succeeded)
         {
-            return Results.Json(ApiEnvelope<bool>.Fail(result.Error ?? "更新密码失败。"), statusCode: result.StatusCode);
+            return Results.Json(ApiEnvelope<bool>.Fail(result.Error ?? "更新密码失败。", result.ErrorCode ?? ApiErrorCodes.UpdatePasswordFailed), statusCode: result.StatusCode);
         }
 
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -111,7 +111,7 @@ public static class SettingsEndpoints
         var result = await systemSettingsService.UpdateSecuritySettingsAsync(request, ct);
         return result.Succeeded
             ? Results.Ok(ApiEnvelope<SecuritySettingsDto>.Ok(result.Data!))
-            : Results.Json(ApiEnvelope<SecuritySettingsDto>.Fail(result.Error ?? "更新失败。"), statusCode: result.StatusCode);
+            : Results.Json(ApiEnvelope<SecuritySettingsDto>.Fail(result.Error ?? "更新失败。", result.ErrorCode ?? ApiErrorCodes.UpdateSettingsFailed), statusCode: result.StatusCode);
     }
 
     /// <summary>
@@ -121,7 +121,7 @@ public static class SettingsEndpoints
     {
         if (!SupportedLanguages.All.Contains(request.Culture))
         {
-            return Results.BadRequest(ApiEnvelope<object>.Fail("不支持的语言代码。"));
+            return Results.BadRequest(ApiEnvelope<object>.Fail("不支持的语言代码。", ApiErrorCodes.UnsupportedLanguage));
         }
 
         httpContext.Response.Cookies.Append(

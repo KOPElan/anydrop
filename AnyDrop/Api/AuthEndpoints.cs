@@ -68,7 +68,7 @@ public static class AuthEndpoints
         if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
         {
             return Results.Json(
-                ApiEnvelope<LoginResponse>.Fail("刷新令牌无效。"),
+                ApiEnvelope<LoginResponse>.Fail("刷新令牌无效。", ApiErrorCodes.InvalidRefreshToken),
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
@@ -76,7 +76,7 @@ public static class AuthEndpoints
         if (!result.Succeeded || result.Payload is null)
         {
             return Results.Json(
-                ApiEnvelope<LoginResponse>.Fail(result.Error ?? "刷新令牌无效。"),
+                ApiEnvelope<LoginResponse>.Fail(result.Error ?? "刷新令牌无效。", ApiErrorCodes.InvalidRefreshToken),
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
@@ -98,7 +98,7 @@ public static class AuthEndpoints
         if (userId is null)
         {
             return Results.Json(
-                ApiEnvelope<HubTokenResponse>.Fail("未授权。"),
+                ApiEnvelope<HubTokenResponse>.Fail("未授权。", ApiErrorCodes.Unauthorized),
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
@@ -106,7 +106,7 @@ public static class AuthEndpoints
         if (user is null)
         {
             return Results.Json(
-                ApiEnvelope<HubTokenResponse>.Fail("用户不存在。"),
+                ApiEnvelope<HubTokenResponse>.Fail("用户不存在。", ApiErrorCodes.UserNotFound),
                 statusCode: StatusCodes.Status404NotFound);
         }
 
@@ -123,14 +123,14 @@ public static class AuthEndpoints
         if (userId is null)
         {
             return Results.Json(
-                ApiEnvelope<LogoutResultDto>.Fail("未授权。"),
+                ApiEnvelope<LogoutResultDto>.Fail("未授权。", ApiErrorCodes.Unauthorized),
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
         var result = await authService.LogoutAsync(userId.Value, ct);
         if (!result.Succeeded)
         {
-            return Results.Json(ApiEnvelope<LogoutResultDto>.Fail(result.Error ?? "登出失败。"), statusCode: result.StatusCode);
+            return Results.Json(ApiEnvelope<LogoutResultDto>.Fail(result.Error ?? "登出失败。", result.ErrorCode ?? ApiErrorCodes.LogoutFailed), statusCode: result.StatusCode);
         }
 
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -146,14 +146,14 @@ public static class AuthEndpoints
         if (userId is null)
         {
             return Results.Json(
-                ApiEnvelope<UserProfileDto>.Fail("未授权。"),
+                ApiEnvelope<UserProfileDto>.Fail("未授权。", ApiErrorCodes.Unauthorized),
                 statusCode: StatusCodes.Status401Unauthorized);
         }
 
         var result = await authService.GetProfileAsync(userId.Value, ct);
         return result.Succeeded
             ? Results.Ok(ApiEnvelope<UserProfileDto>.Ok(result.Data!))
-            : Results.Json(ApiEnvelope<UserProfileDto>.Fail(result.Error ?? "获取用户信息失败。"), statusCode: result.StatusCode);
+            : Results.Json(ApiEnvelope<UserProfileDto>.Fail(result.Error ?? "获取用户信息失败。", result.ErrorCode ?? ApiErrorCodes.GetUserFailed), statusCode: result.StatusCode);
     }
 
     private static async Task<IResult> BuildAuthResultAsync(HttpContext httpContext, AuthResult<LoginResponse> result)
@@ -168,7 +168,7 @@ public static class AuthEndpoints
                         .ToString(CultureInfo.InvariantCulture);
             }
 
-            return Results.Json(ApiEnvelope<LoginResponse>.Fail(result.Error ?? "认证失败。"), statusCode: result.StatusCode);
+            return Results.Json(ApiEnvelope<LoginResponse>.Fail(result.Error ?? "认证失败。", result.ErrorCode ?? ApiErrorCodes.AuthFailed), statusCode: result.StatusCode);
         }
 
         await SignInCookieAsync(httpContext, result.Data!);

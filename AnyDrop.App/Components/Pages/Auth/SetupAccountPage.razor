@@ -46,6 +46,13 @@
     private string? _error;
     private bool _loading;
 
+    /// <summary>S3-06：resx 查词辅助——键不存在时返回 null（供 ApiErrorMessages.Localize 回退）。</summary>
+    private string? TryLocalize(string key)
+    {
+        var localized = L[key];
+        return localized.ResourceNotFound ? null : localized.Value;
+    }
+
     private async Task SetupAsync()
     {
         if (string.IsNullOrWhiteSpace(_nickname)) { _error = L["SetupAccount_NicknameRequired"]; return; }
@@ -64,7 +71,9 @@
         }
         else
         {
-            _error = result.Error ?? L["SetupAccount_Failed"];
+            // S3-06：按服务端错误码查本地化文案；码未知时回退服务端原文，再无原文时用默认文案。
+            _error = ApiErrorMessages.Localize(result.ErrorCode, TryLocalize, result.Error)
+                ?? L["SetupAccount_Failed"];
             _loading = false;
         }
     }

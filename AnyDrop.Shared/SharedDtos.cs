@@ -3,13 +3,17 @@ namespace AnyDrop.Shared;
 // ── 公共 API 响应 Envelope ──────────────────────────────────────────────────────
 
 /// <summary>统一的 API 响应信封。所有 API 响应均返回此结构。</summary>
-public sealed record ApiEnvelope<T>(bool Success, T? Data, string? Error)
+/// <param name="ErrorCode">
+/// 失败时的稳定错误码（见 <see cref="ApiErrorCodes"/>），成功时为 null。
+/// 客户端按码查本地化文案；<paramref name="Error"/> 文本保留作旧客户端回退与日志排障。
+/// </param>
+public sealed record ApiEnvelope<T>(bool Success, T? Data, string? Error, string? ErrorCode = null)
 {
     /// <summary>返回成功响应。</summary>
     public static ApiEnvelope<T> Ok(T? data = default) => new(true, data, null);
 
     /// <summary>返回失败响应。</summary>
-    public static ApiEnvelope<T> Fail(string error) => new(false, default, error);
+    public static ApiEnvelope<T> Fail(string error, string? errorCode = null) => new(false, default, error, errorCode);
 }
 
 // ── 认证相关 DTO ──────────────────────────────────────────────────────────────

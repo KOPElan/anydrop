@@ -107,6 +107,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 // 未配置时用当前计算机时区）。单例，构造时即记启动日志。
 builder.Services.AddSingleton<BackgroundTaskTimeZone>();
 builder.Services.AddScoped<IShareService, ShareService>();
+// S3-06：主题切换共享服务（IThemeService 直通 window.AnyDropTheme）。
+builder.Services.AddScoped<IThemeService, JsThemeService>();
 builder.Services.AddScoped<StorageHealthService>();
 builder.Services.AddScoped<ITopicService, TopicService>();
 builder.Services.AddScoped<ITopicStateService, TopicStateService>();
@@ -359,7 +361,7 @@ builder.Services.AddAuthentication(options =>
             if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("未授权。"));
+                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("未授权。", ApiErrorCodes.Unauthorized));
             }
 
             var returnUrl = Uri.EscapeDataString($"{context.Request.Path}{context.Request.QueryString}");
@@ -371,7 +373,7 @@ builder.Services.AddAuthentication(options =>
             if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("无权限访问。"));
+                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("无权限访问。", ApiErrorCodes.Forbidden));
             }
 
             var returnUrl = Uri.EscapeDataString($"{context.Request.Path}{context.Request.QueryString}");
@@ -432,7 +434,7 @@ builder.Services.AddAuthentication(options =>
 
                 context.HandleResponse();
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("未授权。"));
+                return context.Response.WriteAsJsonAsync(ApiEnvelope<object>.Fail("未授权。", ApiErrorCodes.Unauthorized));
             }
         };
     });
