@@ -4,6 +4,7 @@
 @inject IAppStateService AppState
 @inject IOutboxService Outbox
 @inject AppEventBus EventBus
+@inject AnyDrop.App.Platform.IPreferenceStore Preferences
 @inject IStringLocalizer<AppStrings> L
 @implements IDisposable
 
@@ -80,6 +81,52 @@
     {
         EventBus.ConnectivityChanged += OnConnectivityChanged;
         _ = RefreshOutboxCountAsync();
+        RestoreDraft();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // 切换话题时恢复该话题的草稿（每个话题独立保存）
+        RestoreDraft();
+    }
+
+    /// <summary>S2-05：输入框草稿落盘——按话题保存，杀进程/切话题后回来仍在。</summary>
+    private string DraftKey => $"anydrop_draft_{TopicId}";
+
+    private void RestoreDraft()
+    {
+        try
+        {
+            _text = Preferences.Get(DraftKey, string.Empty) ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 恢复草稿失败: {ex.Message}");
+        }
+    }
+
+    private void SaveDraft()
+    {
+        try
+        {
+            Preferences.Set(DraftKey, _text);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 保存草稿失败: {ex.Message}");
+        }
+    }
+
+    private void ClearDraft()
+    {
+        try
+        {
+            Preferences.Set(DraftKey, string.Empty);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 清除草稿失败: {ex.Message}");
+        }
     }
 
     private void OnConnectivityChanged(bool isOnline)
@@ -153,6 +200,8 @@
         var textToSend = _text;
         var sendGeneration = _textGeneration;
         _text = string.Empty;
+        // 发送即清草稿（无论成功还是入箱），避免中途重渲染把旧草稿恢复回来
+        ClearDraft();
         try
         {
             var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
@@ -174,7 +223,10 @@
             {
                 System.Diagnostics.Debug.WriteLine($"[MessageInput] 发件箱写入失败，恢复输入: {enqueueEx.Message}");
                 if (_textGeneration == sendGeneration)
+                {
                     _text = textToSend;
+                    SaveDraft();
+                }
             }
 
             await RefreshOutboxCountAsync();
@@ -184,7 +236,10 @@
             // 服务端拒绝（如 400/401/413）不入箱：恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
             System.Diagnostics.Debug.WriteLine($"[MessageInput] 发送消息失败: {ex.Message}");
             if (_textGeneration == sendGeneration)
+            {
                 _text = textToSend;
+                SaveDraft();
+            }
         }
     }
 
@@ -226,6 +281,7 @@
     {
         _text = e.Value?.ToString() ?? string.Empty;
         _textGeneration++;
+        SaveDraft();
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
