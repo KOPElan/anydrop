@@ -6,6 +6,10 @@ services:
   anydrop:
     ports:
       - "18080:8080"
+    # 以宿主机用户的 UID/GID 运行（由 smoke-compose.sh 传入），而不用镜像默认的 1654：
+    # 容器创建的文件（密钥、日志、上传文件）属主是宿主机用户，备份脚本才能读、
+    # 清理才能删。否则宿主机上的 cp/rm 会因 Permission denied 失败。
+    user: "${SMOKE_UID:-1000}:${SMOKE_GID:-1000}"
     volumes:
       - ${SMOKE_DATA_DIR:-./.smoke/compose-data}:/data
     environment:

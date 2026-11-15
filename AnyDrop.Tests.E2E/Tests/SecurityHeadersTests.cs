@@ -67,6 +67,17 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
         };
         page.PageError += (_, error) => errors.Add($"[pageerror] {error}");
 
+        // 控制台报错只说“404”不说 URL，定位全靠猜：把失败响应的 URL 也记下来。
+        // /api/v1/auth/me 的 401 是登录页的预期探测，见 IsExpectedUnauthorizedProbe。
+        page.Response += (_, response) =>
+        {
+            if (response.Status >= 400
+                && !(response.Status == 401 && response.Url.Contains("/api/v1/auth/me", StringComparison.Ordinal)))
+            {
+                errors.Add($"[http {response.Status}] {response.Url}");
+            }
+        };
+
         await page.GotoAsync($"{fixture.BaseUrl}{path}", new PageGotoOptions
         {
             WaitUntil = WaitUntilState.DOMContentLoaded,

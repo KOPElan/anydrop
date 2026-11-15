@@ -42,6 +42,10 @@ mkdir -p "$DATA_DIR"
 # 不放开写权限，应用创建 /data/keys（S1-05 密钥持久化）时会报 Permission denied。
 # 该目录是脚本结束即删的临时目录，放开权限无长期影响。
 chmod 777 "$DATA_DIR"
+# 让容器以宿主机用户的 UID/GID 运行（见 docker-compose.smoke.yml 的 user:）：
+# 容器创建的文件属主是宿主机用户，备份（cp）和清理（rm）才不会 Permission denied。
+export SMOKE_UID="$(id -u)"
+export SMOKE_GID="$(id -g)"
 docker compose -f docker-compose.yml -f docker-compose.smoke.yml up -d
 
 wait_health() {
