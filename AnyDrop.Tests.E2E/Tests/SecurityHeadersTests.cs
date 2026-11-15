@@ -56,8 +56,13 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
         }
 
         var errors = new List<string>();
+        // 诊断追踪：控制台报错只说状态码不说 URL，CI 上又无法复现本地问题；
+        // 失败时把本次导航的全部请求/响应/控制台消息都写进断言消息里，
+        // 这样下一次失败就能直接看到是哪个 URL 出了问题。
+        var trace = new List<string>();
         page.Console += (_, message) =>
         {
+            trace.Add($"[console {message.Type}] {message.Text}");
             // Playwright .NET 的 IConsoleMessage.Type 是字符串（"error" / "warning" / …）
             if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase)
                 && !IsExpectedUnauthorizedProbe(message.Text))
@@ -66,15 +71,13 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
             }
         };
         page.PageError += (_, error) => errors.Add($"[pageerror] {error}");
-
-        // 控制台报错只说“404”不说 URL，定位全靠猜：把失败响应的 URL 也记下来。
-        // /api/v1/auth/me 的 401 是登录页的预期探测，见 IsExpectedUnauthorizedProbe。
-        // dotnet-browser-tools/hot-reload-settings.json 的 404 也是预期内的开发态噪声：
-        // blazor.web.js 在 Development 下用 fetch() 探测热重载配置，普通 dotnet run
-        //（非 dotnet watch）不注册该端点，因此总是 404；生产构建根本不发这个请求。
-        // fetch() 失败本身不进控制台，这个条目只是为了不让开发态噪声在断言里冒出来。
+        page.Request += (_, request) => trace.Add($"[req {request.Method}] {request.Url}");
+        // /api/v1/auth/me 的 401 是登录页的预期探测，见 IsExpectedUnauthorizedProbe；
+        // dotnet-browser-tools/hot-reload-settings.json 的 404 是开发态热重载探测噪声，
+        // 两者都不计入错误（只记入追踪）。
         page.Response += (_, response) =>
         {
+            trace.Add($"[res {response.Status}] {response.Url}");
             if (response.Status >= 400
                 && !(response.Status == 401 && response.Url.Contains("/api/v1/auth/me", StringComparison.Ordinal))
                 && !response.Url.Contains("/_framework/dotnet-browser-tools/hot-reload-settings.json", StringComparison.Ordinal))
@@ -82,6 +85,7 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
                 errors.Add($"[http {response.Status}] {response.Url}");
             }
         };
+        page.RequestFailed += (_, request) => trace.Add($"[reqfailed] {request.Url} {request.Failure}");
 
         await page.GotoAsync($"{fixture.BaseUrl}{path}", new PageGotoOptions
         {
@@ -95,7 +99,8 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
         await page.WaitForTimeoutAsync(1500);
 
         errors.Should().BeEmpty(
-            $"访问 {path} 时不应出现控制台错误或 CSP 违规。捕获到的错误（{errors.Count} 条）：{string.Join(" ‖ ", errors)}");
+            $"访问 {path} 时不应出现控制台错误或 CSP 违规。捕获到的错误（{errors.Count} 条）：{string.Join(" ‖ ", errors)}" +
+            $"\n本次导航追踪（{trace.Count} 条）：\n{string.Join("\n", trace)}");
     }
 
     /// <summary>
