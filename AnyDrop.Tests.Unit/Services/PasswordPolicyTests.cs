@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 namespace AnyDrop.Tests.Unit.Services;
 
 /// <summary>
-/// S3-02（SEC-03）：密码策略只约束新密码——最低 10 位，改密新旧不同；
+/// S3-02（SEC-03）：密码策略只约束新密码——最低 8 位，改密新旧不同；
 /// 已有短密码仍能登录；登录路径不做长度校验。
 /// </summary>
 public class PasswordPolicyTests
@@ -18,34 +18,34 @@ public class PasswordPolicyTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData("short9chr")]
+    [InlineData("short7c")]
     public void ValidateNewPassword_TooShort_ReturnsError(string? password)
-        => PasswordPolicy.ValidateNewPassword(password).Should().Be("密码长度至少 10 位。");
+        => PasswordPolicy.ValidateNewPassword(password).Should().Be("密码长度至少 8 位。");
 
     [Fact]
-    public void ValidateNewPassword_Exactly10Chars_Passes()
-        => PasswordPolicy.ValidateNewPassword("0123456789").Should().BeNull();
+    public void ValidateNewPassword_Exactly8Chars_Passes()
+        => PasswordPolicy.ValidateNewPassword("01234567").Should().BeNull();
 
     [Fact]
-    public async Task SetupAsync_PasswordShorterThan10_Returns400WithNewMinimum()
+    public async Task SetupAsync_PasswordShorterThan8_Returns400WithNewMinimum()
     {
         var factory = CreateDbContextFactory();
         var sut = CreateSut(factory);
 
-        var result = await sut.SetupAsync(new SetupRequest("Admin", "Short9chr", "Short9chr"), "k");
+        var result = await sut.SetupAsync(new SetupRequest("Admin", "Short7c", "Short7c"), "k");
 
         result.Succeeded.Should().BeFalse();
         result.StatusCode.Should().Be(400);
-        result.Error.Should().Be("密码长度至少 10 位。");
+        result.Error.Should().Be("密码长度至少 8 位。");
     }
 
     [Fact]
-    public async Task SetupAsync_PasswordExactly10Chars_Succeeds()
+    public async Task SetupAsync_PasswordExactly8Chars_Succeeds()
     {
         var factory = CreateDbContextFactory();
         var sut = CreateSut(factory);
 
-        var result = await sut.SetupAsync(new SetupRequest("Admin", "0123456789", "0123456789"), "k");
+        var result = await sut.SetupAsync(new SetupRequest("Admin", "01234567", "01234567"), "k");
 
         result.Succeeded.Should().BeTrue();
         result.StatusCode.Should().Be(201);
@@ -78,11 +78,11 @@ public class PasswordPolicyTests
         var user = await db.Users.SingleAsync();
 
         var result = await sut.UpdatePasswordAsync(
-            user.Id, new UpdatePasswordRequest("Password1!", "Short9chr", "Short9chr"));
+            user.Id, new UpdatePasswordRequest("Password1!", "Short7c", "Short7c"));
 
         result.Succeeded.Should().BeFalse();
         result.StatusCode.Should().Be(400);
-        result.Error.Should().Be("密码长度至少 10 位。");
+        result.Error.Should().Be("密码长度至少 8 位。");
     }
 
     [Fact]

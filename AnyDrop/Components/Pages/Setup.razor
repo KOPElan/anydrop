@@ -13,14 +13,17 @@
         <div>
             <label class="auth-label mb-1 block text-sm font-medium">@L["Setup_Nickname"]</label>
             <InputText @bind-Value="_model.Nickname" class="auth-input w-full rounded-xl px-3 py-2" />
+            <ValidationMessage For="() => _model.Nickname" />
         </div>
         <div>
             <label class="auth-label mb-1 block text-sm font-medium">@L["Setup_Password"]</label>
             <InputText @bind-Value="_model.Password" type="password" class="auth-input w-full rounded-xl px-3 py-2" />
+            <ValidationMessage For="() => _model.Password" />
         </div>
         <div>
             <label class="auth-label mb-1 block text-sm font-medium">@L["Setup_ConfirmPassword"]</label>
             <InputText @bind-Value="_model.ConfirmPassword" type="password" class="auth-input w-full rounded-xl px-3 py-2" />
+            <ValidationMessage For="() => _model.ConfirmPassword" />
         </div>
         @if (!string.IsNullOrWhiteSpace(_error))
         {
