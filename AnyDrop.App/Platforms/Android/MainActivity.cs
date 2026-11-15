@@ -60,9 +60,9 @@ namespace AnyDrop.App
                 {
                     foreach (var parcelable in uris)
                     {
-                        if (parcelable is Android.Net.Uri uri)
+                        if (parcelable is Android.Net.Uri sharedUri)
                         {
-                            var copied = CopyUriToCache(uri, intent.Type);
+                            var copied = CopyUriToCache(sharedUri, intent.Type);
                             if (copied is not null)
                             {
                                 files.Add(copied);
@@ -117,7 +117,7 @@ namespace AnyDrop.App
         {
             try
             {
-                var resolver = Application.Context.ContentResolver!;
+                var resolver = Android.App.Application.Context.ContentResolver!;
                 // 每文件的真实 MIME 类型优先取该 Uri 自身的类型，Intent 的 Type 只是兜底
                 // （多文件分享时 Intent.Type 常为 */*，无法区分各文件）。
                 var mimeType = resolver.GetType(uri) ?? intentMimeType ?? "application/octet-stream";
