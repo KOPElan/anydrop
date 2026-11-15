@@ -60,27 +60,45 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
         // 失败时把本次导航的全部请求/响应/控制台消息都写进断言消息里，
         // 这样下一次失败就能直接看到是哪个 URL 出了问题。
         var trace = new List<string>();
+        // Blazor 热重载探测的 404 会同时产生一条控制台错误，但控制台文本里没有 URL，
+        // 无法直接按 URL 过滤。利用事件顺序关联：Response 一定先于它触发的控制台
+        // 报错到达，因此先在 Response 里记下探测 404，再用它抵消随后的一条 404
+        // 控制台报错（抵消后立即清零，避免误吞之后真实资源的报错）。
+        // 真实资源 404 不受影响：它仍会在 Response 里记为 [http 404] <url>。
+        var hotReloadProbe404Seen = false;
         page.Console += (_, message) =>
         {
             trace.Add($"[console {message.Type}] {message.Text}");
             // Playwright .NET 的 IConsoleMessage.Type 是字符串（"error" / "warning" / …）
             if (string.Equals(message.Type, "error", StringComparison.OrdinalIgnoreCase)
-                && !IsExpectedUnauthorizedProbe(message.Text))
+                && !IsExpectedUnauthorizedProbe(message.Text)
+                && !IsHotReloadProbeError(message.Text, ref hotReloadProbe404Seen))
             {
                 errors.Add($"[console] {message.Text}");
             }
         };
         page.PageError += (_, error) => errors.Add($"[pageerror] {error}");
         page.Request += (_, request) => trace.Add($"[req {request.Method}] {request.Url}");
-        // /api/v1/auth/me 的 401 是登录页的预期探测，见 IsExpectedUnauthorizedProbe；
-        // dotnet-browser-tools/hot-reload-settings.json 的 404 是开发态热重载探测噪声，
-        // 两者都不计入错误（只记入追踪）。
+        // /api/v1/auth/me 的 401 是登录页的预期探测，见 IsExpectedUnauthorizedProbe。
+        // /_framework/dotnet-browser-tools/hot-reload-settings.json 的 404 是开发态热重载
+        // 探测噪声：Blazor 在 Development（Debug）下加载热重载模块
+        // Microsoft.NET.Sdk.BlazorWeb.HotReload.*.lib.module.js，它用 fetch() 探测该端点；
+        // 普通 dotnet run 不注册这个端点（只有 dotnet watch 会），因此总是 404；
+        // 生产构建根本不加载热重载模块。fetch() 的 404 确实会进控制台（此前误以为不会），
+        // 所以这里既要在 Response 里忽略它，也要在控制台里按顺序抵消它。
+        // 注意：本地 SDK 10.0.404 根本不带这个热重载模块，CI 的新版 10.0.x 才带——
+        // 这就是该失败只在 CI 出现、本地用真浏览器也复现不了的原因。
         page.Response += (_, response) =>
         {
             trace.Add($"[res {response.Status}] {response.Url}");
+            if (response.Status == 404
+                && response.Url.Contains("/_framework/dotnet-browser-tools/hot-reload-settings.json", StringComparison.Ordinal))
+            {
+                hotReloadProbe404Seen = true;
+                return;
+            }
             if (response.Status >= 400
-                && !(response.Status == 401 && response.Url.Contains("/api/v1/auth/me", StringComparison.Ordinal))
-                && !response.Url.Contains("/_framework/dotnet-browser-tools/hot-reload-settings.json", StringComparison.Ordinal))
+                && !(response.Status == 401 && response.Url.Contains("/api/v1/auth/me", StringComparison.Ordinal)))
             {
                 errors.Add($"[http {response.Status}] {response.Url}");
             }
@@ -110,6 +128,28 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
     private static bool IsExpectedUnauthorizedProbe(string text)
         => text.Contains("Failed to load resource", StringComparison.Ordinal)
            && text.Contains("401", StringComparison.Ordinal);
+
+    /// <summary>
+    /// 把一条 404 控制台报错关联到 Blazor 热重载探测：控制台文本里没有 URL，只能按
+    /// 事件顺序抵消——探测的 Response（404）一定先于它触发的控制台报错到达。
+    /// 抵消后把标记清零，避免误吞之后真实资源的 404 报错。
+    /// </summary>
+    private static bool IsHotReloadProbeError(string text, ref bool probe404Seen)
+    {
+        if (!probe404Seen)
+        {
+            return false;
+        }
+
+        if (!text.Contains("Failed to load resource", StringComparison.Ordinal)
+            || !text.Contains("404", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        probe404Seen = false;
+        return true;
+    }
 
     [Fact]
     public async Task Page_DoesNotReferenceThirdPartyOrigins()
