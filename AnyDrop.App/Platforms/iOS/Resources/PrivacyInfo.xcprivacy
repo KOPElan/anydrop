@@ -37,7 +37,11 @@ More information: https://aka.ms/maui-privacy-manifest
             </array>
         </dict>
         <!--
-            The entry below is only needed when you're using the Preferences API in your app.
+            S2-09：应用确实在使用 Preferences API（MauiPreferenceStore：
+            输入框草稿、主题设置均经 Preferences 落盘；iOS 上即 NSUserDefaults），
+            因此该条目必须启用，否则提交 App Store 时隐私清单不完整。
+            原因 CA92.1：访问 UserDefaults 读写应用自身的偏好设置。
+        -->
         <dict>
             <key>NSPrivacyAccessedAPIType</key>
             <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
@@ -45,7 +49,7 @@ More information: https://aka.ms/maui-privacy-manifest
             <array>
                 <string>CA92.1</string>
             </array>
-        </dict> -->
+        </dict>
     </array>
 </dict>
 </plist>

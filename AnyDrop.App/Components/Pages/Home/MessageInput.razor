@@ -2,9 +2,27 @@
 @inject IFileUploadService FileUploadService
 @inject IPickerService Picker
 @inject IAppStateService AppState
+@inject IOutboxService Outbox
+@inject AppEventBus EventBus
+@inject AnyDrop.App.Platform.IPreferenceStore Preferences
 @inject IStringLocalizer<AppStrings> L
+@implements IDisposable
 
 <div class="glass border-t border-white/50 dark:border-gray-700/50 px-3 pt-2 pb-1 safe-area-bottom fixed bottom-0 w-full">
+    @if (_outboxPendingCount > 0)
+    {
+        <button @onclick="DrainOutboxAsync" class="mb-2 px-1 text-left w-full">
+            <p class="text-xs text-amber-600 dark:text-amber-400">@string.Format(L["MessageInput_OutboxPending"], _outboxPendingCount)</p>
+        </button>
+    }
+    @if (_pickerPermissionDenied)
+    {
+        <div class="mb-2 px-1 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-900/25 px-3 py-2">
+            <p class="flex-1 text-xs text-amber-700 dark:text-amber-300">@L["MessageInput_PermissionDenied"]</p>
+            <button @onclick="OpenAppSettingsAsync" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 active:opacity-70">@L["MessageInput_OpenSettings"]</button>
+            <button @onclick="() => _pickerPermissionDenied = false" class="text-xs text-gray-400 active:opacity-70">@L["Common_Close"]</button>
+        </div>
+    }
     @if (_uploading)
     {
         <div class="mb-2 px-1">
@@ -63,6 +81,128 @@
     private bool _burnAfterReading;
     // 每次用户修改 _text 都递增，用于判断发送期间是否有新的用户输入
     private int _textGeneration;
+    // S2-05：发件箱待发送条数（>0 时显示提示，点击立即重试补发）
+    private int _outboxPendingCount;
+    private bool _drainingOutbox;
+    // S2-08：选择器权限被拒时显示去设置的提示条
+    private bool _pickerPermissionDenied;
+
+    protected override void OnInitialized()
+    {
+        EventBus.ConnectivityChanged += OnConnectivityChanged;
+        _ = RefreshOutboxCountAsync();
+        RestoreDraft();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // 切换话题时恢复该话题的草稿（每个话题独立保存）
+        RestoreDraft();
+    }
+
+    /// <summary>S2-05：输入框草稿落盘——按话题保存，杀进程/切话题后回来仍在。</summary>
+    private string DraftKey => $"anydrop_draft_{TopicId}";
+
+    private void RestoreDraft()
+    {
+        try
+        {
+            _text = Preferences.Get(DraftKey, string.Empty) ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 恢复草稿失败: {ex.Message}");
+        }
+    }
+
+    private void SaveDraft()
+    {
+        try
+        {
+            Preferences.Set(DraftKey, _text);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 保存草稿失败: {ex.Message}");
+        }
+    }
+
+    private void ClearDraft()
+    {
+        try
+        {
+            Preferences.Set(DraftKey, string.Empty);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 清除草稿失败: {ex.Message}");
+        }
+    }
+
+    private void OnConnectivityChanged(bool isOnline)
+    {
+        // 网络恢复时自动补发发件箱
+        if (isOnline)
+        {
+            _ = InvokeAsync(DrainOutboxAsync);
+        }
+    }
+
+    /// <summary>S2-05：按入箱顺序补发离线消息；成功发出的消息加入当前话题列表（若在看该话题）。</summary>
+    private async Task DrainOutboxAsync()
+    {
+        if (_drainingOutbox)
+        {
+            return;
+        }
+
+        _drainingOutbox = true;
+        try
+        {
+            await Outbox.DrainAsync(async m =>
+            {
+                var item = await ShareService.SendTextAsync(
+                    new CreateTextShareItemRequest(m.Content, m.TopicId, m.BurnAfterReading));
+                if (m.TopicId == TopicId && !AppState.Messages.Any(x => x.Id == item.Id))
+                {
+                    AppState.Messages.Add(item);
+                    AppState.NotifyMessageAdded();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 发件箱补发失败: {ex.Message}");
+        }
+        finally
+        {
+            _drainingOutbox = false;
+            await RefreshOutboxCountAsync();
+        }
+    }
+
+    private async Task RefreshOutboxCountAsync()
+    {
+        try
+        {
+            var pending = await Outbox.GetPendingAsync();
+            var count = pending.Count;
+            if (count != _outboxPendingCount)
+            {
+                _outboxPendingCount = count;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 读取发件箱失败: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        EventBus.ConnectivityChanged -= OnConnectivityChanged;
+    }
 
     private async Task SendTextAsync()
     {
@@ -70,6 +210,8 @@
         var textToSend = _text;
         var sendGeneration = _textGeneration;
         _text = string.Empty;
+        // 发送即清草稿（无论成功还是入箱），避免中途重渲染把旧草稿恢复回来
+        ClearDraft();
         try
         {
             var item = await ShareService.SendTextAsync(new CreateTextShareItemRequest(textToSend, TopicId, _burnAfterReading));
@@ -78,41 +220,80 @@
                 AppState.Messages.Add(item);
             AppState.NotifyMessageAdded();
         }
+        catch (Exception ex) when (ex is HttpRequestException { StatusCode: null } or TaskCanceledException)
+        {
+            // S2-05：无 HTTP 状态码 = 网络不可达/超时（非服务端拒绝），写入离线发件箱持久化，
+            // 联网后自动补发；输入框不恢复（消息已入箱），避免用户重复发送。
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 离线，消息已存入发件箱: {ex.Message}");
+            try
+            {
+                await Outbox.EnqueueAsync(TopicId, textToSend, _burnAfterReading);
+            }
+            catch (Exception enqueueEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MessageInput] 发件箱写入失败，恢复输入: {enqueueEx.Message}");
+                if (_textGeneration == sendGeneration)
+                {
+                    _text = textToSend;
+                    SaveDraft();
+                }
+            }
+
+            await RefreshOutboxCountAsync();
+        }
         catch (Exception ex)
         {
-            // 发送失败时恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
+            // 服务端拒绝（如 400/401/413）不入箱：恢复输入内容，仅在用户自发送后未修改过输入框时才恢复
             System.Diagnostics.Debug.WriteLine($"[MessageInput] 发送消息失败: {ex.Message}");
             if (_textGeneration == sendGeneration)
+            {
                 _text = textToSend;
+                SaveDraft();
+            }
         }
     }
 
     private async Task PickFileAndUploadAsync()
     {
-        var picked = await Picker.PickFileAsync();
-        if (picked is null) return;
-        await UploadAsync(picked.Value.Stream, picked.Value.FileName, picked.Value.MimeType);
+        var result = await Picker.PickFilesAsync();
+        if (result.Status == PickStatus.PermissionDenied)
+        {
+            _pickerPermissionDenied = true;
+            return;
+        }
+        if (result.Status != PickStatus.Ok) return;
+        await UploadManyAsync(result.Files);
     }
 
     private async Task PickPhotoAndUploadAsync()
     {
-        var picked = await Picker.PickPhotoAsync();
-        if (picked is null) return;
-        await UploadAsync(picked.Value.Stream, picked.Value.FileName, picked.Value.MimeType);
+        var result = await Picker.PickPhotosAsync();
+        if (result.Status == PickStatus.PermissionDenied)
+        {
+            _pickerPermissionDenied = true;
+            return;
+        }
+        if (result.Status != PickStatus.Ok) return;
+        await UploadManyAsync(result.Files);
     }
 
-    private async Task UploadAsync(Stream stream, string fileName, string mimeType)
+    /// <summary>S2-08：多选文件依次上传，总进度 = (已完成数 + 当前文件进度) / 总数。</summary>
+    private async Task UploadManyAsync(IReadOnlyList<PickedFile> files)
     {
         _uploading = true;
         _uploadProgress = 0;
-        var progress = new Progress<double>(p => { _uploadProgress = p; InvokeAsync(StateHasChanged); });
         try
         {
-            var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
-            // 防止竞态：SignalR 推送可能已先于 HTTP 响应将文件消息加入列表
-            if (!AppState.Messages.Any(m => m.Id == item.Id))
-                AppState.Messages.Add(item);
-            AppState.NotifyMessageAdded();
+            for (var i = 0; i < files.Count; i++)
+            {
+                var index = i;
+                var progress = new Progress<double>(p =>
+                {
+                    _uploadProgress = (index + p) / files.Count;
+                    InvokeAsync(StateHasChanged);
+                });
+                await UploadAsync(files[i].Stream, files[i].FileName, files[i].MimeType, progress);
+            }
         }
         finally
         {
@@ -121,10 +302,34 @@
         }
     }
 
+    /// <summary>打开系统设置（应用权限页），让用户为被拒的权限重新授权。</summary>
+    private void OpenAppSettingsAsync()
+    {
+        _pickerPermissionDenied = false;
+        try
+        {
+            AppInfo.ShowSettingsUI();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageInput] 打开系统设置失败: {ex.Message}");
+        }
+    }
+
+    private async Task UploadAsync(Stream stream, string fileName, string mimeType, IProgress<double> progress)
+    {
+        var item = await FileUploadService.UploadFileAsync(stream, fileName, mimeType, TopicId, _burnAfterReading, progress);
+        // 防止竞态：SignalR 推送可能已先于 HTTP 响应将文件消息加入列表
+        if (!AppState.Messages.Any(m => m.Id == item.Id))
+            AppState.Messages.Add(item);
+        AppState.NotifyMessageAdded();
+    }
+
     private void OnTextInput(ChangeEventArgs e)
     {
         _text = e.Value?.ToString() ?? string.Empty;
         _textGeneration++;
+        SaveDraft();
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)

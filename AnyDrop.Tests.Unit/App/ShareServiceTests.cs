@@ -92,5 +92,33 @@ public class ShareServiceTests
 
         capturedRequest!.RequestUri!.Query.Should().Contain("before=cursor-123");
     }
+
+    [Fact]
+    public async Task GetMessagesSinceAsync_IncludesAfterParam()
+    {
+        var topicId = Guid.NewGuid();
+        var data = new TopicMessagesResponse([], false, null);
+        var apiResponse = new ApiEnvelope<TopicMessagesResponse>(true, data, null);
+
+        HttpRequestMessage? capturedRequest = null;
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(apiResponse) });
+
+        var client = new HttpClient(handlerMock.Object) { BaseAddress = new Uri("http://localhost") };
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient("api")).Returns(client);
+        var sut = new ShareService(factoryMock.Object);
+
+        var since = new DateTimeOffset(2026, 11, 15, 10, 30, 0, TimeSpan.Zero);
+        await sut.GetMessagesSinceAsync(topicId, since);
+
+        capturedRequest!.RequestUri!.Query.Should().Contain("after=");
+        capturedRequest.RequestUri.Query.Should().Contain("2026-11-15");
+    }
 }
 

@@ -5,6 +5,7 @@ using AnyDrop.Hubs;
 using AnyDrop.Infrastructure;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -25,8 +26,8 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 文件上传大小限制：优先从配置读取，回退到 1 GB
-const long defaultMaxUploadBytes = 1L * 1024 * 1024 * 1024;
+// 文件上传大小限制：优先从配置读取，回退到 D2 定稿的 500MB（不再回退 1GB）
+const long defaultMaxUploadBytes = UploadLimits.MaxFileSizeBytes;
 var maxUploadBytes = builder.Configuration.GetValue<long?>("Storage:MaxFileSizeBytes") ?? defaultMaxUploadBytes;
 
 // 放宽 Kestrel 的最大请求体限制（默认 30 MB），确保能接收大文件上传
@@ -107,9 +108,11 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 builder.Services.AddScoped<IPasswordHasherService, PasswordHasherService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddSingleton<ILoginRateLimiter, LoginRateLimiter>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IThumbnailService, ThumbnailService>();
+builder.Services.AddScoped<ChunkedUploadService>();
 builder.Services.AddScoped<OrphanFileReconciler>();
 builder.Services.AddHostedService<OrphanedFileCleanupService>();
 builder.Services.AddSingleton<ThumbnailGenerationBackgroundService>();
@@ -150,7 +153,15 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(LinkMetadataService.HttpClientName)
     .ConfigurePrimaryHttpMessageHandler(() => LinkMetadataService.CreateHandler());
 builder.Services.AddHostedService<ExpiredMessageCleanupService>();
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddRazorComponents().AddInteractiveServerComponents(options =>
+{
+    // S2-10：断开的 Blazor 电路保留 10 分钟（默认仅 3 分钟，手机锁屏/弱网切换
+    // 即丢电路，用户回来只能整页刷新重连）；单用户自托管，保留上限保持默认 100；
+    // JS 互操作调用超时保持默认 1 分钟。
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(10);
+    options.DisconnectedCircuitMaxRetained = 100;
+    options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
+});
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -507,6 +518,7 @@ app.MapHub<ShareHub>("/hubs/share")
    .DisableAntiforgery();
 app.MapShareItemEndpoints();
 app.MapFileEndpoints();
+app.MapUploadEndpoints();
 app.MapTopicEndpoints();
 app.MapAuthEndpoints();
 app.MapSettingsEndpoints();

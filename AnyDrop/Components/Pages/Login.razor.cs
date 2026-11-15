@@ -94,10 +94,20 @@ public partial class Login
         _isInteractive = true;
         StateHasChanged();
 
-        var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/auth/me");
-        if (result.ok)
+        // S2-10：已登录检查只是“自动跳过登录页”的体验优化——JS 互操作失败
+        // （电路断开、JS 出错）时不要把异常抛给 Blazor 导致页面崩溃，
+        // 用户仍可通过表单正常登录。
+        try
         {
-            NavigationManager.NavigateTo(_returnUrl, forceLoad: true);
+            var result = await JSRuntime.InvokeAsync<JsApiResult>("authInterop.getJson", "/api/v1/auth/me");
+            if (result.ok)
+            {
+                NavigationManager.NavigateTo(_returnUrl, forceLoad: true);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Login status check via JS interop failed; user can still sign in with the form.");
         }
     }
 

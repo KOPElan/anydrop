@@ -6,6 +6,8 @@ window.AnyDropInterop = window.AnyDropInterop || {
 const _dropZoneCleanups = new WeakMap();
 const _messageScrollCleanups = new WeakMap();
 const _uploadFileCache = new Map();
+// S2-10：在途上传的 XHR（tempId -> XMLHttpRequest），用于取消上传
+const _activeUploads = new Map();
 const _uploadFileCacheTtlMs = 10 * 60 * 1000;
 const _uploadFileCacheCleanupIntervalMs = 60 * 1000;
 // 快网兜底：覆盖资源很快完成布局但未触发媒体事件的场景
@@ -113,6 +115,10 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
 
   await new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
+    // S2-10：记录在途请求以便取消；10 分钟总超时——此前无 timeout，
+    // 断网卡住的上传会永远停在占位气泡，无任何错误提示。
+    _activeUploads.set(tempId, xhr);
+    xhr.timeout = 10 * 60 * 1000;
     xhr.open('POST', '/api/v1/files');
 
     xhr.upload.onprogress = (e) => {
@@ -122,6 +128,11 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
           console.warn('[AnyDrop] Failed to report upload progress:', err);
         });
       }
+    };
+
+    const finish = () => {
+      _activeUploads.delete(tempId);
+      resolve();
     };
 
     xhr.onload = () => {
@@ -141,7 +152,7 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
           console.warn('[AnyDrop] Failed to notify upload failure:', err);
         });
       }
-      resolve();
+      finish();
     };
 
     xhr.onerror = () => {
@@ -149,15 +160,23 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
       dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Network error').catch((err) => {
         console.warn('[AnyDrop] Failed to notify upload error:', err);
       });
-      resolve();
+      finish();
+    };
+
+    xhr.ontimeout = () => {
+      console.warn('[AnyDrop] Upload timed out for', file.name);
+      dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'UPLOAD_TIMED_OUT').catch((err) => {
+        console.warn('[AnyDrop] Failed to notify upload timeout:', err);
+      });
+      finish();
     };
 
     xhr.onabort = () => {
       console.warn('[AnyDrop] Upload aborted for', file.name);
-      dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'Upload aborted').catch((err) => {
+      dotNetRef.invokeMethodAsync('OnFileUploadFailed', tempId, 'UPLOAD_CANCELLED').catch((err) => {
         console.warn('[AnyDrop] Failed to notify upload abort:', err);
       });
-      resolve();
+      finish();
     };
 
     const formData = new FormData();
@@ -169,6 +188,21 @@ AnyDropInterop._uploadSingleFile = async function (file, dotNetRef, context) {
   });
 
   return tempId;
+};
+
+/**
+ * 取消指定在途上传（S2-10）：中止 XHR，onabort 回调会通知 .NET 端标记失败，
+ * 占位气泡随后可重试。返回是否找到并中止了对应请求。
+ */
+AnyDropInterop.cancelUpload = function (tempId) {
+  const xhr = _activeUploads.get(tempId);
+  if (!xhr) return false;
+  try {
+    xhr.abort();
+  } catch {
+    return false;
+  }
+  return true;
 };
 
 AnyDropInterop.retryUpload = async function (tempId, dotNetRef) {
@@ -259,6 +293,24 @@ AnyDropInterop.setupDropZone = function (element, dotNetRef) {
     }
 
     const files = e.dataTransfer ? Array.from(e.dataTransfer.files) : [];
+
+    // S2-10：拖入文件夹时 dataTransfer.files 为空（Chrome），此前静默无任何反馈。
+    // 检测到文件夹条目时通知 .NET 显示提示；同时仍上传其中的普通文件。
+    const items = e.dataTransfer ? Array.from(e.dataTransfer.items || []) : [];
+    const hasFolder = items.some((item) => {
+      try {
+        const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+        return entry && entry.isDirectory;
+      } catch {
+        return false;
+      }
+    });
+    if (hasFolder) {
+      dotNetRef.invokeMethodAsync('OnFolderDropDetected').catch((err) => {
+        console.warn('[AnyDrop] Failed to notify folder drop:', err);
+      });
+    }
+
     if (files.length === 0) return;
 
     // 直接通过 HTTP multipart 上传，不再使用 SignalR 流式传输
@@ -443,6 +495,38 @@ AnyDropInterop.getBrowserTimeZone = function () {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch {
     return 'UTC';
+  }
+};
+
+/**
+ * 输入框草稿落盘（S2-10）：按话题存 localStorage，与 MAUI 端同键 anydrop_draft_{topicId}。
+ * localStorage 在隐私模式等场景可能抛错，全部静默处理——草稿是体验优化，不是关键路径。
+ */
+AnyDropInterop.getDraft = function (key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+AnyDropInterop.setDraft = function (key, value) {
+  try {
+    if (!value) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, value);
+    }
+  } catch {
+    // 隐私模式 / 存储已满时静默失败
+  }
+};
+
+AnyDropInterop.clearDraft = function (key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // 静默失败
   }
 };
 

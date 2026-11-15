@@ -9,13 +9,13 @@ namespace AnyDrop.App.Infrastructure;
 public sealed class HubConnectionManager : IAsyncDisposable
 {
     private readonly IServerConfigService _serverConfig;
-    private readonly ISecureTokenStorage _tokenStorage;
+    private readonly ITokenRefreshService _tokenRefresh;
     private HubConnection? _connection;
 
-    public HubConnectionManager(IServerConfigService serverConfig, ISecureTokenStorage tokenStorage)
+    public HubConnectionManager(IServerConfigService serverConfig, ITokenRefreshService tokenRefresh)
     {
         _serverConfig = serverConfig;
-        _tokenStorage = tokenStorage;
+        _tokenRefresh = tokenRefresh;
     }
 
     /// <summary>获取当前 HubConnection，按需构建。</summary>
@@ -37,7 +37,11 @@ public sealed class HubConnectionManager : IAsyncDisposable
         return new HubConnectionBuilder()
             .WithUrl(hubUrl, options =>
             {
-                options.AccessTokenProvider = () => _tokenStorage.GetTokenAsync()!;
+                // S2-02：Hub 用数分钟有效的专用短 token（经 TokenRefreshService
+                // 缓存与刷新），不再把 24 小时长效 Access Token 交给 SignalR；
+                // 拿不到有效 token 时返回 null，让连接直接走过期流程，
+                // 不再用非空断言把空值硬传。
+                options.AccessTokenProvider = () => _tokenRefresh.GetHubTokenAsync();
             })
             .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30) })
             .Build();

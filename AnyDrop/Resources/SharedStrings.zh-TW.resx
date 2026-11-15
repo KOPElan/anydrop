@@ -290,4 +290,9 @@
   <data name="Search_ImagePreview"><value>圖片預覽</value></data>
   <data name="Search_Today"><value>今天</value></data>
   <data name="Search_Yesterday"><value>昨天</value></data>
+  <data name="Settings_LoadFailed"><value>載入設定失敗，請重新整理再試。</value></data>
+  <data name="Home_FolderDropNotSupported"><value>暫不支援拖入資料夾，請選擇檔案上傳。</value></data>
+  <data name="Home_UploadTimedOut"><value>上傳逾時，請重試。</value></data>
+  <data name="Home_UploadCancelled"><value>已取消上傳。</value></data>
+  <data name="Home_CancelUpload"><value>取消上傳</value></data>
 </root>

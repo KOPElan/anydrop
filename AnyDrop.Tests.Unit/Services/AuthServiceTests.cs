@@ -199,7 +199,15 @@ public class AuthServiceTests
         var limiter = new LoginRateLimiter(new MemoryCache(new MemoryCacheOptions()),
             Options.Create(new AuthOptions { LoginMaxFailures = maxFailures, LoginCooldownSeconds = cooldownSeconds }),
             timeProvider ?? TimeProvider.System);
-        return new AuthService(factory, userService, hasher, token, limiter);
+        var clock = timeProvider ?? TimeProvider.System;
+        var refreshTokens = new RefreshTokenService(factory, token, Options.Create(new AuthOptions
+        {
+            JwtIssuer = "issuer",
+            JwtAudience = "aud",
+            JwtSecret = "UnitTestJwtSecretValueAtLeast32Chars!",
+            RefreshTokenExpiryDays = 30
+        }), clock);
+        return new AuthService(factory, userService, hasher, token, refreshTokens, limiter);
     }
 
     private static TestDbContextFactory CreateDbContextFactory()

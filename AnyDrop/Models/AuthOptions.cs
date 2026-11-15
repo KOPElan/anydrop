@@ -24,6 +24,17 @@ public sealed class AuthOptions
     public int LoginMaxCooldownSeconds { get; set; } = 900;
 
     /// <summary>
+    /// Refresh Token 有效期（天）。S2-01：默认 30 天，旋转使用。
+    /// </summary>
+    public int RefreshTokenExpiryDays { get; set; } = 30;
+
+    /// <summary>
+    /// Hub 专用短 token 有效期（分钟）。S2-02：SignalR 协商时用，
+    /// 数分钟有效，泄露窗口远小于 24 小时的长效 Access Token。
+    /// </summary>
+    public int HubTokenExpiryMinutes { get; set; } = 5;
+
+    /// <summary>
     /// Cookie 的 Secure 策略（<c>Always</c> / <c>SameAsRequest</c> / <c>None</c>）。
     /// 默认 <c>Always</c>：TLS 反代部署下 Cookie 只走 HTTPS。
     /// 纯 HTTP 局域网例外需显式改为 <c>None</c>，否则浏览器不会回传 Cookie、登录会失效。

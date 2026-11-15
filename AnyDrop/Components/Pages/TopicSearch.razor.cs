@@ -465,4 +465,12 @@ public partial class TopicSearch
         var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
         return local.ToString("yyyy/MM/dd HH:mm");
     }
+
+    /// <summary>S2-10：短时间格式（HH:mm），同样按浏览器时区换算；旧实现用 ToLocalTime()
+    /// （服务器本地时区，容器里常为 UTC，与浏览器差 8 小时）。</summary>
+    private string FormatShortTime(DateTimeOffset time)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(time.UtcDateTime, _displayTimeZone);
+        return local.ToString("HH:mm");
+    }
 }

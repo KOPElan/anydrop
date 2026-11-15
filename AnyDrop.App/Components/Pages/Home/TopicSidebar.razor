@@ -36,13 +36,13 @@
     }
 
     <div class="mt-3">
-        <button @onclick="() => _showArchived = !_showArchived"
+        <button @onclick="ToggleArchivedAsync"
                 class="text-xs text-gray-400 dark:text-gray-500 px-3 py-1.5 flex items-center gap-1 active:opacity-70">
             <span class="text-sm">@(_showArchived ? "▾" : "▸")</span> @L["Sidebar_ArchivedTopics"]
         </button>
         @if (_showArchived)
         {
-            @foreach (var topic in AppState.Topics.Where(t => t.IsArchived))
+            @foreach (var topic in _archivedTopics)
             {
                 <div @onclick="() => SelectTopic(topic.Id)"
                      class="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer opacity-60 hover:opacity-80 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all">
@@ -91,6 +91,9 @@
     [Parameter] public EventCallback<Guid> OnTopicSelected { get; set; }
 
     private bool _showArchived;
+    // S2-08：归档话题不在 AppState.Topics（只含未归档）里，展开时调真实归档接口加载；
+    // 旧实现直接过滤 AppState.Topics，归档区永远为空。
+    private List<TopicDto> _archivedTopics = new();
     private bool _showCreateDialog;
     private string _newTopicName = string.Empty;
     private TopicDto? _actionMenuTopic;
@@ -117,12 +120,40 @@
         _newTopicName = string.Empty;
     }
 
+    private async Task ToggleArchivedAsync()
+    {
+        _showArchived = !_showArchived;
+        if (_showArchived)
+        {
+            await LoadArchivedTopicsAsync();
+        }
+    }
+
+    private async Task LoadArchivedTopicsAsync()
+    {
+        try
+        {
+            var topics = await TopicService.GetArchivedTopicsAsync();
+            _archivedTopics = topics.ToList();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[TopicSidebar] 加载归档话题失败: {ex.Message}");
+            _archivedTopics = new List<TopicDto>();
+        }
+    }
+
     private async Task LoadTopicsAsync()
     {
         var topics = await TopicService.GetTopicsAsync();
         AppState.Topics.Clear();
         foreach (var t in topics) AppState.Topics.Add(t);
         AppState.NotifyStateChanged();
+        // 归档/取消归档后归档区也要刷新（若正展开）
+        if (_showArchived)
+        {
+            await LoadArchivedTopicsAsync();
+        }
     }
 
     private async Task OnDrop(Guid targetId)

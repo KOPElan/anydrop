@@ -11,6 +11,9 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
     public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
     public DbSet<PendingFileDeletion> PendingFileDeletions => Set<PendingFileDeletion>();
     public DbSet<MissingFileReport> MissingFileReports => Set<MissingFileReport>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<ChunkedUpload> ChunkedUploads => Set<ChunkedUpload>();
+    public DbSet<ChunkedUploadChunk> ChunkedUploadChunks => Set<ChunkedUploadChunk>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,6 +141,67 @@ public sealed class AnyDropDbContext(DbContextOptions<AnyDropDbContext> options)
                 .IsUnique()
                 .HasFilter("IsResolved = 0");
             entity.HasIndex(e => new { e.IsResolved, e.LastSeenAt });
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.ReplacedByTokenHash).HasMaxLength(64);
+            entity.Property(e => e.ExpiresAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.CreatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.RevokedAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.Property(e => e.LastUsedAt)
+                .HasConversion(
+                    value => value.HasValue ? value.Value.UtcDateTime : (DateTime?)null,
+                    value => value.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)) : null);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.FamilyId });
+            entity.HasIndex(e => e.ExpiresAt);
+        });
+
+        modelBuilder.Entity<ChunkedUpload>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.IdempotencyKey).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.FileName).HasMaxLength(260).IsRequired();
+            entity.Property(e => e.MimeType).HasMaxLength(127);
+            entity.Property(e => e.TotalSha256).HasMaxLength(64);
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.CreatedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.Property(e => e.ExpiresAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            // 同一用户内幂等键唯一：重复初始化返回同一会话，不建第二份。
+            entity.HasIndex(e => new { e.UserId, e.IdempotencyKey }).IsUnique();
+            entity.HasIndex(e => e.ExpiresAt);
+            entity.HasIndex(e => e.Status);
+        });
+
+        modelBuilder.Entity<ChunkedUploadChunk>(entity =>
+        {
+            entity.HasKey(e => new { e.UploadId, e.ChunkIndex });
+            entity.Property(e => e.ReceivedAt)
+                .HasConversion(
+                    value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+            entity.HasOne<ChunkedUpload>()
+                .WithMany()
+                .HasForeignKey(e => e.UploadId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SystemSettings>(entity =>

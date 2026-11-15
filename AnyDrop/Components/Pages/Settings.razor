@@ -225,7 +225,7 @@
                                     {
                                         <span> · @report.TopicName</span>
                                     }
-                                    <span> · @L["Settings_StorageHealthDetected"] @report.FirstDetectedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                                    <span> · @L["Settings_StorageHealthDetected"] @FormatDetectedTime(report.FirstDetectedAt)</span>
                                 </p>
                                 <div class="flex flex-wrap gap-2 pt-1">
                                     <button type="button" class="btn-secondary text-sm" disabled="@_isResolvingMissingFile" @onclick="() => ResolveMissingFileAsync(report.Id, DeleteMessageAction)">@L["Settings_StorageHealthDeleteMessage"]</button>

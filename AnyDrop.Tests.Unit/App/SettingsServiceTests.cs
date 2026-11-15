@@ -106,5 +106,30 @@ public class SettingsServiceTests
 
         result.Should().Be(42);
     }
+
+    [Fact]
+    public async Task UpdateSecuritySettingsAsync_PutsToSecurityEndpoint()
+    {
+        // S2-08：设置页保存安全设置（含自动清理）走 PUT /api/v1/settings/security
+        HttpRequestMessage? capturedRequest = null;
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
+            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK));
+
+        var client = new HttpClient(handlerMock.Object) { BaseAddress = new Uri("http://localhost") };
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient("api")).Returns(client);
+        var sut = new SettingsService(factoryMock.Object);
+
+        await sut.UpdateSecuritySettingsAsync(
+            new UpdateSecuritySettingsRequest(true, 60, "zh-CN", true, 6, 2, false));
+
+        capturedRequest!.Method.Should().Be(HttpMethod.Put);
+        capturedRequest.RequestUri!.PathAndQuery.Should().Contain("api/v1/settings/security");
+    }
 }
 

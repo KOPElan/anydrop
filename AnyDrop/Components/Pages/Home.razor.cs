@@ -3,6 +3,7 @@ using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Resources;
 using AnyDrop.Services;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -18,7 +19,8 @@ namespace AnyDrop.Components.Pages;
 
 public partial class Home : IAsyncDisposable
 {
-    private const long DefaultMaxFileSizeBytes = 1L * 1024 * 1024 * 1024;  // 1 GB
+    // D2：回退上限同样是 500MB（配置缺失时），不再回退 1GB。
+    private const long DefaultMaxFileSizeBytes = UploadLimits.MaxFileSizeBytes;
     // 缩短降级等待：降低连接失败到轮询兜底的感知延迟；仍保留一次短重试避免瞬时抖动。
     private const int HubInitialDelayMs = 100;
     private const int HubRetryDelayMs = 200;
@@ -51,6 +53,7 @@ public partial class Home : IAsyncDisposable
     private HubConnection? _hubConnection;
     private CancellationTokenSource? _pollingCts;
     private Task? _pollingTask;
+    private bool _isDisposed;
     private string _inputText = string.Empty;
     private string? _validationError;
     private bool _isSending;
@@ -67,6 +70,11 @@ public partial class Home : IAsyncDisposable
     private string _browserTimeZoneId = "UTC";
     private TimeZoneInfo _displayTimeZone = TimeZoneInfo.Local;
     private readonly Dictionary<long, string> _messageTimeTextCache = [];
+
+    // S2-10：输入框草稿落盘（localStorage，与 MAUI 端同键 anydrop_draft_{TopicId}）；
+    // 每话题独立，切换话题/刷新后回来仍在。保存防抖 500ms，避免每键一次 JS 往返。
+    private CancellationTokenSource? _draftSaveCts;
+    private string? DraftKey => _selectedTopicId.HasValue ? $"anydrop_draft_{_selectedTopicId.Value}" : null;
     private int _renderScheduled;
     private long _lastPollingHubReconnectAttemptTicks = DateTimeOffset.MinValue.UtcTicks;
 
@@ -171,9 +179,12 @@ public partial class Home : IAsyncDisposable
     {
         if (SelectedTopicId != _selectedTopicId)
         {
+            // S2-10：切换话题前先把旧话题的草稿立即落盘（不等防抖），切完再恢复新话题的草稿。
+            await SaveDraftNowAsync();
             _selectedTopicId = SelectedTopicId;
             await LoadSelectedTopicMessagesAsync();
             await LoadSelectedTopicMetaAsync();
+            await RestoreDraftAsync();
 
             // 主题切换时退出选择模式
             ExitSelectMode();
@@ -268,6 +279,15 @@ public partial class Home : IAsyncDisposable
             catch (Exception ex)
             {
                 Logger.LogDebug(ex, "Failed to get browser timezone, falling back to UTC.");
+            }
+
+            // S2-10：拿到浏览器时区后必须重绘一次，否则首屏消息时间一直按
+            // 服务器本地时区显示，直到下一次 SignalR/轮询触发渲染才纠正。
+            // 同时恢复当前话题的输入草稿（与时区同一次重绘，不多一次渲染）。
+            await RestoreDraftAsync();
+            if (!_isDisposed)
+            {
+                StateHasChanged();
             }
 
             // 设置聊天区域拖放处理（JS 端负责消抖，仅在状态变化时回调 .NET）
@@ -418,6 +438,33 @@ public partial class Home : IAsyncDisposable
                 });
             });
 
+            // S2-04：自动重连成功后立即补拉断线期消息 + 刷新当前主题元数据。
+            // 轮询兜底期间的恢复由 StopPollingIfRealtimeRestoredAsync 覆盖，
+            // 此处覆盖“自动重连在 42 秒内成功、轮询从未启动”的情形。
+            _hubConnection.Reconnected += _ => InvokeAsync(async () =>
+            {
+                var changed = await PollNewMessagesAsync();
+                await LoadSelectedTopicMetaAsync();
+                if (changed)
+                {
+                    RequestRender();
+                }
+            });
+
+            // S2-04：自动重连耗尽（Closed）后降级为轮询兜底；此前仅初始连接
+            // 失败才启动轮询，连接成功后再断线会永久收不到新消息。
+            _hubConnection.Closed += _ => InvokeAsync(() =>
+            {
+                if (_isDisposed || _pollingTask is { IsCompleted: false })
+                {
+                    return;
+                }
+
+                _pollingCts?.Dispose();
+                _pollingCts = new CancellationTokenSource();
+                _pollingTask = StartPollingAsync(_pollingCts.Token);
+            });
+
             // 短暂延迟，等待 Blazor 电路稳定后再连接 SignalR Hub，减少导航后的瞬时协商错误
             await Task.Delay(HubInitialDelayMs);
             var hubStarted = false;
@@ -475,6 +522,9 @@ public partial class Home : IAsyncDisposable
         {
             await ShareService.SendTextAsync(trimmedText, _selectedTopicId, burnAfterReading: _burnAfterReading);
             _inputText = string.Empty;
+            _mobileInputText = string.Empty;
+            // S2-10：发送成功后清除当前话题的草稿
+            await ClearDraftAsync();
             // 发送后主动刷新一次，保障在 SignalR 降级（轮询）场景下也能立即显示；
             // showSkeleton=false 避免清空现有列表并显示骨架屏
             await LoadSelectedTopicMessagesAsync(showSkeleton: false);
@@ -491,6 +541,103 @@ public partial class Home : IAsyncDisposable
         if (e.CtrlKey && string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
         {
             await SendAsync();
+        }
+    }
+
+    // ── 输入框草稿落盘（S2-10） ──────────────────────────────────────────────
+
+    /// <summary>桌面端输入框的绑定 setter：同步移动端字段并安排防抖保存。</summary>
+    private void SetInputText(string value)
+    {
+        _inputText = value;
+        _mobileInputText = value;
+        ScheduleDraftSave();
+    }
+
+    /// <summary>移动端输入框的绑定 setter：同步桌面端字段并安排防抖保存。</summary>
+    private void SetMobileInputText(string value)
+    {
+        _mobileInputText = value;
+        _inputText = value;
+        ScheduleDraftSave();
+    }
+
+    /// <summary>从 localStorage 恢复当前话题的草稿（预渲染阶段 JS 不可用时静默跳过，
+    /// 首渲染的 OnAfterRenderAsync 会再恢复一次）。</summary>
+    private async Task RestoreDraftAsync()
+    {
+        if (DraftKey is null) return;
+        try
+        {
+            var draft = await JS.InvokeAsync<string?>("AnyDropInterop.getDraft", DraftKey);
+            if (!string.IsNullOrEmpty(draft))
+            {
+                _inputText = draft;
+                _mobileInputText = draft;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to restore input draft.");
+        }
+    }
+
+    /// <summary>防抖保存：500ms 内无新输入才写一次 localStorage，避免每键一次 JS 往返。</summary>
+    private void ScheduleDraftSave()
+    {
+        if (DraftKey is null) return;
+        _draftSaveCts?.Cancel();
+        _draftSaveCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _draftSaveCts = cts;
+        _ = SaveDraftAfterDelayAsync(cts.Token);
+    }
+
+    private async Task SaveDraftAfterDelayAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(500, ct);
+            if (ct.IsCancellationRequested || _isDisposed || DraftKey is null) return;
+            await JS.InvokeVoidAsync("AnyDropInterop.setDraft", DraftKey, _inputText);
+        }
+        catch (OperationCanceledException)
+        {
+            // 被更新的输入打断，预期内
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to save input draft.");
+        }
+    }
+
+    /// <summary>立即保存当前草稿（切换话题前调用，不等防抖）。</summary>
+    private async Task SaveDraftNowAsync()
+    {
+        if (DraftKey is null) return;
+        _draftSaveCts?.Cancel();
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.setDraft", DraftKey, _inputText);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to save input draft.");
+        }
+    }
+
+    /// <summary>发送成功后清除当前话题的草稿。</summary>
+    private async Task ClearDraftAsync()
+    {
+        if (DraftKey is null) return;
+        _draftSaveCts?.Cancel();
+        try
+        {
+            await JS.InvokeVoidAsync("AnyDropInterop.clearDraft", DraftKey);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
+        {
+            Logger.LogDebug(ex, "Failed to clear input draft.");
         }
     }
 
@@ -705,7 +852,21 @@ public partial class Home : IAsyncDisposable
             ? new UploadContext(_selectedTopicId.Value.ToString(), _burnAfterReading, _maxUploadFileSizeBytes)
             : null;
 
-    /// <summary>由 JS 调用：用户未选择主题时显示提示。</summary>
+    /// <summary>
+    /// 由 JS 调用：用户拖入了文件夹。浏览器不提供文件夹内容（dataTransfer.files
+    /// 为空），此前静默无任何反馈；现显示提示，普通文件仍正常上传。
+    /// </summary>
+    [JSInvokable]
+    public Task OnFolderDropDetected()
+    {
+        _validationError = L["Home_FolderDropNotSupported"];
+        RequestRender();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 由 JS 调用：用户未选择主题时显示提示。
+    /// </summary>
     [JSInvokable]
     public Task OnNoTopicSelected()
     {
@@ -851,6 +1012,27 @@ public partial class Home : IAsyncDisposable
         });
     }
 
+    /// <summary>S2-10：取消进行中的上传。JS 中止 XHR 后，onabort 回调会调
+    /// OnFileUploadFailed 把占位气泡标记为失败（可重试）；这里只负责发起取消，
+    /// 不直接改本地状态，避免与 XHR 回调重复处理。</summary>
+    private async Task CancelPendingUploadAsync(string tempId)
+    {
+        var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && !p.IsFailed && !p.IsRemote);
+        if (pending is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeAsync<bool>("AnyDropInterop.cancelUpload", tempId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Cancel upload failed for pending item {TempId}", tempId);
+        }
+    }
+
     private async Task RetryPendingUploadAsync(string tempId)
     {
         var pending = _pendingUploads.FirstOrDefault(p => p.TempId == tempId && p.IsFailed && !p.IsRemote);
@@ -858,7 +1040,6 @@ public partial class Home : IAsyncDisposable
         {
             return;
         }
-
         _pendingUploads.Remove(pending);
         _validationError = null;
         RequestRender();
@@ -1146,6 +1327,10 @@ public partial class Home : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _isDisposed = true;
+        _draftSaveCts?.Cancel();
+        _draftSaveCts?.Dispose();
+
         // 清理 JS 拖放事件监听器，防止内存泄漏
         try
         {
@@ -1230,47 +1415,65 @@ public partial class Home : IAsyncDisposable
     }
 
     /// <summary>
-    /// 增量轮询：查询最新一批消息，仅追加尚未显示的新条目，并在用户处于底部附近时
+    /// 增量轮询：查询新消息，仅追加尚未显示的新条目，并在用户处于底部附近时
     /// 触发条件滚动。不清空已有消息列表，不强制滚到底部，避免打断用户翻阅历史。
+    /// S2-04：本地已有消息时用 after=最后一条 CreatedAt 做真增量拉取（升序返回，
+    /// 直接按序追加）；本地为空时拉最新 50 条。断线期消息超过 100 条时分页拉满。
     /// </summary>
     private async Task<bool> PollNewMessagesAsync(CancellationToken ct = default)
     {
         if (!_selectedTopicId.HasValue) return false;
 
-        var response = await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
-        if (response is null) return false;
-
         var hasNew = false;
         var hasUpdated = false;
-        foreach (var msg in response.Messages.Reverse())
+        DateTimeOffset? after = _messages.Count > 0 ? _messages[^1].CreatedAt : null;
+
+        while (true)
         {
-            if (_messageIds.Add(msg.Id))
+            var response = after.HasValue
+                ? await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 100, null, after.Value, ct)
+                : await TopicService.GetTopicMessagesAsync(_selectedTopicId.Value, 50, null, ct);
+            if (response is null) return hasNew || hasUpdated;
+
+            // after 分页返回升序，直接按序追加；首次拉取返回降序，需反转为升序。
+            var ordered = after.HasValue ? response.Messages : response.Messages.Reverse();
+            var hasNewBeforePage = hasNew;
+            foreach (var msg in ordered)
             {
-                _messages.Add(msg);
-                hasNew = true;
-                if (!_isAtBottom)
+                if (_messageIds.Add(msg.Id))
                 {
-                    TrackUnreadMessage(msg.Id);
+                    _messages.Add(msg);
+                    hasNew = true;
+                    if (!_isAtBottom)
+                    {
+                        TrackUnreadMessage(msg.Id);
+                    }
+                }
+                else
+                {
+                    // 就地更新已有消息（例如链接元数据后台刷新）
+                    var idx = _messages.FindIndex(m => m.Id == msg.Id);
+                    if (idx >= 0)
+                    {
+                        _messages[idx] = msg;
+                        hasUpdated = true;
+                    }
                 }
             }
-            else
+
+            // 服务端 after 用 >=：本页若无新增（全是已去重的边界消息），说明已追平，停止分页，
+            // 否则同一刻度内的 100 条消息会反复返回同一页。
+            if (!after.HasValue || response.Messages.Count < 100 || hasNew == hasNewBeforePage)
             {
-                // 就地更新已有消息（例如链接元数据后台刷新）
-                var idx = _messages.FindIndex(m => m.Id == msg.Id);
-                if (idx >= 0)
-                {
-                    _messages[idx] = msg;
-                    hasUpdated = true;
-                }
+                break;
             }
+
+            after = response.Messages[^1].CreatedAt;
         }
 
-        if (hasNew)
+        if (hasNew && _isAtBottom)
         {
-            if (_isAtBottom)
-            {
-                RequestScrollToBottomIfAtBottom();
-            }
+            RequestScrollToBottomIfAtBottom();
         }
 
         return hasNew || hasUpdated;
@@ -1584,6 +1787,17 @@ public partial class Home : IAsyncDisposable
         if (errorMessage.StartsWith("FILE_TOO_LARGE:", StringComparison.OrdinalIgnoreCase))
         {
             return L["Home_UploadFileTooLarge", FormatFileSize(_maxUploadFileSizeBytes)];
+        }
+
+        if (string.Equals(errorMessage, "UPLOAD_TIMED_OUT", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadTimedOut"];
+        }
+
+        if (string.Equals(errorMessage, "UPLOAD_CANCELLED", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(errorMessage, "Upload aborted", StringComparison.OrdinalIgnoreCase))
+        {
+            return L["Home_UploadCancelled"];
         }
 
         if (errorMessage.Contains("413", StringComparison.OrdinalIgnoreCase)

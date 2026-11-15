@@ -63,7 +63,7 @@
                                     }
                                     @if (topic.LastMessageAt.HasValue)
                                     {
-                                        <span class="sidebar-item__time">@topic.LastMessageAt.Value.ToLocalTime().ToString("HH:mm")</span>
+                                        <span class="sidebar-item__time">@FormatSidebarTime(topic.LastMessageAt.Value)</span>
                                     }
                                 </div>
                             </div>

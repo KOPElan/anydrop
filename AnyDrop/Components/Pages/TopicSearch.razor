@@ -396,7 +396,7 @@
                                     @* 右上角时间 *@
                                     <div class="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                          style="background: rgba(0,0,0,0.5);">
-                                        @msg.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                        @FormatShortTime(msg.CreatedAt)
                                     </div>
                                 </div>
                             }
@@ -464,7 +464,7 @@
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? L["Search_Tab_Video"])</p>
                                             <p class="text-[11px] text-on-surface-variant">
-                                                @msg.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                                @FormatShortTime(msg.CreatedAt)
                                                 @if (msg.FileSize.HasValue)
                                                 {
                                                     <span> · @FormatFileSize(msg.FileSize.Value)</span>
@@ -543,7 +543,7 @@
                                     <div class="min-w-0 flex-1">
                                         <p class="text-sm font-semibold text-on-surface truncate">@(msg.FileName ?? L["Search_Tab_File"])</p>
                                         <p class="text-[11px] text-on-surface-variant">
-                                            @msg.CreatedAt.ToLocalTime().ToString("HH:mm")
+                                            @FormatShortTime(msg.CreatedAt)
                                             @if (msg.FileSize.HasValue)
                                             {
                                                 <span> · @FormatFileSize(msg.FileSize.Value)</span>
@@ -629,7 +629,7 @@
                                         @msg.Content
                                     </a>
                                     <div class="flex items-center justify-between mt-auto pt-1">
-                                        <p class="text-[11px] text-on-surface-variant">@msg.CreatedAt.ToLocalTime().ToString("HH:mm")</p>
+                                        <p class="text-[11px] text-on-surface-variant">@FormatShortTime(msg.CreatedAt)</p>
                                         <button type="button"
                                                 class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-primary-fixed transition-colors"
                                                 title="@L["Search_ViewInChat"]"

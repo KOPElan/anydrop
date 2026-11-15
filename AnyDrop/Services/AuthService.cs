@@ -17,6 +17,7 @@ public sealed class AuthService(
     IUserService userService,
     IPasswordHasherService passwordHasherService,
     ITokenService tokenService,
+    IRefreshTokenService refreshTokenService,
     ILoginRateLimiter loginRateLimiter) : IAuthService
 {
     public async Task<AuthResult<LoginResponse>> SetupAsync(SetupRequest request, string rateLimitKey, CancellationToken ct = default)
@@ -80,7 +81,10 @@ public sealed class AuthService(
 
         loginRateLimiter.Reset(rateLimitKey);
         var token = tokenService.GenerateToken(user);
-        var payload = new LoginResponse(new UserProfileDto(user.Nickname, user.LastLoginAt), token.AccessToken, token.ExpiresAt);
+        // S2-01：双发兼容——新客户端拿到 Refresh Token；旧客户端忽略多余字段，
+        // 仍可凭 AccessToken 使用，旧登录路径不断。
+        var (refreshToken, refreshExpiresAt) = await refreshTokenService.IssueAsync(user.Id, ct);
+        var payload = new LoginResponse(new UserProfileDto(user.Nickname, user.LastLoginAt), token.AccessToken, token.ExpiresAt, refreshToken, refreshExpiresAt);
         return AuthResult<LoginResponse>.Success(payload, StatusCodes.Status201Created);
     }
 
@@ -126,7 +130,8 @@ public sealed class AuthService(
         await dbContext.SaveChangesWithRetryAsync(ct);
 
         var token = tokenService.GenerateToken(user);
-        var payload = new LoginResponse(new UserProfileDto(user.Nickname, user.LastLoginAt), token.AccessToken, token.ExpiresAt);
+        var (refreshToken, refreshExpiresAt) = await refreshTokenService.IssueAsync(user.Id, ct);
+        var payload = new LoginResponse(new UserProfileDto(user.Nickname, user.LastLoginAt), token.AccessToken, token.ExpiresAt, refreshToken, refreshExpiresAt);
         return AuthResult<LoginResponse>.Success(payload);
     }
 
@@ -142,6 +147,8 @@ public sealed class AuthService(
         user.SessionVersion++;
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesWithRetryAsync(ct);
+        // S2-01：登出即吊销该用户的全部 Refresh Token，偷到的 refresh token 也随之失效。
+        await refreshTokenService.RevokeAllForUserAsync(userId, ct);
         return AuthResult<LogoutResultDto>.Success(new LogoutResultDto(true));
     }
 
@@ -187,6 +194,8 @@ public sealed class AuthService(
         user.SessionVersion++;
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesWithRetryAsync(ct);
+        // S2-01：改密码吊销全部 Refresh Token——旧设备上的会话不再能静默续期。
+        await refreshTokenService.RevokeAllForUserAsync(userId, ct);
         return AuthResult<bool>.Success(true);
     }
 

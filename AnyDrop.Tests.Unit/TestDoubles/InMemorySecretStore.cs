@@ -13,6 +13,12 @@ public sealed class InMemorySecretStore : ISecretStore
     /// <summary>置为 true 时 <see cref="GetAsync"/> 抛异常，用于验证重试语义。</summary>
     public bool ThrowOnGet { get; set; }
 
+    /// <summary>置为 true 时 <see cref="SetAsync"/> 抛异常，用于验证保存降级（S2-08）。</summary>
+    public bool ThrowOnSet { get; set; }
+
+    /// <summary>置为 true 时 <see cref="RemoveAsync"/> 抛异常，用于验证清除降级（S2-08）。</summary>
+    public bool ThrowOnRemove { get; set; }
+
     public Task<string?> GetAsync(string key, CancellationToken ct = default)
     {
         if (ThrowOnGet)
@@ -26,12 +32,22 @@ public sealed class InMemorySecretStore : ISecretStore
 
     public Task SetAsync(string key, string value, CancellationToken ct = default)
     {
+        if (ThrowOnSet)
+        {
+            throw new InvalidOperationException("simulated keystore failure on set");
+        }
+
         _values[key] = value;
         return Task.CompletedTask;
     }
 
     public Task RemoveAsync(string key, CancellationToken ct = default)
     {
+        if (ThrowOnRemove)
+        {
+            throw new InvalidOperationException("simulated keystore failure on remove");
+        }
+
         _values.TryRemove(key, out _);
         return Task.CompletedTask;
     }

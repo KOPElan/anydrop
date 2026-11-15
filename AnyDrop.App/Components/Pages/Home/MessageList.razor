@@ -1,6 +1,7 @@
 @inject IShareService ShareService
 @inject ISignalRService SignalR
 @inject IAppStateService AppState
+@inject INotificationService Notifications
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject IStringLocalizer<AppStrings> L
@@ -124,6 +125,11 @@ else
 
     private Guid _lastTopicId;
 
+    /// <summary>S2-04：断线期间的轮询兜底（15 秒间隔增量补拉），重连后停止。</summary>
+    private CancellationTokenSource? _pollingCts;
+    private Task? _pollingTask;
+    private const int PollingFallbackIntervalSeconds = 15;
+
     protected override async Task OnParametersSetAsync()
     {
         if (TopicId != _lastTopicId)
@@ -149,6 +155,8 @@ else
         SignalR.TopicsUpdated += OnTopicsUpdated;
         SignalR.ShareItemReceived += OnShareItemReceived;
         SignalR.ShareItemsDeleted += OnShareItemsDeleted;
+        SignalR.Reconnected += OnSignalRReconnected;
+        SignalR.StateChanged += OnSignalRStateChanged;
         AppState.OnChange += StateHasChanged;
         AppState.MessageAdded += OnMessageAdded;
     }
@@ -236,9 +244,132 @@ else
         // so the sidebar topic list (managed elsewhere) stays up to date.
     }
 
+    /// <summary>S2-04：重连成功后按当前话题增量补拉断线期消息（服务端 after 参数）。</summary>
+    private void OnSignalRReconnected()
+    {
+        StopPollingFallback();
+        _ = InvokeAsync(BackfillAsync);
+    }
+
+    private void OnSignalRStateChanged(Microsoft.AspNetCore.SignalR.Client.HubConnectionState state)
+    {
+        _ = InvokeAsync(() =>
+        {
+            if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Disconnected)
+            {
+                StartPollingFallback();
+            }
+            else if (state == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+            {
+                StopPollingFallback();
+            }
+        });
+    }
+
+    /// <summary>
+    /// S2-04：增量补拉——取本地最后一条消息的 CreatedAt，向服务端拉取其后新消息并追加去重；
+    /// 本地为空时走完整加载。若补拉返回已满 100 条上限，继续循环直到拉空（断线期消息较多时）。
+    /// </summary>
+    private async Task BackfillAsync()
+    {
+        if (AppState.Messages.Count == 0)
+        {
+            await LoadMessagesAsync();
+            return;
+        }
+
+        try
+        {
+            var since = AppState.Messages[^1].CreatedAt;
+            while (true)
+            {
+                var result = await ShareService.GetMessagesSinceAsync(TopicId, since);
+                if (result.Messages.Count == 0)
+                {
+                    break;
+                }
+
+                var existingIds = AppState.Messages.Select(m => m.Id).ToHashSet();
+                var fresh = result.Messages.Where(m => !existingIds.Contains(m.Id)).ToList();
+                foreach (var item in fresh)
+                {
+                    AppState.Messages.Add(item);
+                }
+
+                if (fresh.Count > 0)
+                {
+                    AppState.NotifyStateChanged();
+                    if (_isNearBottom)
+                    {
+                        RequestScrollToBottom();
+                    }
+                }
+
+                // 服务端 after 用 >=：本页无新增（全是已去重的边界消息）说明已追平，停止分页。
+                if (fresh.Count == 0)
+                {
+                    break;
+                }
+
+                since = result.Messages[^1].CreatedAt;
+                if (result.Messages.Count < 100)
+                {
+                    break;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MessageList] 增量补拉失败: {ex.Message}");
+        }
+    }
+
+    private void StartPollingFallback()
+    {
+        if (_pollingTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        _pollingCts?.Dispose();
+        _pollingCts = new CancellationTokenSource();
+        var ct = _pollingCts.Token;
+        _pollingTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(PollingFallbackIntervalSeconds), ct);
+                    await InvokeAsync(BackfillAsync);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 轮询停止是预期的
+            }
+        }, ct);
+    }
+
+    private void StopPollingFallback()
+    {
+        _pollingCts?.Cancel();
+        _pollingCts?.Dispose();
+        _pollingCts = null;
+        _pollingTask = null;
+    }
+
     private void OnShareItemReceived(ShareItemDto item)
     {
-        if (item.TopicId != TopicId) return;
+        // S2-08：非当前话题的新消息不在本列表显示，改为本地通知（点击跳回该话题）。
+        // AppState.Topics 是当前已加载的话题列表；归档话题不在其中时用默认名。
+        if (item.TopicId != TopicId)
+        {
+            var topicId = item.TopicId ?? Guid.Empty;
+            var topicName = AppState.Topics.FirstOrDefault(t => t.Id == topicId)?.Name ?? "AnyDrop";
+            _ = Notifications.ShowMessageNotificationAsync(topicName, PreviewOf(item), topicId);
+            return;
+        }
         InvokeAsync(async () =>
         {
             if (AppState.Messages.Any(m => m.Id == item.Id)) return;
@@ -249,6 +380,19 @@ else
                 RequestScrollToBottom();
             }
         });
+    }
+
+    /// <summary>通知预览：文本取正文截断，文件/图片/视频取文件名，链接取标题。</summary>
+    private static string PreviewOf(ShareItemDto item)
+    {
+        var preview = item.ContentType switch
+        {
+            ShareContentType.Text => item.Content,
+            ShareContentType.Link => item.LinkTitle ?? item.Content,
+            _ => item.FileName ?? item.Content
+        };
+        preview ??= string.Empty;
+        return preview.Length > 100 ? preview[..100] + "…" : preview;
     }
 
     private void OnShareItemsDeleted(IReadOnlyList<Guid> ids)
@@ -390,6 +534,9 @@ else
         SignalR.TopicsUpdated -= OnTopicsUpdated;
         SignalR.ShareItemReceived -= OnShareItemReceived;
         SignalR.ShareItemsDeleted -= OnShareItemsDeleted;
+        SignalR.Reconnected -= OnSignalRReconnected;
+        SignalR.StateChanged -= OnSignalRStateChanged;
+        StopPollingFallback();
         AppState.OnChange -= StateHasChanged;
         AppState.MessageAdded -= OnMessageAdded;
         var dotNetRef = _dotNetRef;

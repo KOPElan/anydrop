@@ -77,6 +77,25 @@ public sealed class OrphanedFileCleanupService(
 
         var result = await reconciler.ReconcileAsync(deleteOrphans, ct);
 
+        // S2-07：清扫过期未完成的分片会话（24 小时未完成即视为放弃，删行删临时分片）。
+        // 与超期预占位行一样无条件清理，不受 OrphanCleanupEnabled（仅报告）模式约束——
+        // 过期本身就是会话的终结条件，不是“疑似孤儿”。
+        var expiredUploads = 0;
+        try
+        {
+            var uploadService = scope.ServiceProvider.GetRequiredService<ChunkedUploadService>();
+            expiredUploads = await uploadService.SweepExpiredAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "过期分片会话清扫失败，将在下一轮重试。");
+        }
+
+        if (expiredUploads > 0)
+        {
+            logger.LogInformation("过期分片会话清扫：清理 {Count} 个过期未完成的上传会话。", expiredUploads);
+        }
+
         if (result.OrphansFound == 0 && result.MissingReferencedFiles == 0
             && result.StalePlaceholdersRemoved == 0 && result.SweepRowsRemoved == 0
             && result.QueueEntriesDrained == 0 && result.QueueEntriesFailed == 0)
