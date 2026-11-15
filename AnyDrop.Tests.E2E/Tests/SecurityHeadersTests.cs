@@ -94,7 +94,8 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
         // 无法用元素等待替代，故保留一个很短的固定等待。
         await page.WaitForTimeoutAsync(1500);
 
-        errors.Should().BeEmpty($"访问 {path} 时不应出现控制台错误或 CSP 违规");
+        errors.Should().BeEmpty(
+            $"访问 {path} 时不应出现控制台错误或 CSP 违规。捕获到的错误（{errors.Count} 条）：{string.Join(" ‖ ", errors)}");
     }
 
     /// <summary>
