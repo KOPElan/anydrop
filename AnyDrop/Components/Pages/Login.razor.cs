@@ -145,7 +145,7 @@ public partial class Login
 
     private sealed class LoginFormModel
     {
-        [Required] public string Password { get; set; } = string.Empty;
+        [Required(ErrorMessage = "请输入密码。")] public string Password { get; set; } = string.Empty;
     }
 
     private sealed class JsApiResult
