@@ -131,7 +131,9 @@ jobs:
   # 这些用例此前从不运行，导致「AuthTestHelpers 只接受 201」这样的破坏长期无人发现。
   e2e:
     name: E2E (Playwright)
-    runs-on: ubuntu-latest
+    # Playwright 的 Chromium 尚不支持 ubuntu 26.04（ubuntu-latest 当前指向它），
+    # 在 Playwright 升级之前先固定 24.04。
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -172,6 +174,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate test JWT secret
+        # docker-compose.yml 要求 ANYDROP_JWT_SECRET（至少 32 字符），
+        # 且冒烟测试不测真实密钥：每次运行现生成一个随机值即可。
+        run: echo "ANYDROP_JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Run compose smoke test
         run: bash scripts/smoke-compose.sh
