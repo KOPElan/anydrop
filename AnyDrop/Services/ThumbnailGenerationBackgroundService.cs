@@ -1,12 +1,14 @@
 namespace AnyDrop.Services;
 
 /// <summary>
-/// 后台任务：每天在系统设置配置的 UTC 小时运行一次，批量为所有未处理的图片/视频生成缩略图。
+/// 后台任务：每天在系统设置配置的小时（按后台任务时区，D6）运行一次，
+/// 批量为所有未处理的图片/视频生成缩略图。
 /// </summary>
 public sealed class ThumbnailGenerationBackgroundService(
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
     AnyDrop.Data.DbWriteGate dbWriteGate,
+    BackgroundTaskTimeZone taskTimeZone,
     ILogger<ThumbnailGenerationBackgroundService> logger) : BackgroundService
 {
     // 保证同一时间只有一个批处理实例运行（定时触发与 API 手动触发互斥）
@@ -28,17 +30,14 @@ public sealed class ThumbnailGenerationBackgroundService(
                 }
 
                 var targetHour = await GetTargetHourAsync(stoppingToken);
-                var now = timeProvider.GetUtcNow().UtcDateTime;
-                var nextRun = new DateTime(now.Year, now.Month, now.Day, targetHour, 0, 0, DateTimeKind.Utc);
-                if (nextRun <= now)
-                {
-                    nextRun = nextRun.AddDays(1);
-                }
-
-                var delay = nextRun - now;
+                var utcNow = timeProvider.GetUtcNow();
+                var nextRunUtc = taskTimeZone.GetNextRunUtc(targetHour, utcNow);
+                var delay = nextRunUtc - utcNow;
                 logger.LogInformation(
-                    "ThumbnailGenerationBackgroundService: next run at {NextRun:yyyy-MM-dd HH:mm} UTC (in {Minutes:F0} minutes).",
-                    nextRun,
+                    "ThumbnailGenerationBackgroundService: next run at {NextRunLocal:yyyy-MM-dd HH:mm} {TimeZoneId} ({NextRunUtc:yyyy-MM-dd HH:mm} UTC, in {Minutes:F0} minutes).",
+                    taskTimeZone.ToLocal(nextRunUtc),
+                    taskTimeZone.TimeZone.Id,
+                    nextRunUtc,
                     delay.TotalMinutes);
 
                 await Task.Delay(delay, timeProvider, stoppingToken);

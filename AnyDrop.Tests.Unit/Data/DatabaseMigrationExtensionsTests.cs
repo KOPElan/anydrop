@@ -6,16 +6,15 @@ using Microsoft.EntityFrameworkCore;
 namespace AnyDrop.Tests.Unit.Data;
 
 /// <summary>
-/// 针对「模型期望 <c>SystemSettings.ScheduledThumbnailGenerationEnabled</c> 列，
-/// 但没有任何迁移会创建它」的回归测试。
+/// S1-04（DAT-10）回归组：基线迁移 + 旧库升级门。
 ///
-/// 背景：该列对应的迁移文件缺少 <c>.Designer.cs</c>，因而没有 <c>[DbContext]</c> 特性，
-/// EF Core 从未发现它，也就从未被应用。此前是靠一个启动补丁建列的；补丁一旦被移除，
-/// 任何读取 SystemSettings 全字段的接口（例如 <c>/api/v1/settings/security</c>）都会以
-/// <c>no such column</c> 直接 500。
+/// 背景：基线之前有 13 个旧迁移，其中 <c>20260513141000_AddScheduledThumbnailGenerationFlag</c>
+/// 迁移文件缺失（.Designer.cs 不存在，文件本身也不在仓库里），EF Core 从未应用过它；
+/// <c>SystemSettings.ScheduledThumbnailGenerationEnabled</c> 列一直靠启动补丁创建。
+/// S1-04 用一个基线迁移替代全部旧迁移并删除补丁，旧库由升级门接过去。
 ///
-/// 这组测试用**真实的 SQLite 数据库**完整走一遍「应用迁移 + 兼容步骤」，
-/// 正是此前缺失的一环——其余测试全部基于 InMemory provider，根本不执行迁移。
+/// 这组测试用**真实的 SQLite 数据库**完整走一遍迁移与升级门——
+/// 其余测试全部基于 InMemory provider，根本不执行迁移。
 /// </summary>
 public class DatabaseMigrationExtensionsTests : IDisposable
 {
@@ -35,7 +34,7 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         return new AnyDropDbContext(options);
     }
 
-    private static async Task<bool> ColumnExistsAsync(AnyDropDbContext db, string columnName)
+    private static async Task<bool> ColumnExistsAsync(AnyDropDbContext db, string columnName, string tableName = "SystemSettings")
     {
         var connection = (SqliteConnection)db.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open)
@@ -44,7 +43,7 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         }
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info(SystemSettings);";
+        command.CommandText = $"PRAGMA table_info({tableName});";
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -57,40 +56,176 @@ public class DatabaseMigrationExtensionsTests : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// 基线迁移在全新库上建出完整结构：5 张表、种子行、补丁列直接由迁移创建
+    /// （不再靠启动补丁），且已删除的 TimeZoneId 列不在新库里。
+    /// </summary>
     [Fact]
-    public async Task MigrateThenEnsure_MakesFullEntityQueryable()
+    public async Task BaselineMigration_CreatesFullSchema()
     {
         await using var db = CreateContext();
 
         await db.Database.MigrateAsync();
 
-        (await ColumnExistsAsync(db, ColumnName)).Should().BeFalse(
-            "迁移集合中没有任何一个会创建该列——这正是需要兼容步骤的原因");
-
-        await DatabaseMigrationExtensions.EnsureScheduledThumbnailGenerationColumnAsync(
-            db, CancellationToken.None);
-
-        (await ColumnExistsAsync(db, ColumnName)).Should().BeTrue();
+        (await ColumnExistsAsync(db, ColumnName)).Should().BeTrue(
+            "基线迁移应直接创建该列，启动补丁已删除");
+        (await ColumnExistsAsync(db, "TimeZoneId")).Should().BeFalse(
+            "S1-07 已删除死字段 SystemSettings.TimeZoneId，新库不应再有该列");
 
         // 关键回归断言：读取全部字段不再抛 "no such column"
         var settings = await db.SystemSettings.AsNoTracking().ToListAsync();
-        settings.Should().NotBeEmpty("迁移中的 HasData 会写入默认设置行");
+        settings.Should().HaveCount(1, "基线迁移的 HasData 会写入默认设置行");
         settings[0].ScheduledThumbnailGenerationEnabled.Should().BeFalse();
+
+        foreach (var table in new[] { "Users", "Topics", "ShareItems", "SystemSettings", "PendingFileDeletions" })
+        {
+            (await TableExistsAsync(db, table)).Should().BeTrue($"基线迁移应创建 {table} 表");
+        }
     }
 
+    /// <summary>全新库没有迁移历史表，升级门直接放行，由 MigrateAsync 应用基线。</summary>
     [Fact]
-    public async Task EnsureColumn_IsIdempotent()
+    public async Task Gate_FreshDb_ReturnsFalse()
+    {
+        await using var db = CreateContext();
+
+        var marked = await DatabaseMigrationExtensions.MarkBaselineAppliedIfOldHeadAsync(
+            db, null, CancellationToken.None);
+
+        marked.Should().BeFalse();
+    }
+
+    /// <summary>已是基线库时升级门不做任何事。</summary>
+    [Fact]
+    public async Task Gate_BaselineDb_ReturnsFalse()
     {
         await using var db = CreateContext();
         await db.Database.MigrateAsync();
 
-        await DatabaseMigrationExtensions.EnsureScheduledThumbnailGenerationColumnAsync(
-            db, CancellationToken.None);
+        var marked = await DatabaseMigrationExtensions.MarkBaselineAppliedIfOldHeadAsync(
+            db, null, CancellationToken.None);
 
-        var secondRun = async () => await DatabaseMigrationExtensions.EnsureScheduledThumbnailGenerationColumnAsync(
-            db, CancellationToken.None);
+        marked.Should().BeFalse();
+    }
 
-        await secondRun.Should().NotThrowAsync("列已存在时应直接返回，不重复执行 ALTER");
+    /// <summary>
+    /// 模拟旧库：历史改写为最后一版旧迁移、删掉新迁移带来的结构（UploadState 列、
+    /// MissingFileReports 表）与补丁列（模拟从未跑过补丁的旧库），
+    /// 升级门应校验通过、补齐列、把基线记入历史；随后 MigrateAsync 应用新迁移。
+    /// </summary>
+    [Fact]
+    public async Task Gate_OldHeadDb_MarksBaselineAndBackfillsColumn()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+        await RewriteHistoryAsync(db, DatabaseMigrationExtensions.LastPreBaselineMigrationId);
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE ShareItems DROP COLUMN UploadState;");
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE MissingFileReports;");
+        await db.Database.ExecuteSqlRawAsync(
+            $"ALTER TABLE SystemSettings DROP COLUMN {ColumnName};");
+        (await ColumnExistsAsync(db, ColumnName)).Should().BeFalse("前置条件：模拟旧库缺补丁列");
+
+        var marked = await DatabaseMigrationExtensions.MarkBaselineAppliedIfOldHeadAsync(
+            db, null, CancellationToken.None);
+
+        marked.Should().BeTrue();
+        (await ColumnExistsAsync(db, ColumnName)).Should().BeTrue("升级门应补齐补丁列");
+        (await ReadHistoryAsync(db)).Should().Contain(DatabaseMigrationExtensions.BaselineMigrationId);
+
+        // 随后 MigrateAsync 应用基线之后的新迁移（UploadState 列 + 修复记录表），
+        // 不能因表已存在而失败
+        await db.Database.MigrateAsync();
+        (await ColumnExistsAsync(db, "UploadState", "ShareItems")).Should().BeTrue("新迁移应补上 UploadState 列");
+        (await TableExistsAsync(db, "MissingFileReports")).Should().BeTrue("新迁移应创建修复记录表");
+        (await db.SystemSettings.CountAsync()).Should().Be(1);
+    }
+
+    /// <summary>停在中间版本（非最后一版旧迁移）的库不能直接接基线，必须先升上去。</summary>
+    [Fact]
+    public async Task Gate_IntermediateOldDb_Throws()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+        await RewriteHistoryAsync(db, "20260512142059_AddThumbnailFields");
+
+        var act = async () => await DatabaseMigrationExtensions.MarkBaselineAppliedIfOldHeadAsync(
+            db, null, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*无法识别*");
+    }
+
+    /// <summary>来历不明的迁移历史不猜测，直接拒绝启动。</summary>
+    [Fact]
+    public async Task Gate_UnknownHistory_Throws()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+        await RewriteHistoryAsync(db, "20990101000000_SomeoneElsesMigration");
+
+        var act = async () => await DatabaseMigrationExtensions.MarkBaselineAppliedIfOldHeadAsync(
+            db, null, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*无法识别*");
+    }
+
+    /// <summary>历史停在最后一版但缺表——标记基线会掩盖损坏，必须拒绝启动。</summary>
+    [Fact]
+    public async Task Gate_OldHeadMissingTable_Throws()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+        await RewriteHistoryAsync(db, DatabaseMigrationExtensions.LastPreBaselineMigrationId);
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE PendingFileDeletions;");
+
+        var act = async () => await DatabaseMigrationExtensions.MarkBaselineAppliedIfOldHeadAsync(
+            db, null, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*PendingFileDeletions*不存在*");
+    }
+
+    private static async Task RewriteHistoryAsync(AnyDropDbContext db, string migrationId)
+    {
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM __EFMigrationsHistory;");
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ({0}, '10.0.0');",
+            migrationId);
+    }
+
+    private static async Task<List<string>> ReadHistoryAsync(AnyDropDbContext db)
+    {
+        var connection = (SqliteConnection)db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        var ids = new List<string>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT MigrationId FROM __EFMigrationsHistory;";
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            ids.Add(reader["MigrationId"]?.ToString() ?? string.Empty);
+        }
+
+        return ids;
+    }
+
+    private static async Task<bool> TableExistsAsync(AnyDropDbContext db, string tableName)
+    {
+        var connection = (SqliteConnection)db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $table LIMIT 1;";
+        command.Parameters.AddWithValue("$table", tableName);
+        return await command.ExecuteScalarAsync() is not null;
     }
 
     [Fact]

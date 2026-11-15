@@ -2,6 +2,7 @@ using AnyDrop.Data;
 using AnyDrop.Hubs;
 using AnyDrop.Models;
 using AnyDrop.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -14,8 +15,9 @@ public class TopicServiceTests
     [Fact]
     public async Task CreateTopicAsync_WhenNameIsEmpty_ThrowsException()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _);
 
         var act = () => service.CreateTopicAsync(new CreateTopicRequest(" "));
 
@@ -25,8 +27,9 @@ public class TopicServiceTests
     [Fact]
     public async Task CreateTopicAsync_WhenNameIsValid_ReturnsTopicDto()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _);
 
         var result = await service.CreateTopicAsync(new CreateTopicRequest("工作"));
 
@@ -38,7 +41,8 @@ public class TopicServiceTests
     [Fact]
     public async Task GetAllTopicsAsync_ReturnsTopicsInCorrectSortOrder()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var now = DateTimeOffset.UtcNow;
         dbContext.Topics.AddRange(
             new Topic { Id = Guid.NewGuid(), Name = "C", SortOrder = 1, CreatedAt = now.AddMinutes(-5), LastMessageAt = now.AddMinutes(-2) },
@@ -46,7 +50,7 @@ public class TopicServiceTests
             new Topic { Id = Guid.NewGuid(), Name = "B", SortOrder = 1, CreatedAt = now.AddMinutes(-1), LastMessageAt = null });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
         var result = await service.GetAllTopicsAsync();
 
         result.Select(x => x.Name).Should().Equal("A", "C", "B");
@@ -55,12 +59,13 @@ public class TopicServiceTests
     [Fact]
     public async Task ReorderTopicsAsync_UpdatesSortOrderInDatabase()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var topicA = new Topic { Name = "A", SortOrder = 0 };
         var topicB = new Topic { Name = "B", SortOrder = 1 };
         dbContext.Topics.AddRange(topicA, topicB);
         await dbContext.SaveChangesAsync();
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
 
         await service.ReorderTopicsAsync(new ReorderTopicsRequest(
         [
@@ -76,7 +81,8 @@ public class TopicServiceTests
     [Fact]
     public async Task GetTopicMessagesAsync_WithCursor_ReturnsPaginatedResults()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var topic = new Topic { Name = "A" };
         dbContext.Topics.Add(topic);
         var now = DateTimeOffset.UtcNow;
@@ -86,7 +92,7 @@ public class TopicServiceTests
             new ShareItem { Content = "m3", TopicId = topic.Id, CreatedAt = now.AddMinutes(-1), ContentType = ShareContentType.Text });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
         var first = await service.GetTopicMessagesAsync(topic.Id, 2, null);
         var second = await service.GetTopicMessagesAsync(topic.Id, 2, DateTimeOffset.Parse(first!.NextCursor!));
 
@@ -98,7 +104,8 @@ public class TopicServiceTests
     [Fact]
     public async Task DeleteTopicAsync_SetsTopicIdNullOnMessages()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var topic = new Topic { Name = "A" };
         dbContext.Topics.Add(topic);
         dbContext.ShareItems.Add(new ShareItem
@@ -109,19 +116,22 @@ public class TopicServiceTests
         });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
         var deleted = await service.DeleteTopicAsync(topic.Id);
 
         deleted.Should().BeTrue();
-        (await dbContext.Topics.CountAsync()).Should().Be(0);
-        (await dbContext.ShareItems.SingleAsync()).TopicId.Should().BeNull();
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        (await verifyDb.Topics.CountAsync()).Should().Be(0);
+        (await verifyDb.ShareItems.SingleAsync()).TopicId.Should().BeNull();
     }
 
     [Fact]
     public async Task TopicMutations_BroadcastTopicsUpdated()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out var clientProxyMock);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out var clientProxyMock);
 
         var topic = await service.CreateTopicAsync(new CreateTopicRequest("A"));
         await service.ReorderTopicsAsync(new ReorderTopicsRequest([new TopicOrderItem(topic.Id, 0)]));
@@ -138,18 +148,21 @@ public class TopicServiceTests
     [Fact]
     public async Task PinTopicAsync_WhenPinned_SetsPinnedFields()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var topic = new Topic { Name = "Pin me" };
         dbContext.Topics.Add(topic);
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
         var result = await service.PinTopicAsync(topic.Id, true);
 
         result.IsPinned.Should().BeTrue();
         result.PinnedAt.Should().NotBeNull();
 
-        var entity = await dbContext.Topics.SingleAsync();
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        var entity = await verifyDb.Topics.SingleAsync();
         entity.IsPinned.Should().BeTrue();
         entity.PinnedAt.Should().NotBeNull();
     }
@@ -157,14 +170,15 @@ public class TopicServiceTests
     [Fact]
     public async Task GetAllTopicsAsync_WhenPinned_ReturnsPinnedFirst()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var now = DateTimeOffset.UtcNow;
         dbContext.Topics.AddRange(
             new Topic { Name = "Normal", SortOrder = 0, CreatedAt = now, LastMessageAt = now },
             new Topic { Name = "Pinned", SortOrder = 99, CreatedAt = now, LastMessageAt = now.AddMinutes(-10), IsPinned = true, PinnedAt = now.AddMinutes(-20) });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
         var topics = await service.GetAllTopicsAsync();
 
         topics[0].Name.Should().Be("Pinned");
@@ -174,7 +188,8 @@ public class TopicServiceTests
     [Fact]
     public async Task GetAllTopicsAsync_MultiplePinned_SortsByPinnedAtAscending()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var now = DateTimeOffset.UtcNow;
         dbContext.Topics.AddRange(
             new Topic { Name = "Pinned-Late", SortOrder = 0, IsPinned = true, PinnedAt = now.AddMinutes(-1) },
@@ -182,21 +197,21 @@ public class TopicServiceTests
             new Topic { Name = "Normal", SortOrder = 0 });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _);
+        var service = CreateService(factory, out _);
         var topics = await service.GetAllTopicsAsync();
 
         topics.Select(x => x.Name).Take(2).Should().Equal("Pinned-Early", "Pinned-Late");
     }
 
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"topic-tests-{Guid.NewGuid():N}")
             .Options;
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
-    private static TopicService CreateService(AnyDropDbContext dbContext, out Mock<IClientProxy> clientProxyMock)
+    private static TopicService CreateService(TestDbContextFactory factory, out Mock<IClientProxy> clientProxyMock)
     {
         clientProxyMock = new Mock<IClientProxy>();
         clientProxyMock
@@ -209,6 +224,6 @@ public class TopicServiceTests
         var hubContextMock = new Mock<IHubContext<ShareHub>>();
         hubContextMock.Setup(context => context.Clients).Returns(hubClientsMock.Object);
 
-        return new TopicService(dbContext, hubContextMock.Object);
+        return new TopicService(factory, hubContextMock.Object);
     }
 }

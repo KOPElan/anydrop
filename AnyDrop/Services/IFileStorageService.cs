@@ -5,11 +5,23 @@ public interface IFileStorageService
     Task<string> SaveFileAsync(Stream content, string fileName, string mimeType, CancellationToken ct = default);
 
     /// <summary>
+    /// 按上传命名规则生成存储相对路径（<c>yyyyMMdd/{guid}{ext}</c>），只算路径、不写文件。
+    /// S1-01：上传先建预占位行，行里要先有最终路径，再按此路径落盘。
+    /// </summary>
+    string GenerateStoragePath(string fileName);
+
+    /// <summary>
     /// 将文件保存到指定的存储相对路径（而非自动生成路径）。
     /// </summary>
     Task<string> SaveFileAtPathAsync(Stream content, string storagePath, string mimeType, CancellationToken ct = default);
 
     Task<Stream> GetFileAsync(string storagePath, CancellationToken ct = default);
+
+    /// <summary>
+    /// 存储相对路径对应的文件是否存在（S1-02：缩略图生成前先校验，
+    /// 避免对不存在的原文件抛异常、走完整解码路径）。
+    /// </summary>
+    Task<bool> FileExistsAsync(string storagePath, CancellationToken ct = default);
 
     Task DeleteFileAsync(string storagePath, CancellationToken ct = default);
 

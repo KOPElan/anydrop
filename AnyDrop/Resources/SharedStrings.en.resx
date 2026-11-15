@@ -249,6 +249,17 @@
 
   <!-- Thumbnail Settings -->
   <data name="Settings_ThumbnailGeneration"><value>Thumbnails &amp; Previews</value></data>
+  <data name="Settings_StorageHealth"><value>Storage Health</value></data>
+  <data name="Settings_StorageHealthHint"><value>Files referenced by the database but missing on disk. The reconciler records them here; database rows are never deleted automatically. If a file comes back, the record resolves itself.</value></data>
+  <data name="Settings_StorageHealthLoading"><value>Loading…</value></data>
+  <data name="Settings_StorageHealthNone"><value>No missing references found.</value></data>
+  <data name="Settings_StorageHealthFile"><value>File</value></data>
+  <data name="Settings_StorageHealthThumbnail"><value>Thumbnail</value></data>
+  <data name="Settings_StorageHealthDetected"><value>First detected</value></data>
+  <data name="Settings_StorageHealthDeleteMessage"><value>Delete message</value></data>
+  <data name="Settings_StorageHealthDismiss"><value>Mark as resolved</value></data>
+  <data name="Settings_StorageHealthResolved"><value>Resolved.</value></data>
+  <data name="Settings_StorageHealthFailed"><value>Failed to resolve.</value></data>
   <data name="Settings_ThumbnailHour"><value>Daily generation time (hour 0–23)</value></data>
   <data name="Settings_ThumbnailHourHint"><value>The server will generate thumbnails for unprocessed images/videos at the specified hour each day</value></data>
   <data name="Settings_ThumbnailScheduleEnabled"><value>Enable scheduled batch generation</value></data>

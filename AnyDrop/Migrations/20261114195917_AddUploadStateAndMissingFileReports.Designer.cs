@@ -11,14 +11,92 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AnyDrop.Migrations
 {
     [DbContext(typeof(AnyDropDbContext))]
-    [Migration("20260426113308_AddTimezoneLanguageBurnDuration")]
-    partial class AddTimezoneLanguageBurnDuration
+    [Migration("20261114195917_AddUploadStateAndMissingFileReports")]
+    partial class AddUploadStateAndMissingFileReports
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
+
+            modelBuilder.Entity("AnyDrop.Models.MissingFileReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FirstDetectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResolvedBy")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ShareItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsResolved", "LastSeenAt");
+
+                    b.HasIndex("ShareItemId", "StoragePath", "Kind")
+                        .IsUnique()
+                        .HasFilter("IsResolved = 0");
+
+                    b.ToTable("MissingFileReports");
+                });
+
+            modelBuilder.Entity("AnyDrop.Models.PendingFileDeletion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("ShareItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("PendingFileDeletions");
+                });
 
             modelBuilder.Entity("AnyDrop.Models.ShareItem", b =>
                 {
@@ -35,6 +113,9 @@ namespace AnyDrop.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DeleteAfter")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ExpiresAt")
@@ -57,12 +138,23 @@ namespace AnyDrop.Migrations
                         .HasMaxLength(127)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ThumbnailPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("TopicId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("UploadState")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1);
 
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("DeleteAfter");
 
                     b.HasIndex("ExpiresAt");
 
@@ -76,6 +168,16 @@ namespace AnyDrop.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("AutoCleanupEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("AutoCleanupMonths")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1);
 
                     b.Property<bool>("AutoFetchLinkPreview")
                         .ValueGeneratedOnAdd()
@@ -94,12 +196,15 @@ namespace AnyDrop.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("zh-CN");
 
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
+                    b.Property<bool>("ScheduledThumbnailGenerationEnabled")
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("UTC");
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("ThumbnailGenerationHour")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(2);
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
@@ -112,10 +217,13 @@ namespace AnyDrop.Migrations
                         new
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
+                            AutoCleanupEnabled = false,
+                            AutoCleanupMonths = 1,
                             AutoFetchLinkPreview = true,
                             BurnAfterReadingMinutes = 10,
                             Language = "zh-CN",
-                            TimeZoneId = "UTC",
+                            ScheduledThumbnailGenerationEnabled = false,
+                            ThumbnailGenerationHour = 2,
                             UpdatedAt = new DateTime(2026, 4, 19, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });

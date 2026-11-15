@@ -294,11 +294,20 @@ Auth__CookieSecurePolicy=None
 
 ```
 孤儿文件对账完成：扫描 812 个文件；孤儿 3 个（5242880 字节），已删除 0 个；
-数据库引用了 0 个不存在的文件。模式：仅报告（Storage:OrphanCleanupEnabled=false）。
+数据库引用了 0 个不存在的文件（未解决修复记录 0 个）；超期预占位清理 0 行；
+延迟删除清扫 0 行 / 0 个文件；待删队列消费 0 条、失败 0 条。模式：仅报告（Storage:OrphanCleanupEnabled=false）。
 样本：20260418/ab12….png, 20260418/cd34….jpg
 ```
 
 确认这些文件确实无用后，把 `Storage__OrphanCleanupEnabled` 设为 `true` 即可自动回收。对账有 24 小时宽限期，正在进行中的上传不会被误判。
+
+**上传不再留无主文件**：上传先建一条「上传中」预占位数据库行（最终路径已定），再落盘，落盘后转正为可见消息。任何一步崩溃都只留下一行预占位记录，对账在 24 小时宽限期后清理（删行删文件），磁盘上不再有找不到主人的文件。
+
+**延迟删除的清扫**：批量删除与自动清理只写 7 天后的删除标记（消息立即不可见），对账在标记到期后才真正删行删文件；删文件失败会进入待删队列，按 1、2、4……24 小时退避重试，失败 7 次以上记 Error 请人工检查。
+
+**缺失引用的修复**：数据库引用但磁盘上不存在的文件，对账会记入修复记录（设置页「存储健康」区可见），并标明对应消息与首次发现时间；文件恢复后自动标记已解决。你可以在设置页选择删除对应消息或标记已处理——对账本身绝不自动删除数据库行。
+
+**缩略图**：图片先读头信息再按尺寸限流（默认单边 8192px、总像素约 33.5MP，覆盖 8K 立绘），超限的图片跳过、不全量解码；视频每文件最多等 ffmpeg 60 秒，超时杀进程、本文件跳过、不堵整批。缩略图文件被手动删掉后，下一次生成会发现路径失效并自动重生成。以上上限都可在 `Thumbnails` 配置节调整（`FfmpegTimeoutSeconds`、`FfmpegPath`、`MaxImageDimensionPixels`、`MaxImagePixels`）。
 
 ---
 
@@ -355,61 +364,51 @@ curl -fsS http://localhost:8080/health
 - `/data/anydrop.db` — SQLite 数据库（用户、主题、消息元数据）
 - `/data/anydrop.db-wal`、`/data/anydrop.db-shm` — SQLite 预写日志（数据库运行在 WAL 模式）
 - `/data/files/` — 上传的文件
+- `/data/keys/` — Data Protection 密钥（Cookie 与防伪令牌签名）。**密钥丢失等于全员掉登录**：重建容器后原有登录态失效、已签发的防伪令牌失效，备份时必须包含该目录，恢复时也必须随数据库一起恢复。
 
 > ⚠️ **不要在服务运行时直接 `tar` 整个数据目录。** 数据库处于 WAL 模式，逐个复制文件可能得到
-> 不一致甚至损坏的备份——`.db` 与 `-wal` 的内容可能来自不同时刻。请使用下面两种方式之一。
+> 不一致甚至损坏的备份——`.db` 与 `-wal` 的内容可能来自不同时刻。
 
-### 方式一：短暂停机备份（推荐，最可靠）
-
-```bash
-docker compose stop anydrop
-docker run --rm \
-  -v anydrop-data:/data \
-  -v "$(pwd)/backup:/backup" \
-  alpine tar czf /backup/anydrop-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
-docker compose start anydrop
-```
-
-### 方式二：在线备份（服务不中断）
-
-分两步，顺序不能反——**先给数据库拍快照，再按快照里的记录同步文件**：
+### 备份（`scripts/backup.sh`）
 
 ```bash
-mkdir -p backup
-TS=$(date +%Y%m%d-%H%M%S)
-docker run --rm \
-  -v anydrop-data:/data \
-  -v "$(pwd)/backup:/backup" \
-  alpine sh -c 'apk add --no-cache sqlite >/dev/null &&
-    sqlite3 /data/anydrop.db ".backup /backup/anydrop.db" &&
-    sqlite3 /backup/anydrop.db "SELECT DISTINCT Content FROM ShareItems WHERE ContentType IN (1, 2, 3) UNION SELECT DISTINCT ThumbnailPath FROM ShareItems WHERE ThumbnailPath IS NOT NULL;" |
-      grep -v "^$" > /backup/files-$TS.txt &&
-    tar czf /backup/anydrop-files-$TS.tar.gz -C /data -T /backup/files-$TS.txt'
+# Docker 卷模式（宿主机上跑，服务不中断）
+scripts/backup.sh --volume anydrop-data --out-dir ./backup
+# 本地目录模式（本机或容器内）
+scripts/backup.sh --data-dir /data --out-dir ./backup
+# 定时备份：宿主机 crontab，每天 03:30，保留最近 7 份（默认）
+# 30 3 * * * /path/to/anydrop/scripts/backup.sh --volume anydrop-data --out-dir /path/to/anydrop/backup >> /var/log/anydrop-backup.log 2>&1
 ```
 
-为什么必须按快照里的记录打包，而不是直接 `tar` 整个 `files/` 目录：
-快照与文件打包之间有时间差，直接打包整个目录会混入快照之后才上传的
-文件（备份里的数据库没有这些记录，恢复后是孤儿文件），还可能打包到
-一半被删的文件。按快照的 `Content` / `ThumbnailPath` 清单打包，
-备份里的每个文件在备份的数据库里都有记录，两边一致。
+备份分两步，顺序不能反——**先给数据库拍快照（`sqlite3 .backup`），再按快照里的记录同步文件**（`ContentType 1/2/3` 的 `Content` 与 `ThumbnailPath` 清单），最后把 `keys/` 目录一起打包。为什么必须按快照里的记录打包，而不是直接 `tar` 整个 `files/` 目录：快照与文件打包之间有时间差，直接打包整个目录会混入快照之后才上传的文件（备份里的数据库没有这些记录，恢复后是孤儿文件），还可能打包到一半被删的文件。按快照清单打包，备份里的每个文件在备份的数据库里都有记录，两边一致。
 
-> 注意这里以**读写**方式挂载卷（没有 `:ro`）：WAL 模式下即使只读查询也需要访问 `-shm` 文件。
+产物是 `./backup/anydrop-backup-<时间戳>.tar.gz`（含 `anydrop.db`、`files/`、`keys/`、`manifest.sha256`、备份信息）与同名 `.sha256` 整包校验和；默认保留最近 7 份，旧的自动删除。备份时数据库引用但磁盘上不存在的文件会记入包内的 `missing.txt` 并打印警告（恢复后请在设置页「存储健康」处理）。
+
+> 注意在线备份以**读写**方式挂载卷（没有 `:ro`）：WAL 模式下即使只读查询也需要访问 `-shm` 文件。
 >
 > 另注意：数据库运行在 WAL 模式（启动时由应用自动启用，见上），
 > `-wal` / `-shm` 文件是运行时的中间状态，**不要**单独备份它们——
 > `.backup` 命令会把已提交的数据完整导出到快照里。
 
-### 恢复
+### 恢复（`scripts/restore.sh`）
+
+**恢复到一个新目录，校验通过后再切换——绝不在原目录上先清空。**
 
 ```bash
+# 1. 恢复到新目录（自动校验整包 sha256、包内 manifest.sha256、数据库完整性）
+scripts/restore.sh --archive ./backup/anydrop-backup-<时间戳>.tar.gz --target-dir ./restored-data
+# 2. 停掉旧服务（旧数据原地不动，作为切换前的最后一道保险）
 docker compose down
-# 方式一产物（整目录归档）
-docker run --rm -v anydrop-data:/data -v "$(pwd)/backup:/backup" alpine \
-  sh -c 'rm -rf /data/* && tar xzf /backup/<备份文件>.tar.gz -C /data'
+# 3. 切换：把已验证的新目录内容拷回数据卷（或直接改用该目录作 bind mount）
+docker run --rm -v anydrop-data:/data -v "$(pwd)/restored-data:/restored" alpine \
+  sh -c 'cp -a /restored/. /data/'
+# 4. 起服务，访问 /health 确认数据库与存储均正常
 docker compose up -d
 ```
 
-恢复完成后访问 `/health` 确认数据库与存储均正常。
+本地运行（非 Docker）时：第 3 步改为把 `Storage__DatabasePath` / `Storage__BasePath` / `DataProtection__KeysPath` 指到新目录，再启动服务。
+
+恢复完成后请做一次演练确认：访问 `/health`、打开设置页确认无新增的缺失引用修复记录、随机抽取消息下载文件。建议每季度在隔离环境完整演练一次（恢复到新目录 → 起临时实例 → `/health` 通过 → 对账孤儿与缺失均为零 → 随机抽 20 条消息可正常下载）。
 
 ---
 
@@ -434,13 +433,49 @@ E2E 会自行以**独立的临时数据目录**启动服务端，不会触碰本
 
 ### 数据库迁移
 
+仓库里只有一个迁移：**基线迁移**（`AnyDrop/Migrations/*_Baseline.cs`），包含当前模型的
+完整建表（5 张表、全部索引、默认设置行）。历史上的 13 个旧迁移已在 Stage 1（S1-04）
+删除——其中一个（`20260513141000_AddScheduledThumbnailGenerationFlag`）文件缺失，
+EF Core 从未应用过它，`SystemSettings.ScheduledThumbnailGenerationEnabled` 列一直靠
+启动补丁创建；基线迁移终结了这个双轨：新库由基线直接建列，旧库由升级门接过去。
+
 ```bash
-# 添加新迁移
-dotnet ef migrations add <MigrationName> --project AnyDrop
+# 添加新迁移（基线之后的新改动正常走这条路）
+dotnet ef migrations add <MigrationName> --project AnyDrop --startup-project AnyDrop
 
 # 应用迁移
-dotnet ef database update --project AnyDrop
+dotnet ef database update --project AnyDrop --startup-project AnyDrop
 ```
+
+服务端启动时会自动应用迁移。**迁移失败时服务端拒绝启动**：记一条 `crit: Startup`
+致命日志后以非零码退出，容器编排器会按重启策略处理——不要带着坏库继续跑，
+也**切勿删除数据库文件重建**（会丢失全部用户与消息）。
+
+#### 旧库升级（从基线之前的版本升上来）
+
+启动时服务端会检查 `__EFMigrationsHistory`：
+
+- 全新库（无历史表）：正常应用基线迁移建表。
+- 停在最后一版旧迁移（`20261114181120_AddPendingDeletionAndDeleteAfter`）的库：
+  校验 5 张表与设置种子行完整、补齐历史上由启动补丁创建的那一列后，
+  把基线迁移记入历史，**不重建表、不动数据**，随后启动。日志里会有一条
+  `warn: AnyDrop.Data.DatabaseMigrationExtensions` 标明这次接管。
+- 停在中间版本、或历史无法识别的库：**直接拒绝启动**，日志写明已应用的记录。
+  此时先备份 `data/anydrop.db`，再升到最后一版旧发布（即含
+  `20261114181120_AddPendingDeletionAndDeleteAfter` 的版本）后重新升级，
+  或从备份恢复。不要手动改 `__EFMigrationsHistory`——除非你清楚自己在做什么。
+
+升级前请先按「数据备份与恢复」一节备份（在线备份或停机备份均可）。
+
+#### 后台任务时区
+
+孤儿对账、过期清理、缩略图批处理按同一时区调度（D6），配置
+`BackgroundTasks:TimeZoneId`（环境变量 `BackgroundTasks__TimeZoneId`，IANA ID，
+例如 `Asia/Shanghai`）。留空时用当前计算机时区；ID 无效时记 Error 并回退本机时区，
+永不静默用 UTC。启动日志里有一条 `后台任务时区：…` 写明生效值与来源。
+容器内本机时区通常是 UTC，要与宿主机一致请显式配置本项（`docker-compose.yml` 与
+`.env.example` 里有 `ANYDROP_BACKGROUND_TIMEZONE`），或透传宿主机 `TZ`。
+Web 界面展示用的浏览器时区是另一回事，与此无关。
 
 ### 构建容器镜像
 

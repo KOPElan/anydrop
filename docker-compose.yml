@@ -27,8 +27,19 @@ services:
       - Storage__MaxFileSizeBytes=${ANYDROP_MAX_FILE_SIZE:-104857600}
       # ── JWT 令牌有效期（小时），默认 24 小时 ─────────────────────────────────
       - Auth__TokenExpiryHours=${ANYDROP_TOKEN_EXPIRY_HOURS:-24}
+      # ── Data Protection 密钥（S1-05）────────────────────────────────────────
+      # Cookie 与防伪令牌的签名密钥默认落到 /data/keys（数据库同目录），随
+      # anydrop-data 卷持久化；重建容器后原有登录态不失效。改路径时用本项指定。
+      - DataProtection__KeysPath=${ANYDROP_DATA_PROTECTION_KEYS_PATH:-/data/keys}
       # ── 孤儿文件回收（默认只报告不删除）─────────────────────────────────────
       - Storage__OrphanCleanupEnabled=${ANYDROP_ORPHAN_CLEANUP_ENABLED:-false}
+      # ── 后台任务时区（D6）───────────────────────────────────────────────────
+      # 孤儿对账、过期清理、缩略图批处理按此 IANA 时区调度（例如 Asia/Shanghai）。
+      # 留空时用容器内当前计算机时区——容器内通常是 UTC，要与宿主机一致请显式配置；
+      # 也可以同时透传宿主机 TZ（须镜像含 tzdata，否则仅影响 .NET 的本地时区读取，
+      # BackgroundTasks__TimeZoneId 仍是可靠做法）。
+      - BackgroundTasks__TimeZoneId=${ANYDROP_BACKGROUND_TIMEZONE:-}
+      - TZ=${TZ:-}
       # ── 反向代理 ──────────────────────────────────────────────────────────
       # 应用本身只监听容器内 plain HTTP 8080，TLS 由前面的反向代理终止；
       # 生产环境默认强制 HTTPS 重定向 + HSTS。启用反代时务必把代理的实际网段

@@ -1,5 +1,6 @@
 using AnyDrop.Data;
 using AnyDrop.Hubs;
+using AnyDrop.Tests.Unit.TestDoubles;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using FluentAssertions;
@@ -16,8 +17,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendTextAsync_ValidContent_PersistsToDatabase()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out _);
 
         var dto = await service.SendTextAsync("hello world");
 
@@ -31,8 +33,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendTextAsync_ValidContent_BroadcastsViaSignalR()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out var clientProxyMock, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out var clientProxyMock, out _);
 
         var dto = await service.SendTextAsync("broadcast me");
 
@@ -52,8 +55,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendTextAsync_EmptyContent_ThrowsArgumentException()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out _);
 
         var act = () => service.SendTextAsync("   ");
         await act.Should().ThrowAsync<ArgumentException>();
@@ -62,8 +66,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendTextAsync_ContentExceeds10000Chars_ThrowsArgumentException()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out _);
         var content = new string('a', 10_001);
 
         var act = () => service.SendTextAsync(content);
@@ -73,8 +78,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendTextAsync_ContentWithin10000CharsAfterTrim_PersistsTrimmedContent()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out _);
         var content = $"   {new string('a', 10_000)}   ";
 
         var dto = await service.SendTextAsync(content);
@@ -86,14 +92,15 @@ public class ShareServiceTests
     [Fact]
     public async Task GetRecentAsync_ReturnsTopNOrderedByCreatedAtDesc()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         dbContext.ShareItems.AddRange(
             new ShareItem { Content = "first", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-3), ContentType = ShareContentType.Text },
             new ShareItem { Content = "second", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2), ContentType = ShareContentType.Text },
             new ShareItem { Content = "third", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1), ContentType = ShareContentType.Text });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _, out _);
+        var service = CreateService(factory, out _, out _);
         var result = await service.GetRecentAsync(2);
 
         result.Select(x => x.Content).Should().Equal("third", "second");
@@ -102,8 +109,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendFileAsync_ImageMimeType_PersistsAsImageAndBroadcasts()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out var clientProxyMock, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out var clientProxyMock, out _);
 
         await using var stream = new MemoryStream([1, 2, 3]);
         var dto = await service.SendFileAsync(stream, "photo.png", "image/png");
@@ -125,9 +133,10 @@ public class ShareServiceTests
     [Fact]
     public async Task SendFileAsync_Image_WhenScheduledThumbnailGenerationDisabled_ShouldGenerateThumbnailAsync()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var service = CreateServiceWithThumbnailSettings(
-            dbContext,
+            factory,
             scheduledThumbnailGenerationEnabled: false,
             out var thumbnailServiceMock);
 
@@ -148,9 +157,10 @@ public class ShareServiceTests
     [Fact]
     public async Task SendFileAsync_Image_WhenScheduledThumbnailGenerationEnabled_ShouldNotGenerateThumbnailAsync()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var service = CreateServiceWithThumbnailSettings(
-            dbContext,
+            factory,
             scheduledThumbnailGenerationEnabled: true,
             out var thumbnailServiceMock);
 
@@ -164,8 +174,9 @@ public class ShareServiceTests
     [Fact]
     public async Task SendTextAsync_Link_WhenAutoFetchDisabled_ShouldNotTriggerMetadataFetchFailure()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out _, autoFetchEnabled: false);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out _, autoFetchEnabled: false);
 
         var dto = await service.SendTextAsync("https://example.com");
 
@@ -175,13 +186,14 @@ public class ShareServiceTests
     [Fact]
     public async Task CleanupOldMessagesAsync_WithOldMessages_DeletesAndReturnsCount()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         dbContext.ShareItems.AddRange(
             new ShareItem { Content = "old", CreatedAt = DateTimeOffset.UtcNow.AddMonths(-2), ContentType = ShareContentType.Text },
             new ShareItem { Content = "new", CreatedAt = DateTimeOffset.UtcNow.AddHours(-1), ContentType = ShareContentType.Text });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _, out _);
+        var service = CreateService(factory, out _, out _);
         var count = await service.CleanupOldMessagesAsync(1);
 
         count.Should().Be(1);
@@ -191,11 +203,12 @@ public class ShareServiceTests
     [Fact]
     public async Task CleanupOldMessagesAsync_WithNoOldMessages_ReturnsZero()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         dbContext.ShareItems.Add(new ShareItem { Content = "new", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text });
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _, out _);
+        var service = CreateService(factory, out _, out _);
         var count = await service.CleanupOldMessagesAsync(1);
 
         count.Should().Be(0);
@@ -205,12 +218,13 @@ public class ShareServiceTests
     [Fact]
     public async Task CleanupOldMessagesAsync_WithOldMessages_BroadcastsShareItemsDeleted()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var oldItem = new ShareItem { Content = "old", CreatedAt = DateTimeOffset.UtcNow.AddMonths(-2), ContentType = ShareContentType.Text };
         dbContext.ShareItems.Add(oldItem);
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out var clientProxyMock, out _);
+        var service = CreateService(factory, out var clientProxyMock, out _);
         await service.CleanupOldMessagesAsync(1);
 
         clientProxyMock.Verify(
@@ -227,13 +241,14 @@ public class ShareServiceTests
     [Fact]
     public async Task DeleteShareItemsAsync_WithExistingIds_DeletesAndReturnsActualCount()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var item1 = new ShareItem { Content = "a", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text };
         var item2 = new ShareItem { Content = "b", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text };
         dbContext.ShareItems.AddRange(item1, item2);
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _, out _);
+        var service = CreateService(factory, out _, out _);
         // item2.Id 不存在于请求中，只删除 item1
         var nonExistentId = Guid.NewGuid();
         var count = await service.DeleteShareItemsAsync([item1.Id, nonExistentId]);
@@ -245,8 +260,9 @@ public class ShareServiceTests
     [Fact]
     public async Task DeleteShareItemsAsync_WithEmptyIds_ReturnsZero()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out _);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out _);
 
         var count = await service.DeleteShareItemsAsync([]);
 
@@ -256,12 +272,13 @@ public class ShareServiceTests
     [Fact]
     public async Task DeleteShareItemsAsync_WithExistingIds_BroadcastsShareItemsDeleted()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var item = new ShareItem { Content = "x", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Text };
         dbContext.ShareItems.Add(item);
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out var clientProxyMock, out _);
+        var service = CreateService(factory, out var clientProxyMock, out _);
         await service.DeleteShareItemsAsync([item.Id]);
 
         clientProxyMock.Verify(
@@ -278,12 +295,13 @@ public class ShareServiceTests
     [Fact]
     public async Task DeleteShareItemsAsync_FileItem_DeletesFileAndDoesNotThrow()
     {
-        await using var dbContext = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
         var item = new ShareItem { Content = "files/photo.png", CreatedAt = DateTimeOffset.UtcNow, ContentType = ShareContentType.Image, FileName = "photo.png", MimeType = "image/png" };
         dbContext.ShareItems.Add(item);
         await dbContext.SaveChangesAsync();
 
-        var service = CreateService(dbContext, out _, out var fileStorageMock);
+        var service = CreateService(factory, out _, out var fileStorageMock);
         fileStorageMock.Setup(x => x.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         await service.DeleteShareItemsAsync([item.Id]);
@@ -296,8 +314,9 @@ public class ShareServiceTests
     {
         // 主题校验必须发生在落盘之前：反过来时主题不存在会抛出 ArgumentException，
         // 端点转换成 400 返回，但文件已写入磁盘且永远不会被任何 ShareItem 引用。
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out var fileStorageMock);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out var fileStorageMock);
         await using var stream = new MemoryStream([1, 2, 3]);
 
         var act = () => service.SendFileAsync(
@@ -305,17 +324,21 @@ public class ShareServiceTests
 
         await act.Should().ThrowAsync<ArgumentException>();
 
+        // 主题不存在时，连预占位行都不建、文件也不落盘
         fileStorageMock.Verify(
-            x => x.SaveFileAsync(
+            x => x.SaveFileAtPathAsync(
                 It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        await using var verifyDb = factory.CreateDbContext();
+        (await verifyDb.ShareItems.IgnoreQueryFilters().CountAsync()).Should().Be(0);
     }
 
     [Fact]
     public async Task DeleteShareItemsAsync_ImageItem_AlsoDeletesThumbnail()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out var fileStorageMock);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out var fileStorageMock);
 
         var item = new ShareItem
         {
@@ -344,8 +367,9 @@ public class ShareServiceTests
     [Fact]
     public async Task CleanupOldMessagesAsync_VideoItem_MarksForDelayedDeletionWithoutDeletingFiles()
     {
-        await using var dbContext = CreateDbContext();
-        var service = CreateService(dbContext, out _, out var fileStorageMock);
+        var factory = CreateDbContextFactory();
+        await using var dbContext = factory.CreateDbContext();
+        var service = CreateService(factory, out _, out var fileStorageMock);
 
         dbContext.ShareItems.Add(new ShareItem
         {
@@ -364,21 +388,23 @@ public class ShareServiceTests
         deleted.Should().Be(1);
         fileStorageMock.Verify(
             x => x.DeleteFileAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        var marked = await dbContext.ShareItems.IgnoreQueryFilters().SingleAsync();
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        var marked = await verifyDb.ShareItems.IgnoreQueryFilters().SingleAsync();
         marked.DeleteAfter.Should().NotBeNull();
     }
 
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-{Guid.NewGuid():N}")
             .Options;
 
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
     private static ShareService CreateServiceWithThumbnailSettings(
-        AnyDropDbContext dbContext,
+        TestDbContextFactory factory,
         bool scheduledThumbnailGenerationEnabled,
         out Mock<IThumbnailService> thumbnailServiceMock,
         TimeProvider? timeProvider = null)
@@ -404,13 +430,15 @@ public class ShareServiceTests
 
         var fileStorageServiceMock = new Mock<IFileStorageService>();
         fileStorageServiceMock
-            .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("saved/file.bin");
+            .Setup(x => x.GenerateStoragePath(It.IsAny<string>()))
+            .Returns("saved/file.bin");
+        fileStorageServiceMock
+            .Setup(x => x.SaveFileAtPathAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Stream _, string path, string _, CancellationToken _) => path);
 
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
 
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var systemSettingsMock = new Mock<ISystemSettingsService>();
         systemSettingsMock.Setup(x => x.IsAutoFetchLinkPreviewEnabledAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -423,20 +451,19 @@ public class ShareServiceTests
             .ReturnsAsync((string?)null);
 
         return new ShareService(
-            dbContext,
+            factory,
             hubContextMock.Object,
             topicServiceMock.Object,
             fileStorageServiceMock.Object,
             thumbnailServiceMock.Object,
             linkMetadataService,
             systemSettingsMock.Object,
-            scopeFactoryMock.Object,
             timeProvider ?? TimeProvider.System,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }
 
     private static ShareService CreateService(
-        AnyDropDbContext dbContext,
+        TestDbContextFactory factory,
         out Mock<IClientProxy> clientProxyMock,
         out Mock<IFileStorageService> fileStorageServiceMock,
         bool autoFetchEnabled = true,
@@ -463,15 +490,17 @@ public class ShareServiceTests
 
         fileStorageServiceMock = new Mock<IFileStorageService>();
         fileStorageServiceMock
-            .Setup(x => x.SaveFileAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("saved/file.bin");
+            .Setup(x => x.GenerateStoragePath(It.IsAny<string>()))
+            .Returns("saved/file.bin");
+        fileStorageServiceMock
+            .Setup(x => x.SaveFileAtPathAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Stream _, string path, string _, CancellationToken _) => path);
 
         // LinkMetadataService: 使用真实实例，但 HttpClientFactory 不会发起外部请求
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         var linkMetadataService = new LinkMetadataService(httpClientFactoryMock.Object, NullLogger<LinkMetadataService>.Instance);
 
         // IServiceScopeFactory: fire-and-forget 中使用，测试中不需要实际调用
-        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         var systemSettingsMock = new Mock<ISystemSettingsService>();
         systemSettingsMock.Setup(x => x.IsAutoFetchLinkPreviewEnabledAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(autoFetchEnabled);
@@ -483,14 +512,13 @@ public class ShareServiceTests
             .ReturnsAsync((string?)null);
 
         return new ShareService(
-            dbContext,
+            factory,
             hubContextMock.Object,
             topicServiceMock.Object,
             fileStorageServiceMock.Object,
             thumbnailServiceMock.Object,
             linkMetadataService,
             systemSettingsMock.Object,
-            scopeFactoryMock.Object,
             timeProvider ?? TimeProvider.System,
             Mock.Of<Microsoft.Extensions.Logging.ILogger<ShareService>>());
     }

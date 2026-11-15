@@ -5,13 +5,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AnyDrop.Services;
 
-public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemSettingsService
+/// <summary>
+/// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
+/// 每次调用建短寿命上下文；单例行的「先查后插」遇主键冲突时重读返回，
+/// 避免冷启动并发下偶发 500。
+/// </summary>
+public sealed class SystemSettingsService(IDbContextFactory<AnyDropDbContext> dbContextFactory) : ISystemSettingsService
 {
     private static readonly Guid SettingsId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     public async Task<SecuritySettingsDto> GetSecuritySettingsAsync(CancellationToken ct = default)
     {
-        var settings = await EnsureSettingsAsync(ct);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         return MapToDto(settings);
     }
 
@@ -41,7 +47,8 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return AuthResult<SecuritySettingsDto>.Failure("缩略图生成小时必须在 0–23 之间。", StatusCodes.Status400BadRequest);
         }
 
-        var settings = await EnsureSettingsAsync(ct);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         settings.AutoFetchLinkPreview = request.AutoFetchLinkPreview;
         settings.BurnAfterReadingMinutes = request.BurnAfterReadingMinutes;
         settings.Language = request.Language;
@@ -56,6 +63,7 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
 
     public async Task<bool> IsAutoFetchLinkPreviewEnabledAsync(CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var settingsProjection = await dbContext.SystemSettings
             .AsNoTracking()
             .Select(x => new { x.AutoFetchLinkPreview })
@@ -65,12 +73,13 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return settingsProjection.AutoFetchLinkPreview;
         }
 
-        var settings = await EnsureSettingsAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         return settings.AutoFetchLinkPreview;
     }
 
     public async Task<int> GetBurnAfterReadingMinutesAsync(CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var projection = await dbContext.SystemSettings
             .AsNoTracking()
             .Select(x => new { x.BurnAfterReadingMinutes })
@@ -80,12 +89,13 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return projection.BurnAfterReadingMinutes;
         }
 
-        var settings = await EnsureSettingsAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         return settings.BurnAfterReadingMinutes;
     }
 
     public async Task<(bool Enabled, int Months)> GetAutoCleanupSettingsAsync(CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var projection = await dbContext.SystemSettings
             .AsNoTracking()
             .Select(x => new { x.AutoCleanupEnabled, x.AutoCleanupMonths })
@@ -95,12 +105,13 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return (projection.AutoCleanupEnabled, projection.AutoCleanupMonths);
         }
 
-        var settings = await EnsureSettingsAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         return (settings.AutoCleanupEnabled, settings.AutoCleanupMonths);
     }
 
     public async Task<int> GetThumbnailGenerationHourAsync(CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var projection = await dbContext.SystemSettings
             .AsNoTracking()
             .Select(x => new { x.ThumbnailGenerationHour })
@@ -110,12 +121,13 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return projection.ThumbnailGenerationHour;
         }
 
-        var settings = await EnsureSettingsAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         return settings.ThumbnailGenerationHour;
     }
 
     public async Task<bool> IsScheduledThumbnailGenerationEnabledAsync(CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var projection = await dbContext.SystemSettings
             .AsNoTracking()
             .Select(x => new { x.ScheduledThumbnailGenerationEnabled })
@@ -125,7 +137,7 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             return projection.ScheduledThumbnailGenerationEnabled;
         }
 
-        var settings = await EnsureSettingsAsync(ct);
+        var settings = await EnsureSettingsAsync(dbContext, ct);
         return settings.ScheduledThumbnailGenerationEnabled;
     }
 
@@ -139,7 +151,12 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
             s.ThumbnailGenerationHour,
             s.ScheduledThumbnailGenerationEnabled);
 
-    private async Task<SystemSettings> EnsureSettingsAsync(CancellationToken ct)
+    /// <summary>
+    /// 取不到单例行时插入一行。冷启动并发下两个调用可能同时走到插入：
+    /// 后到的会撞主键冲突——此时不抛 500，改用全新上下文重读一次，
+    /// 读到先到的那行就直接返回；重读不到才原样抛出。
+    /// </summary>
+    private async Task<SystemSettings> EnsureSettingsAsync(AnyDropDbContext dbContext, CancellationToken ct)
     {
         var settings = await dbContext.SystemSettings.FirstOrDefaultAsync(ct);
         if (settings is not null)
@@ -151,13 +168,28 @@ public sealed class SystemSettingsService(AnyDropDbContext dbContext) : ISystemS
         {
             Id = SettingsId,
             AutoFetchLinkPreview = true,
-            TimeZoneId = "UTC",
             BurnAfterReadingMinutes = 10,
             Language = "zh-CN",
             UpdatedAt = DateTimeOffset.UtcNow
         };
         dbContext.SystemSettings.Add(settings);
-        await dbContext.SaveChangesWithRetryAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesWithRetryAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // 并发插入冲突：用全新上下文重读，先到的那一行一定已提交。
+            await using var freshDb = await dbContextFactory.CreateDbContextAsync(ct);
+            var existing = await freshDb.SystemSettings.FirstOrDefaultAsync(ct);
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            throw;
+        }
+
         return settings;
     }
 }

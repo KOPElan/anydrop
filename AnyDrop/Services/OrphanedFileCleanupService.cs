@@ -11,10 +11,9 @@ public sealed class OrphanedFileCleanupService(
     IServiceProvider serviceProvider,
     IConfiguration configuration,
     TimeProvider timeProvider,
+    BackgroundTaskTimeZone taskTimeZone,
     ILogger<OrphanedFileCleanupService> logger) : BackgroundService
 {
-    private static readonly TimeSpan ScanInterval = TimeSpan.FromHours(24);
-
     /// <summary>
     /// 启动后延迟首次扫描，避免与迁移、缩略图批处理抢 IO。
     /// 取 1 分钟而非更久：报告模式下的扫描成本很低，而每次启动都能在日志里
@@ -24,6 +23,9 @@ public sealed class OrphanedFileCleanupService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // S1-07：首轮失败不再终止本服务。旧代码里 InitialDelay + 首次 RunOnceAsync
+        // 在 try/catch 之外（只有 PeriodicTimer 循环内有 catch），首轮抛错会让
+        // ExecuteAsync 直接退出、之后再也不对账。改为捕获并继续走每日锚定循环。
         try
         {
             await Task.Delay(InitialDelay, timeProvider, stoppingToken);
@@ -33,19 +35,35 @@ public sealed class OrphanedFileCleanupService(
         {
             return;
         }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "孤儿文件对账首轮失败，宿主继续运行，将在下一锚定时刻重试。");
+        }
 
-        using var timer = new PeriodicTimer(ScanInterval, timeProvider);
-
-        while (!stoppingToken.IsCancellationRequested
-               && await timer.WaitForNextTickAsync(stoppingToken))
+        // 此后锚定到后台任务时区（D6）的每日凌晨 3 点执行，而不是「启动后每 24 小时」——
+        // 这样三个后台任务的触发时间都按同一时区对齐，日志里的时刻也与运维者的本地时间一致。
+        // 每次都重新算下一次锚点，夏令时跳变日也不会漂移。
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                var delay = taskTimeZone.GetDelayUntilNextDailyRun(
+                    BackgroundTaskTimeZone.DailyAnchorHour, timeProvider.GetUtcNow());
+                logger.LogDebug(
+                    "孤儿文件对账：下次在后台任务时区 {TimeZoneId} 凌晨 {Hour} 点执行（{Minutes:F0} 分钟后）。",
+                    taskTimeZone.TimeZone.Id,
+                    BackgroundTaskTimeZone.DailyAnchorHour,
+                    delay.TotalMinutes);
+                await Task.Delay(delay, timeProvider, stoppingToken);
                 await RunOnceAsync(stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
             {
-                logger.LogWarning(ex, "孤儿文件对账任务失败。");
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "孤儿文件对账任务失败，将在下一锚定时刻重试。");
             }
         }
     }
@@ -59,7 +77,9 @@ public sealed class OrphanedFileCleanupService(
 
         var result = await reconciler.ReconcileAsync(deleteOrphans, ct);
 
-        if (result.OrphansFound == 0 && result.MissingReferencedFiles == 0)
+        if (result.OrphansFound == 0 && result.MissingReferencedFiles == 0
+            && result.StalePlaceholdersRemoved == 0 && result.SweepRowsRemoved == 0
+            && result.QueueEntriesDrained == 0 && result.QueueEntriesFailed == 0)
         {
             logger.LogDebug("孤儿文件对账完成：扫描 {Scanned} 个文件，未发现异常。", result.FilesScanned);
             return result;
@@ -67,12 +87,20 @@ public sealed class OrphanedFileCleanupService(
 
         logger.LogInformation(
             "孤儿文件对账完成：扫描 {Scanned} 个文件；孤儿 {Orphans} 个（{Bytes} 字节），已删除 {Deleted} 个；"
-            + "数据库引用了 {Missing} 个不存在的文件。模式：{Mode}。样本：{Samples}",
+            + "数据库引用了 {Missing} 个不存在的文件（未解决修复记录 {OpenReports} 个）；"
+            + "超期预占位清理 {Placeholders} 行；延迟删除清扫 {SweepRows} 行 / {SweepFiles} 个文件；"
+            + "待删队列消费 {QueueDrained} 条、失败 {QueueFailed} 条。模式：{Mode}。样本：{Samples}",
             result.FilesScanned,
             result.OrphansFound,
             result.OrphanBytes,
             result.OrphansDeleted,
             result.MissingReferencedFiles,
+            result.MissingReportsOpen,
+            result.StalePlaceholdersRemoved,
+            result.SweepRowsRemoved,
+            result.SweepFilesDeleted,
+            result.QueueEntriesDrained,
+            result.QueueEntriesFailed,
             deleteOrphans ? "删除" : "仅报告（Storage:OrphanCleanupEnabled=false）",
             result.SampleOrphans.Count == 0 ? "-" : string.Join(", ", result.SampleOrphans));
 

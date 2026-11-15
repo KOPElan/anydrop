@@ -28,12 +28,12 @@ public class ExpiredMessageFilteringTests : IDisposable
     private readonly string _basePath =
         Path.Combine(AppContext.BaseDirectory, "test-expired", Guid.NewGuid().ToString("N"));
 
-    private AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-expired-{Guid.NewGuid():N}")
             .Options;
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
     private static async Task<Guid> SeedTopicAsync(AnyDropDbContext db)
@@ -64,12 +64,13 @@ public class ExpiredMessageFilteringTests : IDisposable
     [Fact]
     public async Task GetRecentAsync_ExcludesExpiredImmediately()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedTopicAsync(db);
         await SeedTextAsync(db, topicId, "expired", Now.AddMinutes(-1));
         await SeedTextAsync(db, topicId, "alive", Now.AddMinutes(10));
         await SeedTextAsync(db, topicId, "forever", null);
-        var sut = ShareServiceFactory.Create(db, timeProvider: new FakeTimeProvider(Now));
+        var sut = ShareServiceFactory.Create(factory, timeProvider: new FakeTimeProvider(Now));
 
         var recent = await sut.GetRecentAsync();
 
@@ -79,11 +80,12 @@ public class ExpiredMessageFilteringTests : IDisposable
     [Fact]
     public async Task SearchTopicMessagesAsync_ExcludesExpired()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedTopicAsync(db);
         await SeedTextAsync(db, topicId, "hello expired", Now.AddMinutes(-1));
         await SeedTextAsync(db, topicId, "hello alive", Now.AddMinutes(10));
-        var sut = ShareServiceFactory.Create(db, timeProvider: new FakeTimeProvider(Now));
+        var sut = ShareServiceFactory.Create(factory, timeProvider: new FakeTimeProvider(Now));
 
         var result = await sut.SearchTopicMessagesAsync(topicId, "hello");
 
@@ -93,11 +95,12 @@ public class ExpiredMessageFilteringTests : IDisposable
     [Fact]
     public async Task GetTopicMessagesByDate_And_ByType_ExcludeExpired()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedTopicAsync(db);
         await SeedTextAsync(db, topicId, "expired", Now.AddMinutes(-1));
         await SeedTextAsync(db, topicId, "alive", Now.AddMinutes(10));
-        var sut = ShareServiceFactory.Create(db, timeProvider: new FakeTimeProvider(Now));
+        var sut = ShareServiceFactory.Create(factory, timeProvider: new FakeTimeProvider(Now));
 
         var byDate = await sut.GetTopicMessagesByDateAsync(topicId, DateOnly.FromDateTime(Now.DateTime), TimeZoneInfo.Utc);
         byDate.Select(x => x.Content).Should().ContainSingle().Which.Should().Be("alive");
@@ -114,14 +117,15 @@ public class ExpiredMessageFilteringTests : IDisposable
     {
         // 注意：TopicService 直接用 DateTimeOffset.UtcNow（无 TimeProvider 注入），
         // 因此这里按真实当前时间 seeding，不能用上面固定的假 Now。
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedTopicAsync(db);
         var realNow = DateTimeOffset.UtcNow;
         await SeedTextAsync(db, topicId, "expired", realNow.AddMinutes(-1));
         await SeedTextAsync(db, topicId, "alive", realNow.AddMinutes(10));
 
         var hubContext = new Mock<IHubContext<ShareHub>>();
-        var sut = new TopicService(db, hubContext.Object);
+        var sut = new TopicService(factory, hubContext.Object);
 
         var result = await sut.GetTopicMessagesAsync(topicId, 50, null);
         result.Should().NotBeNull();
@@ -139,7 +143,8 @@ public class ExpiredMessageFilteringTests : IDisposable
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Storage:BasePath"] = _basePath })
             .Build();
         var storage = new LocalFileStorageService(configuration, TimeProvider.System);
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var stored = await storage.SaveFileAsync(
             new MemoryStream(Encoding.UTF8.GetBytes("secret")), "secret.txt", "text/plain");
         var item = new ShareItem
@@ -155,7 +160,7 @@ public class ExpiredMessageFilteringTests : IDisposable
         db.ShareItems.Add(item);
         await db.SaveChangesAsync();
 
-        var result = await ShareItemEndpoints.GetFileAsync(item.Id, null, db, storage, CancellationToken.None);
+        var result = await ShareItemEndpoints.GetFileAsync(item.Id, null, factory, storage, CancellationToken.None);
 
         result.Result.Should().BeOfType<NotFound<ApiEnvelope<object>>>();
     }
@@ -167,7 +172,8 @@ public class ExpiredMessageFilteringTests : IDisposable
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Storage:BasePath"] = _basePath })
             .Build();
         var storage = new LocalFileStorageService(configuration, TimeProvider.System);
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var stored = await storage.SaveFileAsync(
             new MemoryStream(Encoding.UTF8.GetBytes("thumb")), "thumb.jpg", "image/jpeg");
         var item = new ShareItem
@@ -183,7 +189,7 @@ public class ExpiredMessageFilteringTests : IDisposable
         db.ShareItems.Add(item);
         await db.SaveChangesAsync();
 
-        var result = await ShareItemEndpoints.GetThumbnailAsync(item.Id, db, storage, CancellationToken.None);
+        var result = await ShareItemEndpoints.GetThumbnailAsync(item.Id, factory, storage, CancellationToken.None);
 
         result.Result.Should().BeOfType<NotFound<ApiEnvelope<object>>>();
     }
@@ -191,7 +197,8 @@ public class ExpiredMessageFilteringTests : IDisposable
     [Fact]
     public async Task CleanupExpiredAsync_MarksAndBroadcastsShareItemsDeleted()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedTopicAsync(db);
         var expiredId = await SeedTextAsync(db, topicId, "expired", Now.AddMinutes(-1));
         await SeedTextAsync(db, topicId, "alive", Now.AddMinutes(10));
@@ -206,22 +213,26 @@ public class ExpiredMessageFilteringTests : IDisposable
         services.AddSingleton(new FakeTimeProvider(Now));
         services.AddSingleton(new DbWriteGate());
         services.AddSingleton(hubContext.Object);
-        services.AddSingleton<ITopicService>(_ => new TopicService(db, hubContext.Object));
+        services.AddSingleton<ITopicService>(_ => new TopicService(factory, hubContext.Object));
         services.AddSingleton(NullLogger<ExpiredMessageCleanupService>.Instance);
-        // 清理服务用 CreateAsyncScope 解析 DbContext；这里直接注册 seed 用的同一个实例。
-        services.AddSingleton(db);
-        services.AddSingleton<AnyDropDbContext>(_ => db);
+        // 清理服务用工厂建短寿命上下文；注册与播种共用同一个 InMemory 库名的工厂。
+        services.AddSingleton<IDbContextFactory<AnyDropDbContext>>(factory);
+        services.AddSingleton<BackgroundTaskTimeZone>(_ => new BackgroundTaskTimeZone(
+            new ConfigurationBuilder().Build(), NullLogger<BackgroundTaskTimeZone>.Instance));
         var provider = services.BuildServiceProvider();
         var sut = new ExpiredMessageCleanupService(
             provider, new FakeTimeProvider(Now), new DbWriteGate(),
+            provider.GetRequiredService<BackgroundTaskTimeZone>(),
             NullLogger<ExpiredMessageCleanupService>.Instance);
 
         await sut.CleanupExpiredAsync(CancellationToken.None);
 
         // 已标记（DeleteAfter 有值），常规查询已看不到
-        var marked = await db.ShareItems.IgnoreQueryFilters().SingleAsync(x => x.Id == expiredId);
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        var marked = await verifyDb.ShareItems.IgnoreQueryFilters().SingleAsync(x => x.Id == expiredId);
         marked.DeleteAfter.Should().NotBeNull();
-        (await db.ShareItems.CountAsync()).Should().Be(1);
+        (await verifyDb.ShareItems.CountAsync()).Should().Be(1);
 
         // 广播了 ShareItemsDeleted，且参数里包含过期消息 ID
         clientProxy.Verify(c => c.SendCoreAsync(
@@ -237,7 +248,8 @@ public class ExpiredMessageFilteringTests : IDisposable
     [Fact]
     public async Task DeleteTopicAsync_UnlinksMarkedMessages()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
         var topicId = await SeedTopicAsync(db);
         var itemId = await SeedTextAsync(db, topicId, "old", null);
         // 模拟已被批量清理标记的消息
@@ -249,12 +261,14 @@ public class ExpiredMessageFilteringTests : IDisposable
         hubClients.Setup(c => c.All).Returns(new Mock<IClientProxy>().Object);
         var hubContext = new Mock<IHubContext<ShareHub>>();
         hubContext.Setup(c => c.Clients).Returns(hubClients.Object);
-        var sut = new TopicService(db, hubContext.Object);
+        var sut = new TopicService(factory, hubContext.Object);
 
         var deleted = await sut.DeleteTopicAsync(topicId);
 
         deleted.Should().BeTrue();
-        var unlinked = await db.ShareItems.IgnoreQueryFilters().SingleAsync(x => x.Id == itemId);
+        // 全新上下文验证：播种用的上下文仍跟踪着旧实体，会返回过期值。
+        await using var verifyDb = factory.CreateDbContext();
+        var unlinked = await verifyDb.ShareItems.IgnoreQueryFilters().SingleAsync(x => x.Id == itemId);
         unlinked.TopicId.Should().BeNull();
     }
 

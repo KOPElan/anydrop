@@ -94,3 +94,6 @@ TestResults/
 
 # Ignore Visual Studio Code workspace settings
 *.code-workspace
+
+# Scratch dir for local verification (old-head DB fixture, server run logs, restore drills)
+.smoke/

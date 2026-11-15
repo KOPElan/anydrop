@@ -74,10 +74,12 @@ public static class ShareItemEndpoints
     public static async Task<Results<FileStreamHttpResult, NotFound<ApiEnvelope<object>>, BadRequest<ApiEnvelope<object>>>> GetFileAsync(
         Guid id,
         bool? download,
-        AnyDropDbContext dbContext,
+        IDbContextFactory<AnyDropDbContext> dbContextFactory,
         IFileStorageService fileStorageService,
         CancellationToken cancellationToken)
     {
+        // S1-03：上下文由工厂现建现用，请求结束即释放。
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var item = await dbContext.ShareItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (item is null)
         {
@@ -156,10 +158,12 @@ public static class ShareItemEndpoints
     /// </summary>
     public static async Task<Results<FileStreamHttpResult, NotFound<ApiEnvelope<object>>>> GetThumbnailAsync(
         Guid id,
-        AnyDropDbContext dbContext,
+        IDbContextFactory<AnyDropDbContext> dbContextFactory,
         IFileStorageService fileStorageService,
         CancellationToken cancellationToken)
     {
+        // S1-03：上下文由工厂现建现用，请求结束即释放。
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var item = await dbContext.ShareItems
             .AsNoTracking()
             .Where(x => x.Id == id)

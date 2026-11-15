@@ -1,5 +1,6 @@
 using AnyDrop.Data;
 using AnyDrop.Services;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,8 +11,9 @@ public class SystemSettingsServiceTests
     [Fact]
     public async Task GetSecuritySettingsAsync_WhenEmpty_ShouldCreateDefault()
     {
-        await using var db = CreateDbContext();
-        var sut = new SystemSettingsService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = new SystemSettingsService(factory);
 
         var result = await sut.GetSecuritySettingsAsync();
 
@@ -22,8 +24,9 @@ public class SystemSettingsServiceTests
     [Fact]
     public async Task UpdateSecuritySettingsAsync_ShouldPersist()
     {
-        await using var db = CreateDbContext();
-        var sut = new SystemSettingsService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = new SystemSettingsService(factory);
 
         var request = new UpdateSecuritySettingsRequest(false, 10, "zh-CN", false, 1);
         var result = await sut.UpdateSecuritySettingsAsync(request);
@@ -40,8 +43,9 @@ public class SystemSettingsServiceTests
     [InlineData(100)]
     public async Task UpdateSecuritySettingsAsync_WithInvalidThumbnailHour_ShouldFail(int invalidHour)
     {
-        await using var db = CreateDbContext();
-        var sut = new SystemSettingsService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = new SystemSettingsService(factory);
 
         var request = new UpdateSecuritySettingsRequest(true, 10, "zh-CN", false, 1, invalidHour);
         var result = await sut.UpdateSecuritySettingsAsync(request);
@@ -56,8 +60,9 @@ public class SystemSettingsServiceTests
     [InlineData(23)]
     public async Task UpdateSecuritySettingsAsync_WithValidThumbnailHour_ShouldPersist(int validHour)
     {
-        await using var db = CreateDbContext();
-        var sut = new SystemSettingsService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = new SystemSettingsService(factory);
 
         var request = new UpdateSecuritySettingsRequest(true, 10, "zh-CN", false, 1, validHour);
         var result = await sut.UpdateSecuritySettingsAsync(request);
@@ -70,8 +75,9 @@ public class SystemSettingsServiceTests
     [Fact]
     public async Task GetThumbnailGenerationHourAsync_WhenNoSettings_ShouldReturnDefault()
     {
-        await using var db = CreateDbContext();
-        var sut = new SystemSettingsService(db);
+        var factory = CreateDbContextFactory();
+        await using var db = factory.CreateDbContext();
+        var sut = new SystemSettingsService(factory);
 
         // 初始化设置（使用 GetSecuritySettingsAsync 触发 EnsureSettingsAsync）
         await sut.GetSecuritySettingsAsync();
@@ -80,11 +86,11 @@ public class SystemSettingsServiceTests
         hour.Should().Be(2); // 默认值
     }
 
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-settings-{Guid.NewGuid():N}")
             .Options;
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 }

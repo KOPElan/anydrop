@@ -193,6 +193,50 @@
                 </div>
             </div>
 
+            @* ── 存储健康（S1-01 缺失引用修复入口）── *@
+            <div class="settings-card rounded-2xl p-5 space-y-4">
+                <div class="flex items-center gap-3">
+                    <div class="settings-icon-wrap">
+                        <span class="material-symbols-outlined settings-icon-text text-base">storage</span>
+                    </div>
+                    <h2 class="text-base font-semibold text-on-surface">@L["Settings_StorageHealth"]</h2>
+                </div>
+                <p class="text-xs text-on-surface-variant/70">@L["Settings_StorageHealthHint"]</p>
+
+                @if (_missingFiles is null)
+                {
+                    <p class="text-sm text-on-surface-variant/70">@L["Settings_StorageHealthLoading"]</p>
+                }
+                else if (_missingFiles.Count == 0)
+                {
+                    <p class="text-sm text-on-surface-variant/70">@L["Settings_StorageHealthNone"]</p>
+                }
+                else
+                {
+                    <div class="space-y-3">
+                        @foreach (var report in _missingFiles)
+                        {
+                            <div class="rounded-xl border border-surface-container p-3 space-y-1">
+                                <p class="text-sm font-medium text-on-surface break-all">@(string.IsNullOrWhiteSpace(report.FileName) ? report.StoragePath : report.FileName)</p>
+                                <p class="text-xs text-on-surface-variant/70 break-all">@report.StoragePath</p>
+                                <p class="text-xs text-on-surface-variant/70">
+                                    @(report.Kind == "thumbnail" ? L["Settings_StorageHealthThumbnail"] : L["Settings_StorageHealthFile"])
+                                    @if (!string.IsNullOrWhiteSpace(report.TopicName))
+                                    {
+                                        <span> · @report.TopicName</span>
+                                    }
+                                    <span> · @L["Settings_StorageHealthDetected"] @report.FirstDetectedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                                </p>
+                                <div class="flex flex-wrap gap-2 pt-1">
+                                    <button type="button" class="btn-secondary text-sm" disabled="@_isResolvingMissingFile" @onclick="() => ResolveMissingFileAsync(report.Id, DeleteMessageAction)">@L["Settings_StorageHealthDeleteMessage"]</button>
+                                    <button type="button" class="btn-secondary text-sm" disabled="@_isResolvingMissingFile" @onclick="() => ResolveMissingFileAsync(report.Id, DismissAction)">@L["Settings_StorageHealthDismiss"]</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
             @if (!string.IsNullOrWhiteSpace(_message))
             {
                 <div class="flex items-center gap-2 rounded-2xl px-4 py-3" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.25);">

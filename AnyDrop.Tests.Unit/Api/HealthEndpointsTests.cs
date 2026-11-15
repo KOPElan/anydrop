@@ -1,5 +1,6 @@
 using AnyDrop.Api;
 using AnyDrop.Data;
+using AnyDrop.Tests.Unit.TestDoubles;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -22,10 +23,10 @@ public class HealthEndpointsTests : IDisposable
     [Fact]
     public async Task GetHealthAsync_HealthyDatabaseAndStorage_Returns200()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
 
         var result = await HealthEndpoints.GetHealthAsync(
-            db, CreateConfiguration(_basePath), NullLoggerFactory.Instance, CancellationToken.None);
+            factory, CreateConfiguration(_basePath), NullLoggerFactory.Instance, CancellationToken.None);
 
         (result as IStatusCodeHttpResult)?.StatusCode.Should().Be(StatusCodes.Status200OK);
     }
@@ -33,7 +34,7 @@ public class HealthEndpointsTests : IDisposable
     [Fact]
     public async Task GetHealthAsync_StorageNotWritable_Returns503()
     {
-        await using var db = CreateDbContext();
+        var factory = CreateDbContextFactory();
 
         // 把存储路径指向一个已存在的「文件」：Directory.CreateDirectory 会失败，
         // 从而模拟磁盘/卷不可写。比使用非法字符更贴近真实故障，且跨平台稳定。
@@ -42,7 +43,7 @@ public class HealthEndpointsTests : IDisposable
         try
         {
             var result = await HealthEndpoints.GetHealthAsync(
-                db, CreateConfiguration(blocker), NullLoggerFactory.Instance, CancellationToken.None);
+                factory, CreateConfiguration(blocker), NullLoggerFactory.Instance, CancellationToken.None);
 
             (result as IStatusCodeHttpResult)?.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
         }
@@ -55,22 +56,24 @@ public class HealthEndpointsTests : IDisposable
     [Fact]
     public async Task GetHealthAsync_DatabaseUnavailable_Returns503()
     {
-        var db = CreateDbContext();
-        await db.DisposeAsync();
+        // 工厂返回一个已被释放的上下文：探针查询抛 ObjectDisposedException，应返回 503。
+        var disposed = CreateDbContextFactory().CreateDbContext();
+        await disposed.DisposeAsync();
+        var factory = new DisposedContextFactory(disposed);
 
         var result = await HealthEndpoints.GetHealthAsync(
-            db, CreateConfiguration(_basePath), NullLoggerFactory.Instance, CancellationToken.None);
+            factory, CreateConfiguration(_basePath), NullLoggerFactory.Instance, CancellationToken.None);
 
         (result as IStatusCodeHttpResult)?.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
     }
 
-    private static AnyDropDbContext CreateDbContext()
+    private static TestDbContextFactory CreateDbContextFactory()
     {
         var options = new DbContextOptionsBuilder<AnyDropDbContext>()
             .UseInMemoryDatabase($"anydrop-health-{Guid.NewGuid():N}")
             .Options;
 
-        return new AnyDropDbContext(options);
+        return new TestDbContextFactory(options);
     }
 
     private static IConfiguration CreateConfiguration(string basePath)
@@ -87,5 +90,11 @@ public class HealthEndpointsTests : IDisposable
         {
             Directory.Delete(_basePath, true);
         }
+    }
+
+    /// <summary>始终返回同一个（已被释放的）上下文的工厂，仅用于模拟数据库不可用。</summary>
+    private sealed class DisposedContextFactory(AnyDropDbContext disposed) : IDbContextFactory<AnyDropDbContext>
+    {
+        public AnyDropDbContext CreateDbContext() => disposed;
     }
 }

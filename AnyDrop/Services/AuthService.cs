@@ -5,8 +5,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AnyDrop.Services;
 
+/// <summary>
+/// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
+/// 每次调用建短寿命上下文。注意「读后改」必须在同一个上下文里完成：
+/// <see cref="IUserService"/> 返回的实体属于另一个方法的上下文（已释放），
+/// 在本服务的上下文里直接保存它不会生效，因此改密码 / 登出 / 登录更新
+/// 一律用本方法的上下文重新加载用户再改。
+/// </summary>
 public sealed class AuthService(
-    AnyDropDbContext dbContext,
+    IDbContextFactory<AnyDropDbContext> dbContextFactory,
     IUserService userService,
     IPasswordHasherService passwordHasherService,
     ITokenService tokenService,
@@ -59,6 +66,7 @@ public sealed class AuthService(
             UpdatedAt = now
         };
 
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         dbContext.Users.Add(user);
 
         try
@@ -89,7 +97,8 @@ public sealed class AuthService(
                 retryAfter);
         }
 
-        var user = await userService.GetSingleUserAsync(ct);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var user = await dbContext.Users.FirstOrDefaultAsync(ct);
         if (user is null)
         {
             return AuthResult<LoginResponse>.Failure("请先完成初始化配置。", StatusCodes.Status409Conflict);
@@ -123,7 +132,8 @@ public sealed class AuthService(
 
     public async Task<AuthResult<LogoutResultDto>> LogoutAsync(Guid userId, CancellationToken ct = default)
     {
-        var user = await userService.GetByIdAsync(userId, ct);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
         {
             return AuthResult<LogoutResultDto>.Failure("用户不存在。", StatusCodes.Status404NotFound);
@@ -158,7 +168,8 @@ public sealed class AuthService(
             return AuthResult<bool>.Failure("两次输入的新密码不一致。", StatusCodes.Status400BadRequest);
         }
 
-        var user = await userService.GetByIdAsync(userId, ct);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
         {
             return AuthResult<bool>.Failure("用户不存在。", StatusCodes.Status404NotFound);
@@ -181,6 +192,7 @@ public sealed class AuthService(
 
     public async Task<bool> ValidateSessionVersionAsync(Guid userId, int sessionVersion, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
         var current = await dbContext.Users.AsNoTracking()
             .Where(x => x.Id == userId)
             .Select(x => (int?)x.SessionVersion)

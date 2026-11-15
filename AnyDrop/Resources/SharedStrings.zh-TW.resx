@@ -241,6 +241,17 @@
 
   <!-- 縮圖設定 -->
   <data name="Settings_ThumbnailGeneration"><value>縮圖與預覽圖</value></data>
+  <data name="Settings_StorageHealth"><value>儲存健康</value></data>
+  <data name="Settings_StorageHealthHint"><value>資料庫引用但磁碟上不存在的檔案。對帳發現後會記在這裡，不會自動刪除資料庫行；檔案恢復後自動標記已解決。</value></data>
+  <data name="Settings_StorageHealthLoading"><value>正在載入…</value></data>
+  <data name="Settings_StorageHealthNone"><value>未發現缺失引用。</value></data>
+  <data name="Settings_StorageHealthFile"><value>檔案</value></data>
+  <data name="Settings_StorageHealthThumbnail"><value>縮圖</value></data>
+  <data name="Settings_StorageHealthDetected"><value>首次發現</value></data>
+  <data name="Settings_StorageHealthDeleteMessage"><value>刪除訊息</value></data>
+  <data name="Settings_StorageHealthDismiss"><value>標記已處理</value></data>
+  <data name="Settings_StorageHealthResolved"><value>已處理。</value></data>
+  <data name="Settings_StorageHealthFailed"><value>處理失敗。</value></data>
   <data name="Settings_ThumbnailHour"><value>每日自動產生時間（0–23 時）</value></data>
   <data name="Settings_ThumbnailHourHint"><value>伺服器將於每天指定時間對未處理的圖片/影片產生預覽圖</value></data>
   <data name="Settings_ThumbnailScheduleEnabled"><value>啟用排程批次產生</value></data>

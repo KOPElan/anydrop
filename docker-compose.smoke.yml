@@ -1,0 +1,14 @@
+# Compose 冒烟测试覆盖文件（S1-08）。
+# 用法：docker compose -f docker-compose.yml -f docker-compose.smoke.yml up -d
+# 仅用于冒烟：数据落在 .smoke/compose-data（宿主机临时目录，脚本结束即删），
+# 不用命名卷；plain HTTP（无 TLS 反代），固定测试密钥。绝不要用于生产。
+services:
+  anydrop:
+    ports:
+      - "18080:8080"
+    volumes:
+      - ${SMOKE_DATA_DIR:-./.smoke/compose-data}:/data
+    environment:
+      - Auth__JwtSecret=smoke-test-secret-at-least-32-chars!!
+      - ReverseProxy__RequireHttps=false
+      - Auth__CookieSecurePolicy=None

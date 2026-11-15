@@ -7,13 +7,19 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AnyDrop.Services;
 
-public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHub> hubContext) : ITopicService
+/// <summary>
+/// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
+/// 每次调用建短寿命上下文，不再随 Blazor 电路持有同一上下文数小时。
+/// </summary>
+public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFactory, IHubContext<ShareHub> hubContext) : ITopicService
 {
     private const int TopicIconMaxLength = 100;
 
     public async Task<IReadOnlyList<TopicDto>> GetAllTopicsAsync(CancellationToken ct = default)
     {
-        var topics = await BuildOrderedTopicsQuery()
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
+        var topics = await BuildOrderedTopicsQuery(dbContext)
             .Where(x => !x.IsArchived)
             .AsNoTracking()
             .ToListAsync(ct);
@@ -47,6 +53,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicDto?> GetTopicByIdAsync(Guid topicId, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topic = await dbContext.Topics
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == topicId, ct);
@@ -78,6 +86,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
     }
 
     public async Task<IReadOnlyList<TopicDto>> GetArchivedTopicsAsync(CancellationToken ct = default)    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topics = await dbContext.Topics
             .Where(x => x.IsArchived)
             .OrderByDescending(x => x.ArchivedAt ?? x.CreatedAt)
@@ -114,6 +124,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicDto> CreateTopicAsync(CreateTopicRequest request, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var name = ValidateName(request.Name);
         var topic = new Topic
         {
@@ -132,6 +144,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicDto?> UpdateTopicAsync(Guid topicId, UpdateTopicRequest request, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct);
         if (topic is null)
         {
@@ -150,6 +164,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicDto?> UpdateTopicIconAsync(Guid topicId, UpdateTopicIconRequest request, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct);
         if (topic is null)
         {
@@ -168,6 +184,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<bool> DeleteTopicAsync(Guid topicId, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct);
         if (topic is null)
         {
@@ -218,6 +236,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task ReorderTopicsAsync(ReorderTopicsRequest request, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         if (request.Items is null || request.Items.Count == 0)
         {
             throw new ArgumentException("items must not be empty", nameof(request));
@@ -283,6 +303,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicDto> PinTopicAsync(Guid topicId, bool isPinned, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct)
             ?? throw new KeyNotFoundException("主题不存在");
 
@@ -300,6 +322,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicDto> ArchiveTopicAsync(Guid topicId, bool isArchived, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var topic = await dbContext.Topics.FirstOrDefaultAsync(t => t.Id == topicId, ct)
             ?? throw new KeyNotFoundException("主题不存在");
 
@@ -324,6 +348,8 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
     public async Task<TopicMessagesResponse?> GetTopicMessagesAsync(Guid topicId, int limit, DateTimeOffset? before, CancellationToken ct = default)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(ct);
+
         var exists = await dbContext.Topics.AnyAsync(t => t.Id == topicId, ct);
         if (!exists)
         {
@@ -372,7 +398,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         await hubContext.Clients.All.SendAsync("TopicsUpdated", topics, CancellationToken.None);
     }
 
-    private IQueryable<Topic> BuildOrderedTopicsQuery()
+    private static IQueryable<Topic> BuildOrderedTopicsQuery(AnyDropDbContext dbContext)
     {
         return dbContext.Topics
             .OrderByDescending(x => x.IsPinned)
