@@ -84,6 +84,12 @@ public static class ShareItemEndpoints
             return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息不存在"));
         }
 
+        // S0-06：已到期的定时销毁消息不可下载，不等清理任务。
+        if (item.ExpiresAt is not null && item.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期"));
+        }
+
         if (item.ContentType is not (ShareContentType.File or ShareContentType.Image or ShareContentType.Video))
         {
             return TypedResults.BadRequest(ApiEnvelope<object>.Fail("该消息不包含文件"));
@@ -92,7 +98,8 @@ public static class ShareItemEndpoints
         try
         {
             var stream = await fileStorageService.GetFileAsync(item.Content, cancellationToken);
-            var contentType = string.IsNullOrWhiteSpace(item.MimeType) ? "application/octet-stream" : item.MimeType;
+            // MIME 先规范化再比较：上传方控制的 Content-Type 可能带参数或尾空格。
+            var contentType = MimeTypeHelper.Normalize(item.MimeType);
             var fileName = item.FileName ?? "download.bin";
             var asAttachment = download == true || !CanServeInline(contentType);
             return asAttachment
@@ -106,7 +113,7 @@ public static class ShareItemEndpoints
     }
 
     /// <summary>
-    /// 手动清理指定月数前的消息，同时清理相关文件资源。
+    /// 手动清理指定月数前的消息：只写延迟删除标记（7 天后物理删除），消息立即不可见。
     /// </summary>
     public static async Task<Results<Ok<ApiEnvelope<CleanupResult>>, BadRequest<ApiEnvelope<object>>>> CleanupOldMessagesAsync(
         int months,
@@ -123,7 +130,7 @@ public static class ShareItemEndpoints
     }
 
     /// <summary>
-    /// 批量删除指定 ID 的消息，同时清理相关文件资源。
+    /// 批量删除指定 ID 的消息：先提交数据库删除，再删文件。
     /// </summary>
     public static async Task<Results<Ok<ApiEnvelope<object>>, BadRequest<ApiEnvelope<object>>>> BatchDeleteAsync(
         [FromBody] BatchDeleteRequest request,
@@ -156,12 +163,18 @@ public static class ShareItemEndpoints
         var item = await dbContext.ShareItems
             .AsNoTracking()
             .Where(x => x.Id == id)
-            .Select(x => new { x.ThumbnailPath })
+            .Select(x => new { x.ThumbnailPath, x.ExpiresAt })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (item is null || string.IsNullOrWhiteSpace(item.ThumbnailPath))
         {
             return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图尚未生成"));
+        }
+
+        // S0-06：已到期的定时销毁消息的缩略图也不可访问。
+        if (item.ExpiresAt is not null && item.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期"));
         }
 
         try
@@ -182,16 +195,21 @@ public static class ShareItemEndpoints
     /// <c>application/xhtml+xml</c> 这类同样能执行脚本的类型。
     /// 现在只有图片、视频、音频内联，且排除 SVG（SVG 可以内嵌脚本与外部引用）；
     /// 其余内容一律作为附件下载，并由 <c>X-Content-Type-Options: nosniff</c> 兜底。
+    ///
+    /// 调用方必须先对 MIME 做规范化（见 <see cref="MimeTypeHelper"/>）：
+    /// <c>image/svg+xml; charset=utf-8</c> 或带尾空格的变体未经规范化会绕过
+    /// 精确匹配、落入 <c>image/</c> 内联分支。
     /// </summary>
-    private static bool CanServeInline(string mimeType)
+    internal static bool CanServeInline(string mimeType)
     {
-        if (mimeType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase))
+        var normalized = MimeTypeHelper.Normalize(mimeType);
+        if (MimeTypeHelper.IsSvg(normalized))
         {
             return false;
         }
 
-        return mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-               || mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
-               || mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+        return normalized.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+               || normalized.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+               || normalized.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
     }
 }

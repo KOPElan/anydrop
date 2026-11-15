@@ -150,7 +150,7 @@
   <!-- Message Input -->
   <data name="MessageInput_Placeholder"><value>Type a message...</value></data>
   <data name="MessageInput_Uploading"><value>Uploading</value></data>
-  <data name="MessageInput_BurnAfterReading"><value>Burn After Reading</value></data>
+  <data name="MessageInput_BurnAfterReading"><value>Timed Auto-Delete</value></data>
 
   <!-- Home Page -->
   <data name="Home_SelectTopic"><value>Select a topic</value></data>

@@ -63,15 +63,16 @@ public interface IShareService
         CancellationToken ct = default);
 
     /// <summary>
-    /// 清理指定月数前的消息（同时删除相关文件资源）。
+    /// 清理指定月数前的消息：只写延迟删除标记（当前时间 + 7 天），消息立即不可见，
+    /// 文件到期后由清扫任务物理删除（D5）。不立即删行、不立即删文件。
     /// </summary>
     /// <param name="months">清理多少月前的消息（支持 1 / 3 / 6）。</param>
     /// <param name="topicId">可选的主题 ID，为 null 时清理所有主题的消息。</param>
-    /// <returns>实际删除的消息数量。</returns>
+    /// <returns>实际标记的消息数量。</returns>
     Task<int> CleanupOldMessagesAsync(int months, Guid? topicId = null, CancellationToken ct = default);
 
     /// <summary>
-    /// 批量删除指定 ID 的消息（同时删除相关文件资源）。
+    /// 批量删除指定 ID 的消息：先提交数据库删除，再删文件；文件删失败进待删除队列。
     /// </summary>
     /// <param name="ids">要删除的消息 ID 列表。</param>
     /// <returns>实际删除的消息数量。</returns>

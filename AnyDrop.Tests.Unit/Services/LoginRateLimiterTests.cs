@@ -9,13 +9,14 @@ namespace AnyDrop.Tests.Unit.Services;
 
 public class LoginRateLimiterTests
 {
-    private static LoginRateLimiter CreateSut(int maxFailures, int cooldownSeconds, TimeProvider? timeProvider = null)
+    private static LoginRateLimiter CreateSut(int maxFailures, int cooldownSeconds, TimeProvider? timeProvider = null, int? maxCooldownSeconds = null)
         => new(
             new MemoryCache(new MemoryCacheOptions()),
             Options.Create(new AuthOptions
             {
                 LoginMaxFailures = maxFailures,
-                LoginCooldownSeconds = cooldownSeconds
+                LoginCooldownSeconds = cooldownSeconds,
+                LoginMaxCooldownSeconds = maxCooldownSeconds ?? 900
             }),
             timeProvider ?? TimeProvider.System);
 
@@ -180,5 +181,39 @@ public class LoginRateLimiterTests
         sut.RegisterFailure("k");
         sut.IsLocked("k", out var retry).Should().BeTrue();
         retry.Should().BeCloseTo(TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public void RegisterFailure_Cooldown_IsCappedAtMax()
+    {
+        var clock = new FakeTimeProvider();
+        var sut = CreateSut(maxFailures: 1, cooldownSeconds: 60, clock, maxCooldownSeconds: 100);
+
+        // 第 1 次 60 秒，第 2 次本应 120 秒但被上限 100 秒封顶
+        sut.RegisterFailure("k");
+        clock.AdvanceSeconds(61);
+        sut.RegisterFailure("k");
+        sut.IsLocked("k", out var retry).Should().BeTrue();
+        retry.Should().Be(TimeSpan.FromSeconds(100));
+
+        // 第 3 次仍封顶在 100 秒
+        clock.AdvanceSeconds(101);
+        sut.RegisterFailure("k");
+        sut.IsLocked("k", out retry).Should().BeTrue();
+        retry.Should().Be(TimeSpan.FromSeconds(100));
+    }
+
+    [Fact]
+    public void RegisterFailure_DuringLockout_ShouldNotExtendLock()
+    {
+        var clock = new FakeTimeProvider();
+        var sut = CreateSut(maxFailures: 1, cooldownSeconds: 60, clock);
+
+        sut.RegisterFailure("k");
+        clock.AdvanceSeconds(30);
+        sut.RegisterFailure("k"); // 锁定期内的失败不应延长锁定
+
+        sut.IsLocked("k", out var retry).Should().BeTrue();
+        retry.Should().Be(TimeSpan.FromSeconds(30));
     }
 }

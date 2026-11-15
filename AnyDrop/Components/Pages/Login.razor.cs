@@ -23,7 +23,65 @@ public partial class Login
 
     protected override void OnParametersSet()
     {
-        _returnUrl = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl!;
+        _returnUrl = SanitizeReturnUrl(ReturnUrl);
+    }
+
+    /// <summary>
+    /// 只接受站内相对路径作为登录后跳转目标（SEC-01）。
+    ///
+    /// 攻击者可构造 <c>/login?returnUrl=https://evil.example/...</c> 的链接：
+    /// 登录成功后若原样跳转，owner 会在刚输完密码、最信任的时刻被带到仿冒站。
+    /// 因此只接受以单个 <c>/</c> 开头、不含协议（<c>://</c>，含 URL 编码后的形式）
+    /// 与反斜杠的路径，其余一律回退首页。与服务端中间件已有的安全写法对齐。
+    /// </summary>
+    internal static string SanitizeReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return "/";
+        }
+
+        var candidate = returnUrl.Trim();
+        if (!IsLocalRelativePath(candidate))
+        {
+            return "/";
+        }
+
+        // 再校验一次解码后的形式：%2F%2Fevil.com、%5C 等编码绕过在解码后现形。
+        string decoded;
+        try
+        {
+            decoded = Uri.UnescapeDataString(candidate);
+        }
+        catch
+        {
+            return "/";
+        }
+
+        return IsLocalRelativePath(decoded) ? candidate : "/";
+    }
+
+    private static bool IsLocalRelativePath(string value)
+    {
+        if (value.Length == 0 || value[0] != '/')
+        {
+            return false;
+        }
+
+        // //evil.com（协议相对 URL）与 /\evil.com 都不是站内路径
+        if (value.Length > 1 && (value[1] == '/' || value[1] == '\\'))
+        {
+            return false;
+        }
+
+        // 路径中任何位置出现协议或反斜杠都拒绝：/search?q=https://... 也不放行
+        if (value.Contains('\\') || value.Contains("://", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // 控制字符（换行等）可能被用来拆分响应头或跳转目标
+        return value.All(c => !char.IsControl(c));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

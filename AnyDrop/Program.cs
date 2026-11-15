@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -49,9 +50,28 @@ if (!string.IsNullOrWhiteSpace(dbDirectory))
     Directory.CreateDirectory(dbDirectory);
 }
 
+// 注意：不要往连接串里加 Journal Mode / Busy Timeout——Microsoft.Data.Sqlite
+// 根本不支持这两个关键字（会直接抛 ArgumentException）。
+// WAL 在启动时由 DatabaseMigrationExtensions.EnsureWalModeAsync 对库文件设置
+// （按文件持久化）；busy_timeout 由 SqliteBusyTimeoutInterceptor 在每次打开
+// 连接时设置（按连接生效）。见 S0-04。
 builder.Services.AddDbContext<AnyDropDbContext>(options =>
-    options.UseSqlite($"Data Source={fullDbPath}"));
+    options.UseSqlite($"Data Source={fullDbPath}")
+        .AddInterceptors(new SqliteBusyTimeoutInterceptor()));
+builder.Services.AddSingleton<DbWriteGate>();
 builder.Services.AddSignalR();
+
+// 反向代理头的可信来源统一由 ReverseProxy 节配置（见下面的 reverseProxyOptions），
+// 不再另设 ForwardedHeaders 节——两个 Configure 同时存在会让配置分裂、行为取决于注册顺序。
+
+// S0-03：HTTPS 重定向的目标端口。应用本身只监听容器内 plain HTTP，
+// 若不显式指定，HttpsRedirectionMiddleware 会因无法确定 HTTPS 端口
+// 而静默放行（日志只留一条警告），生产上等于重定向没生效。
+// 反代的公开 HTTPS 端口通常是 443；非标准端口时配 ReverseProxy:HttpsPort。
+builder.Services.Configure<HttpsRedirectionOptions>(options =>
+{
+    options.HttpsPort = builder.Configuration.GetValue<int?>("ReverseProxy:HttpsPort") ?? 443;
+});
 // 统一的时间源。业务代码一律通过 TimeProvider 取当前时间，
 // 从而可以在测试中用假时钟确定性地验证限流冷却、令牌过期、阅后即焚等时间相关逻辑。
 builder.Services.AddSingleton(TimeProvider.System);
@@ -169,6 +189,13 @@ builder.Services.AddAuthentication(options =>
         options.Cookie.Name = "anydrop.auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        // S0-03（D3）：默认只走 HTTPS。Auth:CookieSecurePolicy 可配
+        // Always / SameAsRequest / None；纯 HTTP 局域网例外需显式配 None，
+        // 否则浏览器不会回传 Cookie，登录后立刻被登出。
+        options.Cookie.SecurePolicy = Enum.TryParse<CookieSecurePolicy>(
+                authOptions.CookieSecurePolicy, ignoreCase: true, out var securePolicy)
+            ? securePolicy
+            : CookieSecurePolicy.Always;
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/login";
 
@@ -291,9 +318,32 @@ var app = builder.Build();
 
 // 必须放在管道最前面：任何读取 RemoteIpAddress 或 Request.Scheme 的中间件
 // （限流、访问日志、Cookie 的 Secure 判定）都要看到代理转发的真实值。
+// 注意 UseForwardedHeaders 只信任上面配置过的代理，未知来源的 X-Forwarded-For 会被丢弃。
 if (reverseProxyOptions.Enabled)
 {
     app.UseForwardedHeaders();
+}
+
+// S0-03（D3）：默认要求 TLS 反代。ReverseProxy:RequireHttps 未配置时，
+// 生产环境默认 true、开发环境默认 false（本地开发仍是 http://0.0.0.0:5002）。
+// 纯 HTTP 局域网例外：显式设置 ReverseProxy__RequireHttps=false，
+// 同时须把 Auth:CookieSecurePolicy 设为 None，否则 Cookie 不会被浏览器回传。
+var requireHttps = reverseProxyOptions.RequireHttps ?? !app.Environment.IsDevelopment();
+if (requireHttps)
+{
+    app.UseHsts();
+    // 健康检查探针（/health）不重定向：编排器与 compose healthcheck
+    // 在容器内用 plain HTTP 访问它，重定向到 https 会因容器内无 TLS
+    // 监听而失败，容器会被误判为不健康。
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase),
+        branch => branch.UseHttpsRedirection());
+}
+else
+{
+    app.Logger.LogWarning(
+        "ReverseProxy:RequireHttps is disabled: serving plain HTTP. " +
+        "Only use this on a trusted LAN; set Auth:CookieSecurePolicy=None or login cookies will be dropped by browsers.");
 }
 
 // 访问日志：默认只记录慢请求（级别为 Warning），可通过 AnyDrop.RequestLog 调整
@@ -421,6 +471,7 @@ app.UseAuthorization();
 
 app.MapStaticAssets().AllowAnonymous();
 app.MapHub<ShareHub>("/hubs/share")
+   .RequireAuthorization()
    .DisableAntiforgery();
 app.MapShareItemEndpoints();
 app.MapFileEndpoints();

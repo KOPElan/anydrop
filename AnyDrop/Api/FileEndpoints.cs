@@ -69,9 +69,7 @@ public static class FileEndpoints
                 fileName = "upload";
             }
 
-            var mimeType = string.IsNullOrWhiteSpace(file.ContentType)
-                ? "application/octet-stream"
-                : file.ContentType;
+            var mimeType = MimeTypeHelper.Normalize(file.ContentType);
 
             await using var stream = file.OpenReadStream();
             var dto = await shareService.SendFileAsync(

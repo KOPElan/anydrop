@@ -14,7 +14,7 @@
 - **多类型内容** — 支持文字、图片、视频、任意文件、链接（含 OG 元数据预览）
 - **主题分组** — 将内容按主题（频道）组织，支持置顶、归档、删除
 - **主题搜索** — 全文搜索、按日期查找、按类型（图片/视频/文件/链接）分类浏览
-- **阅后即焚** — 消息可设为"阅后即焚"，阅读后自动销毁
+- **定时销毁** — 消息可设为定时销毁，到期自动删除（不是阅读后销毁）
 - **单用户私有部署** — 首次访问完成初始化设置，密码保存在本地数据库，不外发
 - **容器化就绪** — 提供 Dockerfile 与 docker-compose.yml，一命令启动
 
@@ -226,7 +226,14 @@ npm run css:watch:app
 | `Auth__JwtSecret` | JWT 签名密钥（**必填**） | — |
 | `Auth__TokenExpiryHours` | 登录令牌有效期（小时） | `24` |
 | `Auth__LoginMaxFailures` | 登录失败锁定阈值 | `5` |
-| `Auth__LoginCooldownSeconds` | 登录冷却时间（秒） | `60` |
+| `Auth__LoginCooldownSeconds` | 登录首次冷却时间（秒），反复触发后按 `×2` 递增 | `60` |
+| `Auth__LoginMaxCooldownSeconds` | 登录渐进冷却上限（秒） | `900` |
+| `Auth__CookieSecurePolicy` | Cookie 的 Secure 策略：`Always` / `SameAsRequest` / `None` | `Always` |
+| `ReverseProxy__RequireHttps` | 是否强制 HTTPS（重定向 + HSTS）；未设置时生产环境默认 `true`、开发环境默认 `false` | 见说明 |
+| `ReverseProxy__HttpsPort` | 反代的公开 HTTPS 端口（重定向目标）；不配时重定向中间件会因无法确定端口而静默放行 | `443` |
+| `ForwardedHeaders__KnownProxies` | 信任的反代 IP（逗号分隔），默认仅本机回环 | — |
+| `ForwardedHeaders__KnownNetworks` | 信任的反代网段 CIDR（逗号分隔），例如 `172.18.0.0/16` | — |
+| `ForwardedHeaders__ForwardLimit` | 信任的代理级数（默认只信任最靠近本机的一级） | `1` |
 | `Storage__DatabasePath` | SQLite 数据库路径 | `data/anydrop.db` |
 | `Storage__BasePath` | 上传文件存储目录 | `data/files` |
 | `Storage__MaxFileSizeBytes` | 单文件大小上限（字节） | Docker Compose 为 `104857600`（100 MB）；源码运行时见 `AnyDrop/appsettings.json` |
@@ -236,6 +243,41 @@ npm run css:watch:app
 | `ReverseProxy__KnownProxies` | 受信任代理的 IP 列表 | — |
 | `ReverseProxy__KnownNetworks` | 受信任代理的网段（CIDR）列表 | — |
 | `ASPNETCORE_URLS` | Kestrel 监听地址 | `http://+:5002`（容器内为 `http://+:8080`） |
+
+---
+
+## 反向代理与 HTTPS
+
+AnyDrop 默认按 **TLS 反代**交付：应用本身只监听容器内 / 本机的 plain HTTP，
+TLS 由前面的反向代理（Caddy / Nginx / Traefik 等）终止。生产环境默认开启
+HTTPS 重定向 + HSTS，纯 HTTP 请求会被重定向到 HTTPS。
+
+部署时反代需把下面两个头透传给应用：
+
+- `X-Forwarded-For`：客户端真实 IP（限流按它计数）
+- `X-Forwarded-Proto`：客户端实际协议（`https`）
+
+应用**只信任已配置的代理**发来的这两个头。Docker 部署时反代与应用通常在同一
+网络，需把反代所在网段配进 `ForwardedHeaders__KnownNetworks`（例如
+`ForwardedHeaders__KnownNetworks=172.18.0.0/16`，以 `docker network inspect`
+看到的实际网段为准）；不配时，应用看到的来源 IP 会是反代容器 IP，
+登录限流会按容器 IP 计数（所有用户共用一个计数器），且无法按真实 IP 隔离。
+
+纯 HTTP 局域网例外（仅限可信内网）：显式设置以下两项，缺一不可——
+
+```bash
+ReverseProxy__RequireHttps=false
+Auth__CookieSecurePolicy=None
+```
+
+只关重定向、不改 Cookie 策略时，浏览器因 Secure 标记不会回传 Cookie，
+表现为「登录成功后立刻被登出」。本地源码开发（`http://0.0.0.0:5002`）
+已在开发环境配置中默认走此例外，无需手动设置。
+
+启动时应用会校验 `Users` 表的 `SingletonKey` 唯一索引是否存在——它是
+「全库只能有一个用户」的唯一防线。若历史数据库迁移不完整导致索引缺失，
+服务端会直接启动失败并给出明确信息；请先备份数据库，再按迁移指引修复，
+不要绕过该检查继续运行。
 
 ---
 
@@ -330,19 +372,32 @@ docker compose start anydrop
 
 ### 方式二：在线备份（服务不中断）
 
-使用 SQLite 自带的 `.backup` 命令导出快照，它保证读取到一个一致的事务视图：
+分两步，顺序不能反——**先给数据库拍快照，再按快照里的记录同步文件**：
 
 ```bash
 mkdir -p backup
+TS=$(date +%Y%m%d-%H%M%S)
 docker run --rm \
   -v anydrop-data:/data \
   -v "$(pwd)/backup:/backup" \
   alpine sh -c 'apk add --no-cache sqlite >/dev/null &&
     sqlite3 /data/anydrop.db ".backup /backup/anydrop.db" &&
-    tar czf /backup/anydrop-files-$(date +%Y%m%d-%H%M%S).tar.gz -C /data files'
+    sqlite3 /backup/anydrop.db "SELECT DISTINCT Content FROM ShareItems WHERE ContentType IN (1, 2, 3) UNION SELECT DISTINCT ThumbnailPath FROM ShareItems WHERE ThumbnailPath IS NOT NULL;" |
+      grep -v "^$" > /backup/files-$TS.txt &&
+    tar czf /backup/anydrop-files-$TS.tar.gz -C /data -T /backup/files-$TS.txt'
 ```
 
+为什么必须按快照里的记录打包，而不是直接 `tar` 整个 `files/` 目录：
+快照与文件打包之间有时间差，直接打包整个目录会混入快照之后才上传的
+文件（备份里的数据库没有这些记录，恢复后是孤儿文件），还可能打包到
+一半被删的文件。按快照的 `Content` / `ThumbnailPath` 清单打包，
+备份里的每个文件在备份的数据库里都有记录，两边一致。
+
 > 注意这里以**读写**方式挂载卷（没有 `:ro`）：WAL 模式下即使只读查询也需要访问 `-shm` 文件。
+>
+> 另注意：数据库运行在 WAL 模式（启动时由应用自动启用，见上），
+> `-wal` / `-shm` 文件是运行时的中间状态，**不要**单独备份它们——
+> `.backup` 命令会把已提交的数据完整导出到快照里。
 
 ### 恢复
 

@@ -19,19 +19,30 @@ public sealed class AuthService(
             return AuthResult<LoginResponse>.Failure("初始化已完成。", StatusCodes.Status409Conflict);
         }
 
+        // S0-03：初始化接口同样按来源限流。初始化只能成功一次，但不限流时
+        // 攻击者可用同一出口 IP 反复提交初始化请求刷数据库写操作。
+        // 注意：429 与 409 的顺序——已初始化时直接返回 409，不消耗限流额度。
+        if (loginRateLimiter.IsLocked(rateLimitKey, out _))
+        {
+            return AuthResult<LoginResponse>.Failure("操作过于频繁，请稍后再试。", StatusCodes.Status429TooManyRequests);
+        }
+
         var nickname = request.Nickname.Trim();
         if (string.IsNullOrWhiteSpace(nickname) || nickname.Length > 50)
         {
+            loginRateLimiter.RegisterFailure(rateLimitKey);
             return AuthResult<LoginResponse>.Failure("昵称不能为空且不能超过 50 个字符。", StatusCodes.Status400BadRequest);
         }
 
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
         {
+            loginRateLimiter.RegisterFailure(rateLimitKey);
             return AuthResult<LoginResponse>.Failure("密码长度至少 6 位。", StatusCodes.Status400BadRequest);
         }
 
         if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
         {
+            loginRateLimiter.RegisterFailure(rateLimitKey);
             return AuthResult<LoginResponse>.Failure("两次输入的密码不一致。", StatusCodes.Status400BadRequest);
         }
 
@@ -52,7 +63,7 @@ public sealed class AuthService(
 
         try
         {
-            await dbContext.SaveChangesAsync(ct);
+            await dbContext.SaveChangesWithRetryAsync(ct);
         }
         catch (DbUpdateException)
         {
@@ -94,7 +105,6 @@ public sealed class AuthService(
         loginRateLimiter.Reset(rateLimitKey);
         user.LastLoginAt = DateTimeOffset.UtcNow;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-
         // 存储的哈希参数已过时（旧格式，或迭代次数低于当前要求）：
         // 借这次已知明文的机会就地升级，用户无感。
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
@@ -104,7 +114,7 @@ public sealed class AuthService(
             user.PasswordSalt = upgradedSalt;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         var token = tokenService.GenerateToken(user);
         var payload = new LoginResponse(new UserProfileDto(user.Nickname, user.LastLoginAt), token.AccessToken, token.ExpiresAt);
@@ -121,7 +131,7 @@ public sealed class AuthService(
 
         user.SessionVersion++;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return AuthResult<LogoutResultDto>.Success(new LogoutResultDto(true));
     }
 
@@ -165,7 +175,7 @@ public sealed class AuthService(
         user.PasswordSalt = salt;
         user.SessionVersion++;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return AuthResult<bool>.Success(true);
     }
 

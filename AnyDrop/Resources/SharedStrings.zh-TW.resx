@@ -56,8 +56,8 @@
   <data name="Settings_UpdatePassword"><value>更新密碼</value></data>
   <data name="Settings_Security"><value>系統設置</value></data>
   <data name="Settings_AutoFetchLink"><value>自動獲取連結預覽</value></data>
-  <data name="Settings_BurnDuration"><value>閱後即焚時長（分鐘）</value></data>
-  <data name="Settings_BurnDurationHint"><value>新建閱後即焚訊息時預設保留的分鐘數（1–43200）</value></data>
+  <data name="Settings_BurnDuration"><value>定時銷毀時長（分鐘）</value></data>
+  <data name="Settings_BurnDurationHint"><value>新建定時銷毀訊息時預設保留的分鐘數（1–43200）</value></data>
   <data name="Settings_DarkMode"><value>暗色主題</value></data>
   <data name="Settings_DarkModeHint"><value>啟用後將切換為暗色介面</value></data>
   <data name="Settings_Language"><value>介面語言</value></data>
@@ -199,8 +199,8 @@
   <data name="Home_ConfirmDeleteAction"><value>確認刪除</value></data>
   <data name="Home_UploadImageOrVideo"><value>上傳圖片或影片</value></data>
   <data name="Home_UploadAttachment"><value>上傳附件</value></data>
-  <data name="Home_BurnOnHint"><value>閱後即焚已開啟（10 分鐘後自動刪除）</value></data>
-  <data name="Home_BurnOffHint"><value>開啟閱後即焚</value></data>
+  <data name="Home_BurnOnHint"><value>定時銷毀已開啟（10 分鐘後自動刪除）</value></data>
+  <data name="Home_BurnOffHint"><value>開啟定時銷毀</value></data>
   <data name="Home_InputPlaceholder"><value>輸入訊息，或將檔案拖入聊天區…（Ctrl+Enter 發送）</value></data>
   <data name="Home_MessageRequired"><value>訊息內容不能為空。</value></data>
   <data name="Home_SelectTopicFirst"><value>請先選擇主題。</value></data>

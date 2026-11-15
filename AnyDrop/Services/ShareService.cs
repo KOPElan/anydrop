@@ -62,7 +62,7 @@ public sealed class ShareService(
         }
 
         dbContext.ShareItems.Add(item);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         // 先广播消息（让用户立即看到），再后台补全链接元数据
         var dto = item.ToDto();
@@ -110,7 +110,7 @@ public sealed class ShareService(
 
             item.LinkTitle = title;
             item.LinkDescription = description;
-            await db.SaveChangesAsync();
+            await db.SaveChangesWithRetryAsync();
 
             // 推送补全后的消息，让客户端更新气泡内容
             await hubContext.Clients.All.SendAsync("ReceiveShareItem", item.ToDto());
@@ -188,7 +188,7 @@ public sealed class ShareService(
         dbContext.ShareItems.Add(item);
         try
         {
-            await dbContext.SaveChangesAsync(ct);
+            await dbContext.SaveChangesWithRetryAsync(ct);
         }
         catch
         {
@@ -242,8 +242,10 @@ public sealed class ShareService(
         var normalizedCount = count <= 0 ? 50 : count;
         var safeCount = Math.Clamp(normalizedCount, 1, 200);
 
+        // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
         return await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .OrderByDescending(x => x.CreatedAt)
             .Take(safeCount)
             .Select(x => x.ToDto())
@@ -290,6 +292,7 @@ public sealed class ShareService(
         // 这与 README 宣称的「全文搜索」不符。
         var queryable = dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId
                         && (EF.Functions.Like(x.Content.ToLower(), likePattern, @"\")
                             || (x.FileName != null
@@ -331,8 +334,10 @@ public sealed class ShareService(
     {
         var (startUtc, endUtc) = GetUtcRange(date, date, timeZone);
 
+        // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
         return await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
             .OrderBy(x => x.CreatedAt)
             .Select(x => x.ToDto())
@@ -349,8 +354,10 @@ public sealed class ShareService(
         var (startUtc, endUtc) = GetUtcRange(start, end, timeZone);
 
         // 只拉取 CreatedAt 列，再按调用方时区归属到具体日期
+        // S0-06：已到期的定时销毁消息不产生活跃日期。
         var timestamps = await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId && x.CreatedAt >= startUtc && x.CreatedAt < endUtc)
             .Select(x => x.CreatedAt)
             .ToListAsync(ct);
@@ -409,6 +416,7 @@ public sealed class ShareService(
 
         var queryable = dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId && x.ContentType == contentType);
 
         if (before.HasValue)
@@ -473,14 +481,18 @@ public sealed class ShareService(
 
         var deletedIds = new List<Guid>(items.Count);
 
+        // S0-05（D5）：批量 / 自动清理只写延迟删除标记，不立即删行也不删文件。
+        // 标记一提交，消息就对所有读路径不可见（全局查询过滤器）；文件由
+        // Stage 1 的清扫任务在 DeleteAfter 到期后物理删除。进程在标记与清扫
+        // 之间被 kill，重启后行与文件都还在，不会出现悬空引用。
+        var deleteAfter = timeProvider.GetUtcNow().AddDays(DeletionPolicy.DelayedDeleteDays);
         foreach (var item in items)
         {
-            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorageService, logger, item, ct, "cleanup");
-            dbContext.ShareItems.Remove(item);
+            item.DeleteAfter = deleteAfter;
             deletedIds.Add(item.Id);
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         // 广播被清理的消息 ID，让已打开的客户端同步移除对应气泡
         await hubContext.Clients.All.SendAsync("ShareItemsDeleted", deletedIds, CancellationToken.None);
@@ -517,16 +529,24 @@ public sealed class ShareService(
             .Distinct()
             .ToHashSet();
 
-        var deletedIds = new List<Guid>(items.Count);
+        var deletedIds = items.Select(x => x.Id).ToList();
+
+        // S0-05（DAT-01）：先提交数据库删除，再删文件。顺序反过来之前是
+        // 「先删文件、再提交」，进程在中间被 kill 就会留下「行还在、文件已删」
+        // 的悬空引用；现在中间被 kill 只会留下孤儿文件（对账可发现），
+        // 行一定已经不可见。文件删失败不静默丢失，进待删除队列。
+        dbContext.ShareItems.RemoveRange(items);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         foreach (var item in items)
         {
-            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorageService, logger, item, ct, "batch delete");
-            dbContext.ShareItems.Remove(item);
-            deletedIds.Add(item.Id);
+            var failedPaths = await ShareItemFileCleanup.DeleteItemFilesAsync(
+                fileStorageService, logger, item, ct, "batch delete");
+            foreach (var path in failedPaths)
+            {
+                await PendingFileDeletionQueue.EnqueueAsync(dbContext, item.Id, path, "batch delete", ct);
+            }
         }
-
-        await dbContext.SaveChangesAsync(ct);
 
         // 广播被删除的消息 ID，让所有客户端同步移除对应气泡；
         // 使用 CancellationToken.None 确保请求取消不影响其他客户端的同步
@@ -550,7 +570,9 @@ public sealed class ShareService(
             .ToListAsync(ct);
 
         // 一次性加载所有受影响主题的全部剩余消息并在内存中取最新一条，避免 foreach 内逐主题查询（N+1）
+        // S0-06：主题预览不取已到期的消息。
         var remainingItems = await dbContext.ShareItems
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId.HasValue && topicIds.Contains(x.TopicId.Value))
             .OrderByDescending(x => x.CreatedAt)
             .ThenByDescending(x => x.Id)
@@ -571,7 +593,7 @@ public sealed class ShareService(
                     : null;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         var allTopics = await topicService.GetAllTopicsAsync(ct);
         await hubContext.Clients.All.SendAsync("TopicsUpdated", allTopics, CancellationToken.None);
@@ -580,12 +602,15 @@ public sealed class ShareService(
 
     private static ShareContentType ResolveContentType(string mimeType)
     {
-        if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        // 先规范化：带参数的 "image/png; charset=x" 之类不应影响分类，
+        // 且入库的 MimeType 与服务端内联判断用同一份规范化结果。
+        var normalized = MimeTypeHelper.Normalize(mimeType);
+        if (normalized.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
             return ShareContentType.Image;
         }
 
-        if (mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        if (normalized.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
         {
             return ShareContentType.Video;
         }

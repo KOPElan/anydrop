@@ -7,13 +7,15 @@ using Microsoft.EntityFrameworkCore;
 namespace AnyDrop.Services;
 
 /// <summary>
-/// 后台服务：每分钟检查并删除已到期的"阅后即焚"消息；
+/// 后台服务：每分钟检查并标记已到期的"定时销毁"消息；
 /// 同时每天（UTC 日期变更后）检查是否需要执行自动清理旧消息任务。
-/// 删除时同步清理对应的文件（Image/Video/File 类型）。
+/// 标记（<c>DeleteAfter</c>）一提交消息即不可见，文件由 Stage 1 的清扫任务
+/// 在到期后物理删除（D5）；本服务不再直接删文件。
 /// </summary>
 public sealed class ExpiredMessageCleanupService(
     IServiceProvider serviceProvider,
     TimeProvider timeProvider,
+    DbWriteGate dbWriteGate,
     ILogger<ExpiredMessageCleanupService> logger) : BackgroundService
 {
     // 记录上次执行自动清理的日期（UTC），避免一天内重复执行
@@ -52,11 +54,17 @@ public sealed class ExpiredMessageCleanupService(
         }
     }
 
-    private async Task CleanupExpiredAsync(CancellationToken ct)
+    /// <summary>
+    /// 执行一轮过期清理。internal 以便测试直接验证标记 + 广播行为
+    /// （后台循环本身用 PeriodicTimer 驱动，不适合在单元测试里跑）。
+    /// </summary>
+    internal async Task CleanupExpiredAsync(CancellationToken ct)
     {
+        // S0-04：后台写操作串行化——与缩略图批处理互斥写库，避免两个定时任务争写锁。
+        using var _ = await dbWriteGate.AcquireAsync(ct);
+
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AnyDropDbContext>();
-        var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
         var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<ShareHub>>();
 
         var now = timeProvider.GetUtcNow();
@@ -76,15 +84,23 @@ public sealed class ExpiredMessageCleanupService(
             .Distinct()
             .ToHashSet();
 
+        // S0-05（D5）：过期清理同样只写延迟删除标记，不立即删行、不立即删文件。
+        // 标记一提交，消息就对所有读路径不可见；文件由 Stage 1 的清扫任务
+        // 在 DeleteAfter 到期后物理删除。
+        var deleteAfter = now.AddDays(DeletionPolicy.DelayedDeleteDays);
         foreach (var item in expired)
         {
-            // 删除物理文件（原文件 + 缩略图），失败时只记录警告，不阻断其余条目的清理
-            await ShareItemFileCleanup.DeleteItemFilesAsync(fileStorage, logger, item, ct, "expired cleanup");
-            db.ShareItems.Remove(item);
+            item.DeleteAfter = deleteAfter;
         }
 
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Deleted {Count} expired burn-after-reading message(s).", expired.Count);
+        await db.SaveChangesWithRetryAsync(ct);
+        logger.LogInformation("Marked {Count} expired timed-deletion message(s) for delayed deletion.", expired.Count);
+
+        // S0-06：广播被标记的消息 ID，让已打开的页面立即移除对应气泡，
+        // 不必等下一轮清理或手动刷新。读过滤（S0-06）已让新请求看不到它们，
+        // 但已打开的页面只有收到广播才会同步消失。
+        var markedIds = expired.Select(x => x.Id).ToList();
+        await hubContext.Clients.All.SendAsync("ShareItemsDeleted", markedIds, CancellationToken.None);
 
         // 更新受影响主题的 LastMessageAt/LastMessagePreview 并广播
         if (affectedTopicIds.Count > 0)
@@ -95,7 +111,10 @@ public sealed class ExpiredMessageCleanupService(
 
             foreach (var topic in topics)
             {
+                // S0-06：主题预览不取已到期的消息（本批刚标记的已被全局过滤器排除，
+                // 这里再叠加过期过滤，覆盖标记前一刻刚好到期的消息）。
                 var latest = await db.ShareItems
+                    .NotExpired(timeProvider.GetUtcNow())
                     .Where(x => x.TopicId == topic.Id)
                     .OrderByDescending(x => x.CreatedAt)
                     .FirstOrDefaultAsync(ct);
@@ -108,7 +127,7 @@ public sealed class ExpiredMessageCleanupService(
                         : null;
             }
 
-            await db.SaveChangesAsync(ct);
+            await db.SaveChangesWithRetryAsync(ct);
 
             // 广播 TopicsUpdated 让侧边栏刷新
             var topicService = scope.ServiceProvider.GetRequiredService<ITopicService>();
@@ -123,6 +142,9 @@ public sealed class ExpiredMessageCleanupService(
     /// </summary>
     private async Task RunAutoCleanupIfEnabledAsync(CancellationToken ct)
     {
+        // S0-04：同上，自动清理的写操作也走同一把锁。
+        using var _ = await dbWriteGate.AcquireAsync(ct);
+
         await using var scope = serviceProvider.CreateAsyncScope();
         var settingsService = scope.ServiceProvider.GetRequiredService<ISystemSettingsService>();
         var (enabled, months) = await settingsService.GetAutoCleanupSettingsAsync(ct);
@@ -137,7 +159,7 @@ public sealed class ExpiredMessageCleanupService(
 
         if (deleted > 0)
         {
-            logger.LogInformation("Auto cleanup deleted {Count} message(s) older than {Months} month(s).", deleted, months);
+            logger.LogInformation("Auto cleanup marked {Count} message(s) older than {Months} month(s) for delayed deletion.", deleted, months);
         }
     }
 }

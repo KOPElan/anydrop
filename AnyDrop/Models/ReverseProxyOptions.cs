@@ -26,6 +26,16 @@ public sealed class ReverseProxyOptions
     public string[] KnownNetworks { get; set; } = [];
 
     /// <summary>
+    /// 是否强制 HTTPS（重定向 + HSTS）。未配置时生产环境默认 true、开发环境默认 false，
+    /// 由 Program.cs 结合当前环境决定。纯 HTTP 局域网例外需显式设为 false，
+    /// 同时把 <c>Auth:CookieSecurePolicy</c> 设为 None，否则浏览器不会回传登录 Cookie。
+    /// </summary>
+    public bool? RequireHttps { get; set; }
+
+    /// <summary>反代的公开 HTTPS 端口（默认 443），供 HttpsRedirection 中间件使用。</summary>
+    public int HttpsPort { get; set; } = 443;
+
+    /// <summary>
     /// 解析受信任来源。无法解析的条目会被忽略而不是让服务启动失败——
     /// 配置写错时应该退化为「不信任任何来源」（安全默认），而不是让实例起不来。
     /// </summary>

@@ -18,8 +18,10 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             .AsNoTracking()
             .ToListAsync(ct);
 
+        // S0-06：计数不含已到期的定时销毁消息。
         var counts = await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(DateTimeOffset.UtcNow)
             .Where(x => x.TopicId != null)
             .GroupBy(x => x.TopicId)
             .Select(g => new { TopicId = g.Key!.Value, Count = g.Count() })
@@ -56,6 +58,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
 
         var messageCount = await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(DateTimeOffset.UtcNow)
             .CountAsync(x => x.TopicId == topicId, ct);
 
         return new TopicDto(
@@ -82,8 +85,10 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             .ToListAsync(ct);
 
         var topicIds = topics.Select(t => t.Id).ToHashSet();
+        // S0-06：计数不含已到期的定时销毁消息。
         var counts = await dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(DateTimeOffset.UtcNow)
             .Where(x => x.TopicId != null && topicIds.Contains(x.TopicId.Value))
             .GroupBy(x => x.TopicId)
             .Select(g => new { TopicId = g.Key!.Value, Count = g.Count() })
@@ -118,7 +123,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         };
 
         dbContext.Topics.Add(topic);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
 
         await BroadcastTopicsUpdatedAsync(ct);
 
@@ -134,10 +139,12 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
 
         topic.Name = ValidateName(request.Name);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
-        var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
+        var messageCount = await dbContext.ShareItems
+            .NotExpired(DateTimeOffset.UtcNow)
+            .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
@@ -150,10 +157,12 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
 
         topic.Icon = NormalizeAndValidateIcon(request.Icon);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
-        var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
+        var messageCount = await dbContext.ShareItems
+            .NotExpired(DateTimeOffset.UtcNow)
+            .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
@@ -171,14 +180,19 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             return false;
         }
 
-        var messages = await dbContext.ShareItems.Where(s => s.TopicId == topicId).ToListAsync(ct);
+        // 注意：这里必须 IgnoreQueryFilters——已标记延迟删除 / 已过期的消息
+        // 也要解开关联，否则删主题会在外键上失败。
+        var messages = await dbContext.ShareItems
+            .IgnoreQueryFilters()
+            .Where(s => s.TopicId == topicId)
+            .ToListAsync(ct);
         foreach (var message in messages)
         {
             message.TopicId = null;
         }
 
         dbContext.Topics.Remove(topic);
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         return true;
@@ -241,7 +255,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
                 topics[item.TopicId].SortOrder = item.SortOrder;
             }
 
-            await dbContext.SaveChangesAsync(ct);
+            await dbContext.SaveChangesWithRetryAsync(ct);
             if (tx is not null)
             {
                 await tx.CommitAsync(ct);
@@ -275,10 +289,12 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         topic.IsPinned = isPinned;
         topic.PinnedAt = isPinned ? DateTimeOffset.UtcNow : null;
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
-        var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
+        var messageCount = await dbContext.ShareItems
+            .NotExpired(DateTimeOffset.UtcNow)
+            .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
@@ -297,10 +313,12 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             topic.PinnedAt = null;
         }
 
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
-        var messageCount = await dbContext.ShareItems.CountAsync(s => s.TopicId == topic.Id, ct);
+        var messageCount = await dbContext.ShareItems
+            .NotExpired(DateTimeOffset.UtcNow)
+            .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
 
@@ -313,8 +331,10 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
         }
 
         var safeLimit = Math.Clamp(limit <= 0 ? 50 : limit, 1, 100);
+        // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
         var query = dbContext.ShareItems
             .AsNoTracking()
+            .NotExpired(DateTimeOffset.UtcNow)
             .Where(x => x.TopicId == topicId);
 
         if (before.HasValue)
@@ -335,6 +355,7 @@ public sealed class TopicService(AnyDropDbContext dbContext, IHubContext<ShareHu
             var lastCreatedAt = messages[^1].CreatedAt;
             hasMore = await dbContext.ShareItems
                 .AsNoTracking()
+                .NotExpired(DateTimeOffset.UtcNow)
                 .AnyAsync(x => x.TopicId == topicId && x.CreatedAt < lastCreatedAt, ct);
             if (hasMore)
             {

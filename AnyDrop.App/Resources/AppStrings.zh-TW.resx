@@ -150,7 +150,7 @@
   <!-- 訊息輸入框 / Message Input -->
   <data name="MessageInput_Placeholder"><value>輸入訊息...</value></data>
   <data name="MessageInput_Uploading"><value>上傳中</value></data>
-  <data name="MessageInput_BurnAfterReading"><value>閱後即焚</value></data>
+  <data name="MessageInput_BurnAfterReading"><value>定時銷毀</value></data>
 
   <!-- 首頁 / Home Page -->
   <data name="Home_SelectTopic"><value>選擇主題</value></data>

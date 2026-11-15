@@ -37,7 +37,7 @@ public sealed class UserService(AnyDropDbContext dbContext) : IUserService
 
         user.Nickname = normalized;
         user.UpdatedAt = DateTimeOffset.UtcNow;
-        await dbContext.SaveChangesAsync(ct);
+        await dbContext.SaveChangesWithRetryAsync(ct);
         return AuthResult<UserProfileDto>.Success(new UserProfileDto(user.Nickname, user.LastLoginAt));
     }
 }

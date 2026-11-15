@@ -56,8 +56,8 @@
   <data name="Settings_UpdatePassword"><value>Update Password</value></data>
   <data name="Settings_Security"><value>System Settings</value></data>
   <data name="Settings_AutoFetchLink"><value>Auto-fetch link previews</value></data>
-  <data name="Settings_BurnDuration"><value>Burn-after-reading duration (minutes)</value></data>
-  <data name="Settings_BurnDurationHint"><value>Default retention in minutes for burn-after-reading messages (1–43200)</value></data>
+  <data name="Settings_BurnDuration"><value>Timed auto-delete duration (minutes)</value></data>
+  <data name="Settings_BurnDurationHint"><value>Default retention in minutes for timed auto-delete messages (1–43200)</value></data>
   <data name="Settings_DarkMode"><value>Dark theme</value></data>
   <data name="Settings_DarkModeHint"><value>Enable dark interface</value></data>
   <data name="Settings_Language"><value>Interface language</value></data>
@@ -207,8 +207,8 @@
   <data name="Home_ConfirmDeleteAction"><value>Confirm Delete</value></data>
   <data name="Home_UploadImageOrVideo"><value>Upload image or video</value></data>
   <data name="Home_UploadAttachment"><value>Upload attachment</value></data>
-  <data name="Home_BurnOnHint"><value>Burn-after-reading enabled (auto delete after 10 minutes)</value></data>
-  <data name="Home_BurnOffHint"><value>Enable burn-after-reading</value></data>
+  <data name="Home_BurnOnHint"><value>Timed auto-delete enabled (auto delete after 10 minutes)</value></data>
+  <data name="Home_BurnOffHint"><value>Enable timed auto-delete</value></data>
   <data name="Home_InputPlaceholder"><value>Type a message, or drag files into chat... (Ctrl+Enter to send)</value></data>
   <data name="Home_MessageRequired"><value>Message cannot be empty.</value></data>
   <data name="Home_SelectTopicFirst"><value>Please select a topic first.</value></data>

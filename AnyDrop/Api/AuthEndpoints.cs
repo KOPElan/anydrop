@@ -39,7 +39,7 @@ public static class AuthEndpoints
         IAuthService authService,
         CancellationToken ct)
     {
-        var result = await authService.SetupAsync(request, BuildRateLimitKey(httpContext), ct);
+        var result = await authService.SetupAsync(request, BuildRateLimitKey(httpContext, "setup"), ct);
         return await BuildAuthResultAsync(httpContext, result);
     }
 
@@ -49,7 +49,7 @@ public static class AuthEndpoints
         IAuthService authService,
         CancellationToken ct)
     {
-        var result = await authService.LoginAsync(request, BuildRateLimitKey(httpContext), ct);
+        var result = await authService.LoginAsync(request, BuildRateLimitKey(httpContext, "login"), ct);
         return await BuildAuthResultAsync(httpContext, result);
     }
 
@@ -154,8 +154,14 @@ public static class AuthEndpoints
             });
     }
 
-    private static string BuildRateLimitKey(HttpContext httpContext)
-        => $"single-user:{httpContext.Connection.RemoteIpAddress}";
+    /// <summary>
+    /// 限流 key：按接口 + 真实来源 IP 区分。反代部署下 <see cref="HttpContext.Connection"/>
+    /// 的 RemoteIpAddress 由 ForwardedHeaders 中间件根据 X-Forwarded-For 还原
+    /// （只信任已配置的代理，见 Program.cs），因此同一出口 IP 的攻击只锁该 IP，
+    /// 不会像原来那样按连接 IP 把所有用户一起锁住。
+    /// </summary>
+    private static string BuildRateLimitKey(HttpContext httpContext, string kind)
+        => $"single-user:{kind}:{httpContext.Connection.RemoteIpAddress}";
 
     private static Guid? GetUserId(ClaimsPrincipal principal)
     {

@@ -14,28 +14,44 @@ internal static class ShareItemFileCleanup
 {
     /// <summary>
     /// 删除条目自身携带的文件（原文件 + 缩略图）。
-    /// 失败只记录警告，不向上抛出——否则单个文件删除失败会阻断整批清理。
+    /// 返回删除失败的存储路径——调用方须把失败入队
+    /// （<see cref="PendingFileDeletionQueue"/>），而不是只记一条日志。
+    /// 文件本就不存在时视为成功（存储层删除不存在的文件是空操作）。
     /// </summary>
-    public static async Task DeleteItemFilesAsync(
+    public static async Task<IReadOnlyList<string>> DeleteItemFilesAsync(
         IFileStorageService fileStorageService,
         ILogger logger,
         ShareItem item,
         CancellationToken ct,
         string context)
     {
+        var failed = new List<string>();
+
         if (item.ContentType is ShareContentType.Image or ShareContentType.Video or ShareContentType.File)
         {
-            await TryDeleteAsync(fileStorageService, logger, item.Content, item.Id, ct, context);
+            if (!await TryDeleteAsync(fileStorageService, logger, item.Content, item.Id, ct, context))
+            {
+                failed.Add(item.Content);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(item.ThumbnailPath))
         {
-            await TryDeleteAsync(fileStorageService, logger, item.ThumbnailPath, item.Id, ct, context);
+            if (!await TryDeleteAsync(fileStorageService, logger, item.ThumbnailPath, item.Id, ct, context))
+            {
+                failed.Add(item.ThumbnailPath);
+            }
         }
+
+        return failed;
     }
 
-    /// <summary>按存储路径删除单个文件，失败仅记录警告。</summary>
-    public static async Task TryDeleteAsync(
+    /// <summary>
+    /// 按存储路径删除单个文件。返回 <c>true</c> 表示已删或本就不存在；
+    /// 返回 <c>false</c> 表示真实 IO 失败（调用方应入队重试）。
+    /// 失败只记录警告，不向上抛出——否则单个文件删除失败会阻断整批清理。
+    /// </summary>
+    public static async Task<bool> TryDeleteAsync(
         IFileStorageService fileStorageService,
         ILogger logger,
         string? storagePath,
@@ -45,12 +61,13 @@ internal static class ShareItemFileCleanup
     {
         if (string.IsNullOrWhiteSpace(storagePath))
         {
-            return;
+            return true;
         }
 
         try
         {
             await fileStorageService.DeleteFileAsync(storagePath, ct);
+            return true;
         }
         catch (Exception ex)
         {
@@ -60,6 +77,7 @@ internal static class ShareItemFileCleanup
                 storagePath,
                 itemId,
                 context);
+            return false;
         }
     }
 }
