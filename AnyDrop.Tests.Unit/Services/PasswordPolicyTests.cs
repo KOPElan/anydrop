@@ -91,7 +91,11 @@ public class PasswordPolicyTests
         // Stage 0 之前按 6 位建的用户：登录路径不做长度校验，必须仍能登录。
         var factory = CreateDbContextFactory();
         await using var db = factory.CreateDbContext();
-        var hasher = new PasswordHasherService();
+        // 测试里用很低的迭代次数：哈希参数的正确性由 PasswordHasherServiceTests 覆盖。
+        var hasher = new PasswordHasherService(Options.Create(new AuthOptions
+        {
+            PasswordHashIterations = 1_000
+        }));
         var (hash, salt) = hasher.HashPassword("Abc123");
         var now = DateTimeOffset.UtcNow;
         db.Users.Add(new User
@@ -115,7 +119,11 @@ public class PasswordPolicyTests
     private static AuthService CreateSut(TestDbContextFactory factory)
     {
         var userService = new UserService(factory);
-        var hasher = new PasswordHasherService();
+        // 测试里用很低的迭代次数：哈希参数的正确性由 PasswordHasherServiceTests 覆盖。
+        var hasher = new PasswordHasherService(Options.Create(new AuthOptions
+        {
+            PasswordHashIterations = 1_000
+        }));
         var options = Options.Create(new AuthOptions
         {
             JwtIssuer = "issuer",

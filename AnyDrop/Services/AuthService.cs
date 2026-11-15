@@ -197,7 +197,8 @@ public sealed class AuthService(
 
         // 新旧相同直接拒绝：否则「改密码」等于没改，旧密码泄露后仍可用，
         // 还会误触 SessionVersion 递增把全部设备登出。
-        if (passwordHasherService.VerifyPassword(request.NewPassword, user.PasswordHash, user.PasswordSalt))
+        if (passwordHasherService.VerifyPassword(request.NewPassword, user.PasswordHash, user.PasswordSalt)
+            != PasswordVerificationResult.Failed)
         {
             return AuthResult<bool>.Failure("新密码不能与当前密码相同。", StatusCodes.Status400BadRequest, ApiErrorCodes.PasswordSameAsOld);
         }

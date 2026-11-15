@@ -40,7 +40,6 @@ public class AuthServiceTests
     }
 
     [Fact]
-    [Fact]
     public async Task LoginAsync_AfterTooManyFailures_Returns429WithRetryAfter()
     {
         // 被限流时必须返回 429 并给出可等待时长，而不是伪装成「密码错误」：
@@ -128,7 +127,6 @@ public class AuthServiceTests
         var stored = await db.Users.AsNoTracking().SingleAsync();
         // 测试用 1000 次迭代（见 CreateSut），哈希串必须记录该参数
         stored.PasswordHash.Should().StartWith("pbkdf2-sha256$1000$");
-    }
     }
 
     [Fact]
