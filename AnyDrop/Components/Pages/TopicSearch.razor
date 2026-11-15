@@ -278,7 +278,7 @@
                                  @onclick="() => NavigateToMessage(msg.Id)">
                                 <img class="w-full max-h-48 object-cover"
                                      src="@GetThumbnailUrl(msg.Id)"
-                                     onerror="this.onerror=null;this.src='@GetFileUrl(msg.Id)'"
+                                     data-fallback-src="@GetFileUrl(msg.Id)"
                                       alt="@(msg.FileName ?? L["Search_Tab_Image"] )" />
                                 <div class="flex items-center justify-between px-3 py-2">
                                     <p class="text-[11px] text-on-surface-variant">@FormatMessageTime(msg.CreatedAt)</p>
@@ -294,8 +294,7 @@
                                 <div class="relative cursor-pointer" @onclick="() => OpenVideoPreview(GetFileUrl(msg.Id))">
                                     <img class="w-full max-h-48 object-cover bg-on-surface/10"
                                          src="@GetThumbnailUrl(msg.Id)"
-                                         onerror="this.onerror=null;this.src=this.getAttribute('data-fallback')"
-                                         data-fallback="@VideoThumbnailFallbackDataUrl"
+                                         data-fallback-src="@VideoThumbnailFallbackDataUrl"
                                          alt="@(msg.FileName ?? L["Search_Tab_Video"])" />
                                     <div class="absolute inset-0 flex items-center justify-center">
                                         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">
@@ -375,7 +374,7 @@
                                      @onclick="() => OpenImagePreview(GetFileUrl(msg.Id))">
                                     <img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                          src="@GetThumbnailUrl(msg.Id)"
-                                         onerror="this.onerror=null;this.src='@GetFileUrl(msg.Id)'"
+                                         data-fallback-src="@GetFileUrl(msg.Id)"
                                          alt="@(msg.FileName ?? L["Search_Tab_Image"])" />
                                     @* 悬浮操作条：两个按钮均靠右 *@
                                     <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 px-2 py-1.5 opacity-0 transition-opacity group-hover:opacity-100"
@@ -453,8 +452,7 @@
                                     <div class="relative cursor-pointer" @onclick="() => OpenVideoPreview(GetFileUrl(msg.Id))">
                                         <img class="w-full max-h-52 object-cover bg-on-surface/10"
                                              src="@GetThumbnailUrl(msg.Id)"
-                                             onerror="this.onerror=null;this.src=this.getAttribute('data-fallback')"
-                                             data-fallback="@VideoThumbnailFallbackDataUrl"
+                                             data-fallback-src="@VideoThumbnailFallbackDataUrl"
                                              alt="@(msg.FileName ?? L["Search_Tab_Video"])" />
                                         <div class="absolute inset-0 flex items-center justify-center">
                                             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-black/45 text-white">

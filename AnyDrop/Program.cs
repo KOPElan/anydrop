@@ -2,6 +2,7 @@ using AnyDrop.Api;
 using AnyDrop.Components;
 using AnyDrop.Data;
 using AnyDrop.Hubs;
+using AnyDrop.Infrastructure;
 using AnyDrop.Models;
 using AnyDrop.Services;
 using Microsoft.AspNetCore.Antiforgery;
@@ -10,10 +11,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 
@@ -70,6 +73,34 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<ThumbnailGeneratio
 builder.Services.AddSingleton<LinkMetadataService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
+
+// 反向代理支持（默认关闭）。详见 ReverseProxyOptions 的说明。
+var reverseProxyOptions = builder.Configuration.GetSection("ReverseProxy").Get<ReverseProxyOptions>()
+                          ?? new ReverseProxyOptions();
+if (reverseProxyOptions.Enabled)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+        // 不用 ForwardLimit 限制跳数，而由可信来源列表界定：只有来自
+        // KnownProxies / KnownNetworks 的请求，其 X-Forwarded-* 才会被采纳。
+        options.ForwardLimit = null;
+
+        var (proxies, networks) = reverseProxyOptions.ParseTrustedSources();
+
+        foreach (var proxy in proxies)
+        {
+            options.KnownProxies.Add(proxy);
+        }
+
+        foreach (var network in networks)
+        {
+            options.KnownIPNetworks.Add(network);
+        }
+    });
+}
+
 builder.Services.AddHttpClient();
 // 抓取外链元数据专用的客户端：禁用自动重定向，并在建连前校验目标 IP（SSRF 防护）
 builder.Services.AddHttpClient(LinkMetadataService.HttpClientName)
@@ -258,7 +289,17 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
-// 安全响应头：放在管道最前面，确保所有响应（含静态资源与错误页）都带上。
+// 必须放在管道最前面：任何读取 RemoteIpAddress 或 Request.Scheme 的中间件
+// （限流、访问日志、Cookie 的 Secure 判定）都要看到代理转发的真实值。
+if (reverseProxyOptions.Enabled)
+{
+    app.UseForwardedHeaders();
+}
+
+// 访问日志：默认只记录慢请求（级别为 Warning），可通过 AnyDrop.RequestLog 调整
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+// 安全响应头：确保所有响应（含静态资源与错误页）都带上。
 // 这里刻意只添加不影响资源加载的指令——完整的 default-src 'self' 还需验证
 // Blazor 的内联脚本与 WebSocket 行为，在浏览器端回归测试（E2E）接入 CI 之前
 // 不宜贸然收紧，否则可能以「页面白屏」的形式破坏应用。
@@ -276,7 +317,24 @@ app.Use(async (context, next) =>
 
     // 禁止被嵌入 iframe，防点击劫持
     headers["X-Frame-Options"] = "DENY";
-    headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
+
+    // 完整的内容安全策略。
+    // 唯一保留的例外是 style-src 的 'unsafe-inline'：组件里大量使用 style 属性
+    // （132 处），而内联样式属性无法用 nonce 或 hash 覆盖。
+    // script-src 已收紧为 'self'：页面内不再有内联 <script>，原先的内联 onerror
+    // 也改成了由同源脚本在捕获阶段统一处理（见 wwwroot/js/image-fallback.js）。
+    headers["Content-Security-Policy"] =
+        "default-src 'self'; " +
+        "script-src 'self'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: blob:; " +
+        "media-src 'self' blob:; " +
+        "font-src 'self'; " +
+        "connect-src 'self' ws: wss:; " +
+        "frame-ancestors 'none'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'; " +
+        "object-src 'none'";
 
     await next();
 });

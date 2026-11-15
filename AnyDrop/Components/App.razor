@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -6,16 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <ResourcePreloader />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    @* 字体与图标字体均已自托管（见 scripts/fetch-web-assets.ps1）：页面不再访问任何第三方 CDN *@
+    <link rel="stylesheet" href="/css/fonts.css" />
     <link rel="stylesheet" href="@Assets["tailwind.css"]" />
     <link rel="stylesheet" href="@Assets["AnyDrop.styles.css"]" />
-    <ImportMap />
+    @*
+        <ImportMap /> 会渲染一段内联 <script type="importmap">，而内联脚本要求 CSP 放开
+        script-src 'unsafe-inline'（其内容含带指纹的资源路径，无法用固定 hash 允许）。
+        ReconnectModal 的同位 JS 已经由该组件用解析后的 @Assets 路径显式加载，
+        因此这里不再需要 import map，CSP 得以保持 script-src 'self'。
+        若将来新增依赖 import map 的同位 JS，E2E 的控制台错误断言会立刻发现。
+    *@
     <HeadOutlet @rendermode="InteractiveServer" />
-    @* 尽早恢复主题，避免出现白色/暗色闪烁（FOUC） *@
-    <script>(function(){var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');})()</script>
+    @* 尽早恢复主题，避免出现白色/暗色闪烁（FOUC）。独立同源脚本，使 CSP 可以保持 script-src 'self' *@
+    <script src="/js/theme-init.js"></script>
+    @* 图片失败回退：在捕获阶段监听，替代原先的内联 onerror 属性 *@
+    <script src="/js/image-fallback.js"></script>
 </head>
 
 <body>
@@ -23,7 +29,7 @@
         <Routes @rendermode="InteractiveServer" />
     </CascadingAuthenticationState>
     <ReconnectModal />
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1/Sortable.min.js"></script>
+    <script src="/js/sortable.min.js"></script>
     <script src="/js/sortable-interop.js"></script>
     <script src="/js/dragdrop-interop.js"></script>
     <script src="/js/auth-interop.js"></script>
