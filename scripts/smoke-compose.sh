@@ -38,6 +38,10 @@ docker compose -f docker-compose.yml -f docker-compose.smoke.yml build
 
 step "起容器（临时数据目录）"
 mkdir -p "$DATA_DIR"
+# 数据目录由宿主机用户创建，容器内以非 root（$APP_UID）运行：
+# 不放开写权限，应用创建 /data/keys（S1-05 密钥持久化）时会报 Permission denied。
+# 该目录是脚本结束即删的临时目录，放开权限无长期影响。
+chmod 777 "$DATA_DIR"
 docker compose -f docker-compose.yml -f docker-compose.smoke.yml up -d
 
 wait_health() {
