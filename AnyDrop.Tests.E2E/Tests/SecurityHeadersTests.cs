@@ -69,10 +69,15 @@ public class SecurityHeadersTests(E2ETestFixture fixture)
 
         // 控制台报错只说“404”不说 URL，定位全靠猜：把失败响应的 URL 也记下来。
         // /api/v1/auth/me 的 401 是登录页的预期探测，见 IsExpectedUnauthorizedProbe。
+        // dotnet-browser-tools/hot-reload-settings.json 的 404 也是预期内的开发态噪声：
+        // blazor.web.js 在 Development 下用 fetch() 探测热重载配置，普通 dotnet run
+        //（非 dotnet watch）不注册该端点，因此总是 404；生产构建根本不发这个请求。
+        // fetch() 失败本身不进控制台，这个条目只是为了不让开发态噪声在断言里冒出来。
         page.Response += (_, response) =>
         {
             if (response.Status >= 400
-                && !(response.Status == 401 && response.Url.Contains("/api/v1/auth/me", StringComparison.Ordinal)))
+                && !(response.Status == 401 && response.Url.Contains("/api/v1/auth/me", StringComparison.Ordinal))
+                && !response.Url.Contains("/_framework/dotnet-browser-tools/hot-reload-settings.json", StringComparison.Ordinal))
             {
                 errors.Add($"[http {response.Status}] {response.Url}");
             }
