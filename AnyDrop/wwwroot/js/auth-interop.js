@@ -39,38 +39,27 @@ window.authInterop = {
 };
 
 /**
- * 主题管理：读取/写入 localStorage，并同步切换 <html> 上的 .dark 类。
+ * 主题切换的唯一 JS 契约（S3-06）：Web 与 MAUI 两端共用同一份实现，
+ * 块内容由 ThemeContractTests 保证字节一致，改一处必须改两处。
  *
- * @example
- *   // 页面加载后初始化（恢复上次偏好）
- *   AnyDropTheme.init();
+ *   init()      按 localStorage 恢复偏好并应用到 <html>（启动时在 Blazor 之前调用，避免闪烁）
+ *   set(isDark) 应用并持久化（isDark 为 bool）
+ *   get()       返回当前是否为暗色（bool）
  *
- *   // 从 Blazor 切换主题
- *   await jsRuntime.InvokeVoidAsync("AnyDropTheme.set", isDark);
- *
- *   // 读取当前主题（返回 boolean）
- *   var isDark = await jsRuntime.InvokeAsync<bool>("AnyDropTheme.get");
+ * 存储键 'anydrop_theme'。2026-11-15 前 Web 端用的是 'theme'，统一后老用户
+ * 的已存偏好会重置一次（默认亮色），属一次性迁移。
  */
 window.AnyDropTheme = {
-  /** 从 localStorage 恢复已保存的主题偏好，并应用到 <html> 元素。 */
   init: function () {
-    var dark = localStorage.getItem('theme') === 'dark';
+    var dark = localStorage.getItem('anydrop_theme') === 'dark';
     document.documentElement.classList.toggle('dark', dark);
   },
-  /**
-   * 设置当前主题。
-   * @param {boolean} isDark - true 为暗色，false 为亮色
-   */
   set: function (isDark) {
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('anydrop_theme', isDark ? 'dark' : 'light');
     document.documentElement.classList.toggle('dark', isDark);
   },
-  /**
-   * 获取当前主题偏好。
-   * @returns {boolean} true 表示当前为暗色主题
-   */
   get: function () {
-    return localStorage.getItem('theme') === 'dark';
+    return localStorage.getItem('anydrop_theme') === 'dark';
   }
 };
 

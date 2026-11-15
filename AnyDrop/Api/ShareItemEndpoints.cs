@@ -36,7 +36,8 @@ public static class ShareItemEndpoints
 
         group.MapDelete("/batch", BatchDeleteAsync)
             .WithName("BatchDeleteShareItems")
-            .WithSummary("Batch delete share items by IDs");
+            .WithSummary("Batch delete share items by IDs")
+            .RequireRateLimiting(RateLimitPolicies.BatchDelete);
 
         return app;
     }
@@ -57,7 +58,7 @@ public static class ShareItemEndpoints
     {
         if (string.IsNullOrWhiteSpace(request.Content))
         {
-            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail("Content is required."));
+            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail("Content is required.", ApiErrorCodes.ContentRequired));
         }
 
         try
@@ -67,7 +68,7 @@ public static class ShareItemEndpoints
         }
         catch (ArgumentException ex)
         {
-            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail(ex.Message));
+            return TypedResults.BadRequest(ApiEnvelope<ShareItemDto>.Fail(ex.Message, ApiErrorCodes.SendMessageFailed));
         }
     }
 
@@ -83,18 +84,18 @@ public static class ShareItemEndpoints
         var item = await dbContext.ShareItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (item is null)
         {
-            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息不存在"));
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息不存在", ApiErrorCodes.MessageNotFound));
         }
 
         // S0-06：已到期的定时销毁消息不可下载，不等清理任务。
         if (item.ExpiresAt is not null && item.ExpiresAt <= DateTimeOffset.UtcNow)
         {
-            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期"));
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期", ApiErrorCodes.MessageExpired));
         }
 
         if (item.ContentType is not (ShareContentType.File or ShareContentType.Image or ShareContentType.Video))
         {
-            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("该消息不包含文件"));
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("该消息不包含文件", ApiErrorCodes.MessageHasNoFile));
         }
 
         try
@@ -110,7 +111,7 @@ public static class ShareItemEndpoints
         }
         catch (FileNotFoundException)
         {
-            return TypedResults.NotFound(ApiEnvelope<object>.Fail("文件不存在"));
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("文件不存在", ApiErrorCodes.FileNotFound));
         }
     }
 
@@ -124,7 +125,7 @@ public static class ShareItemEndpoints
     {
         if (months is not (1 or 3 or 6))
         {
-            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("months 参数必须为 1、3 或 6。"));
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("months 参数必须为 1、3 或 6。", ApiErrorCodes.InvalidMonths));
         }
 
         var deletedCount = await shareService.CleanupOldMessagesAsync(months, null, cancellationToken);
@@ -141,12 +142,12 @@ public static class ShareItemEndpoints
     {
         if (request.Ids is null || request.Ids.Count == 0)
         {
-            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("ids 不能为空。"));
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("ids 不能为空。", ApiErrorCodes.IdsRequired));
         }
 
         if (request.Ids.Count > 500)
         {
-            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("单次批量删除不能超过 500 条。"));
+            return TypedResults.BadRequest(ApiEnvelope<object>.Fail("单次批量删除不能超过 500 条。", ApiErrorCodes.BatchDeleteTooLarge));
         }
 
         var deletedCount = await shareService.DeleteShareItemsAsync(request.Ids, cancellationToken);
@@ -172,13 +173,13 @@ public static class ShareItemEndpoints
 
         if (item is null || string.IsNullOrWhiteSpace(item.ThumbnailPath))
         {
-            return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图尚未生成"));
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图尚未生成", ApiErrorCodes.ThumbnailNotReady));
         }
 
         // S0-06：已到期的定时销毁消息的缩略图也不可访问。
         if (item.ExpiresAt is not null && item.ExpiresAt <= DateTimeOffset.UtcNow)
         {
-            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期"));
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("消息已过期", ApiErrorCodes.MessageExpired));
         }
 
         try
@@ -188,7 +189,7 @@ public static class ShareItemEndpoints
         }
         catch (FileNotFoundException)
         {
-            return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图文件不存在"));
+            return TypedResults.NotFound(ApiEnvelope<object>.Fail("缩略图文件不存在", ApiErrorCodes.ThumbnailNotFound));
         }
     }
 

@@ -18,8 +18,8 @@ App 端借鉴 `UI/DESIGN.md` 的 **"Atmospheric Precision"** 理念，但针对�
 |-------|------|------|------|
 | `surface` | `#f5f7fa` | `#111827` (gray-900) | 页面背景 |
 | `surface_container` | `#ffffff` | `#1f2937` (gray-800) | 卡片/输入区背景 |
-| `primary` | `#4f46e5` (indigo-600) | `#818cf8` (indigo-400) | 主按钮/高亮 |
-| `primary_gradient` | `linear-gradient(135deg, #4f46e5, #6366f1)` | 同上 | 主按钮渐变 |
+| `primary` | `#3578F5` | `#5090FF` | 主按钮/高亮 |
+| `primary_gradient` | `linear-gradient(135deg, #3578F5, #5090FF)` | 同上 | 主按钮渐变 |
 | `on_surface` | `#1f2937` (gray-800) | `#f3f4f6` (gray-100) | 正文 |
 | `on_surface_muted` | `#9ca3af` (gray-400) | `#6b7280` (gray-500) | 辅助文字 |
 | `danger` | `#ef4444` (red-500) | `#f87171` (red-400) | 危险操作 |

@@ -15,26 +15,23 @@
     <link rel="stylesheet" href="AnyDrop.App.styles.css" />
     <link rel="icon" href="data:,">
     <script>
-        window.ThemeManager = {
-            setTheme: function(mode) {
-                if (mode === 'dark') {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-                localStorage.setItem('anydrop_theme', mode);
-            },
-            getTheme: function() {
-                return localStorage.getItem('anydrop_theme') || 'light';
-            },
-            init: function() {
-                var saved = localStorage.getItem('anydrop_theme');
-                if (saved === 'dark') {
-                    document.documentElement.classList.add('dark');
-                }
-            }
-        };
-        window.ThemeManager.init();
+// 主题切换的唯一 JS 契约（S3-06）：Web 与 MAUI 两端共用同一份实现，
+// 块内容由 ThemeContractTests 保证字节一致，改一处必须改两处。
+// 存储键 'anydrop_theme'；init/get/set 语义见 AnyDrop/wwwroot/js/auth-interop.js。
+window.AnyDropTheme = {
+  init: function () {
+    var dark = localStorage.getItem('anydrop_theme') === 'dark';
+    document.documentElement.classList.toggle('dark', dark);
+  },
+  set: function (isDark) {
+    localStorage.setItem('anydrop_theme', isDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', isDark);
+  },
+  get: function () {
+    return localStorage.getItem('anydrop_theme') === 'dark';
+  }
+};
+        window.AnyDropTheme.init();
     </script>
     <script>
         window.scrollUtils = {

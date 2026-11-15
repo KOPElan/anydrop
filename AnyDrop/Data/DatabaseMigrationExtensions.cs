@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using AnyDrop.Migrations;
+using AnyDrop.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -46,6 +47,16 @@ public static class DatabaseMigrationExtensions
         await MarkBaselineAppliedIfOldHeadAsync(db, migrationLogger, ct);
         await db.Database.MigrateAsync(ct);
         await EnsureUserSingletonIndexAsync(db, ct);
+
+        // S3-03：FTS5 消息搜索索引（best-effort，不影响启动）。
+        // 创建失败（当前 SQLite 构建未启用 FTS5）时只记 Warning，
+        // 搜索随后全程走 LIKE；可用性记进单例供 ShareService 与
+        // S3-04 的每日摘要读取。
+        var searchIndex = serviceProvider.GetService<MessageSearchIndex>();
+        if (searchIndex is not null)
+        {
+            searchIndex.IsAvailable = await MessageSearchFts.EnsureAsync(db, migrationLogger, ct);
+        }
     }
 
     /// <summary>

@@ -23,6 +23,13 @@
             <button @onclick="() => _pickerPermissionDenied = false" class="text-xs text-gray-400 active:opacity-70">@L["Common_Close"]</button>
         </div>
     }
+    @if (_uploadError is not null)
+    {
+        <div class="mb-2 px-1 flex items-center gap-2">
+            <p class="flex-1 text-xs text-red-500 dark:text-red-400">@_uploadError</p>
+            <button @onclick="() => _uploadError = null" class="text-xs text-gray-400 active:opacity-70">@L["Common_Close"]</button>
+        </div>
+    }
     @if (_uploading)
     {
         <div class="mb-2 px-1">
@@ -78,6 +85,7 @@
     private string _text = string.Empty;
     private bool _uploading;
     private double _uploadProgress;
+    private string? _uploadError;
     private bool _burnAfterReading;
     // 每次用户修改 _text 都递增，用于判断发送期间是否有新的用户输入
     private int _textGeneration;
@@ -282,6 +290,7 @@
     {
         _uploading = true;
         _uploadProgress = 0;
+        _uploadError = null;
         try
         {
             for (var i = 0; i < files.Count; i++)
@@ -295,11 +304,27 @@
                 await UploadAsync(files[i].Stream, files[i].FileName, files[i].MimeType, progress);
             }
         }
+        catch (UploadFailedException ex)
+        {
+            // S3-06：服务端拒绝上传时按错误码显示本地化文案；码未知时显示服务端原文。
+            _uploadError = ApiErrorMessages.Localize(ex.ErrorCode, TryLocalize, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _uploadError = ex.Message;
+        }
         finally
         {
             _uploading = false;
             _uploadProgress = 0;
         }
+    }
+
+    /// <summary>S3-06：resx 查词辅助——键不存在时返回 null（供 ApiErrorMessages.Localize 回退）。</summary>
+    private string? TryLocalize(string key)
+    {
+        var localized = L[key];
+        return localized.ResourceNotFound ? null : localized.Value;
     }
 
     /// <summary>打开系统设置（应用权限页），让用户为被拒的权限重新授权。</summary>

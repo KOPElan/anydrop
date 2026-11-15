@@ -69,7 +69,13 @@ public static class HealthEndpoints
         }
 
         // 只返回状态摘要，不回显任何路径或配置，避免无意泄露。
-        var payload = new { status = healthy ? "healthy" : "unhealthy", checks };
+        // S3-01：版本号一并回显，任一运行实例都可凭它查到对应标签与提交。
+        var payload = new
+        {
+            status = healthy ? "healthy" : "unhealthy",
+            version = AnyDrop.Services.AppVersion.Current,
+            checks
+        };
 
         return healthy
             ? Results.Ok(payload)

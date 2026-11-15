@@ -1,3 +1,5 @@
+using AnyDrop.Logging;
+
 namespace AnyDrop.Services;
 
 /// <summary>
@@ -37,7 +39,8 @@ public sealed class OrphanedFileCleanupService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "孤儿文件对账首轮失败，宿主继续运行，将在下一锚定时刻重试。");
+            // S3-04：用 LogMarkers 常量记日志，摘要按同一字符串计数。
+            logger.LogWarning(ex, LogMarkers.OrphanReconcileFirstRunFailed);
         }
 
         // 此后锚定到后台任务时区（D6）的每日凌晨 3 点执行，而不是「启动后每 24 小时」——
@@ -63,7 +66,8 @@ public sealed class OrphanedFileCleanupService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "孤儿文件对账任务失败，将在下一锚定时刻重试。");
+                // S3-04：用 LogMarkers 常量记日志，摘要按同一字符串计数。
+                logger.LogWarning(ex, LogMarkers.OrphanReconcileFailed);
             }
         }
     }
@@ -88,7 +92,8 @@ public sealed class OrphanedFileCleanupService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "过期分片会话清扫失败，将在下一轮重试。");
+            // S3-04：用 LogMarkers 常量记日志，摘要按同一字符串计数。
+            logger.LogWarning(ex, LogMarkers.ExpiredUploadSweepFailed);
         }
 
         if (expiredUploads > 0)

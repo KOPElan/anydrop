@@ -123,6 +123,6 @@ public class TopicServiceAfterTests
         clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
         var hubContextMock = new Mock<IHubContext<ShareHub>>();
         hubContextMock.Setup(h => h.Clients).Returns(clientsMock.Object);
-        return new TopicService(factory, hubContextMock.Object);
+        return new TopicService(factory, hubContextMock.Object, TimeProvider.System);
     }
 }

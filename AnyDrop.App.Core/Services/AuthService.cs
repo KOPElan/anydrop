@@ -68,7 +68,7 @@ public sealed class AuthService : IAuthService
                 var errorEnvelope = await httpResponse.Content
                     .ReadFromJsonAsync<ApiEnvelope<LoginResponse>>()
                     .ConfigureAwait(false);
-                return new AppAuthResult(false, errorEnvelope?.Error ?? "请求失败");
+                return new AppAuthResult(false, errorEnvelope?.Error ?? "请求失败", ErrorCode: errorEnvelope?.ErrorCode);
             }
 
             var envelope = await httpResponse.Content

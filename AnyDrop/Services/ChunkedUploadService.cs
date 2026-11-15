@@ -351,14 +351,25 @@ public sealed class ChunkedUploadService(
         ShareItemDto dto;
         await using (var mergedRead = File.OpenRead(mergedPath))
         {
-            dto = await shareService.SendFileAsync(
-                mergedRead,
-                session.FileName,
-                session.MimeType,
-                session.TopicId,
-                knownFileSize: session.TotalSize,
-                burnAfterReading: session.BurnAfterReading,
-                ct);
+            try
+            {
+                dto = await shareService.SendFileAsync(
+                    mergedRead,
+                    session.FileName,
+                    session.MimeType,
+                    session.TopicId,
+                    knownFileSize: session.TotalSize,
+                    burnAfterReading: session.BurnAfterReading,
+                    ct);
+            }
+            catch (ArgumentException ex)
+            {
+                // S3-02：魔数校验不通过（或其他参数问题）——合并文件已无用，
+                // 删掉再报 400；否则 ArgumentException 会冒泡成 500，
+                // 且 merged.tmp 残留在会话目录里等 24 小时清扫。
+                File.Delete(mergedPath);
+                throw new ChunkedUploadException(StatusCodes.Status400BadRequest, ex.Message);
+            }
         }
 
         session.Status = ChunkedUploadStatus.Completed;

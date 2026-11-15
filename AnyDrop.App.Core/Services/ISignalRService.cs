@@ -18,8 +18,17 @@ public interface ISignalRService
     /// <summary>当前连接状态。</summary>
     HubConnectionState State { get; }
 
+    /// <summary>
+    /// S3-06：应用级连接状态（Hub 状态 + 网络连通性 + 是否曾经连通过），
+    /// 界面横幅直接按它显示，不必再自己拼三个输入。
+    /// </summary>
+    ConnectionState ConnectionState { get; }
+
     /// <summary>连接状态变化时触发。</summary>
     event Action<HubConnectionState>? StateChanged;
+
+    /// <summary>S3-06：应用级连接状态变化时触发（仅在推导值真正变化时触发）。</summary>
+    event Action<ConnectionState>? ConnectionStateChanged;
 
     /// <summary>
     /// S2-04：重连成功后触发（自动重连与手动重连循环均触发）。

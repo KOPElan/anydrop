@@ -68,6 +68,20 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_WrongPassword_ReturnsInvalidCredentialsCode()
+    {
+        // S3-06：服务端错误码（客户端按码查本地化文案，不再直显中文原文）。
+        var factory = CreateDbContextFactory();
+        var sut = CreateSut(factory);
+        await sut.SetupAsync(new SetupRequest("Admin", "Password1!", "Password1!"), "k");
+
+        var result = await sut.LoginAsync(new LoginRequest("wrong", "/"), "k");
+
+        result.ErrorCode.Should().Be("invalid_credentials");
+        result.Error.Should().Be("账号或密码错误。");
+    }
+
+    [Fact]
     public async Task LoginAsync_WithLegacyStoredHash_UpgradesItOnSuccess()
     {
         // 升级哈希参数后，既有实例里存的是旧格式哈希。首次登录必须成功，

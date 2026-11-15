@@ -16,7 +16,8 @@ public static class TopicEndpoints
         group.MapPut("/reorder", ReorderTopicsAsync);
         group.MapGet("/{id:guid}", GetTopicByIdAsync);
         group.MapGet("/{id:guid}/messages", GetTopicMessagesAsync);
-        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync);
+        group.MapGet("/{id:guid}/messages/search", SearchTopicMessagesAsync)
+            .RequireRateLimiting(RateLimitPolicies.Search);
         group.MapGet("/{id:guid}/messages/by-date", GetTopicMessagesByDateAsync);
         group.MapGet("/{id:guid}/active-dates", GetTopicActiveDatesAsync);
         group.MapGet("/{id:guid}/messages/by-type", GetTopicMessagesByTypeAsync);
@@ -50,7 +51,7 @@ public static class TopicEndpoints
         }
         catch (ArgumentException ex)
         {
-            return Results.BadRequest(ApiEnvelope<TopicDto>.Fail(ex.Message));
+            return Results.BadRequest(ApiEnvelope<TopicDto>.Fail(ex.Message, ApiErrorCodes.CreateTopicFailed));
         }
     }
 
@@ -66,7 +67,7 @@ public static class TopicEndpoints
             ? await topicService.GetTopicMessagesAsync(id, limit ?? 50, null, after, ct)
             : await topicService.GetTopicMessagesAsync(id, limit ?? 50, before, ct);
         return result is null
-            ? Results.NotFound(ApiEnvelope<TopicMessagesResponse>.Fail("主题不存在"))
+            ? Results.NotFound(ApiEnvelope<TopicMessagesResponse>.Fail("主题不存在", ApiErrorCodes.TopicNotFound))
             : Results.Ok(ApiEnvelope<TopicMessagesResponse>.Ok(result));
     }
 
@@ -80,12 +81,12 @@ public static class TopicEndpoints
         {
             var updated = await topicService.UpdateTopicAsync(id, request, ct);
             return updated is null
-                ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"))
+                ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在", ApiErrorCodes.TopicNotFound))
                 : Results.Ok(ApiEnvelope<TopicDto>.Ok(updated));
         }
         catch (ArgumentException ex)
         {
-            return Results.BadRequest(ApiEnvelope<TopicDto>.Fail(ex.Message));
+            return Results.BadRequest(ApiEnvelope<TopicDto>.Fail(ex.Message, ApiErrorCodes.UpdateTopicFailed));
         }
     }
 
@@ -94,7 +95,7 @@ public static class TopicEndpoints
         var deleted = await topicService.DeleteTopicAsync(id, ct);
         return deleted
             ? Results.NoContent()
-            : Results.NotFound(ApiEnvelope<object>.Fail("主题不存在"));
+            : Results.NotFound(ApiEnvelope<object>.Fail("主题不存在", ApiErrorCodes.TopicNotFound));
     }
 
     private static async Task<IResult> PinTopicAsync(
@@ -110,7 +111,7 @@ public static class TopicEndpoints
         }
         catch (KeyNotFoundException)
         {
-            return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"));
+            return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在", ApiErrorCodes.TopicNotFound));
         }
     }
 
@@ -127,7 +128,7 @@ public static class TopicEndpoints
         }
         catch (KeyNotFoundException)
         {
-            return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"));
+            return Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在", ApiErrorCodes.TopicNotFound));
         }
     }
 
@@ -139,7 +140,7 @@ public static class TopicEndpoints
     {
         var updated = await topicService.UpdateTopicIconAsync(id, request, ct);
         return updated is null
-            ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"))
+            ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在", ApiErrorCodes.TopicNotFound))
             : Results.Ok(ApiEnvelope<TopicDto>.Ok(updated));
     }
 
@@ -147,7 +148,7 @@ public static class TopicEndpoints
     {
         if (request.Items is null || request.Items.Count == 0)
         {
-            return Results.BadRequest(ApiEnvelope<object>.Fail("items 不能为空"));
+            return Results.BadRequest(ApiEnvelope<object>.Fail("items 不能为空", ApiErrorCodes.ItemsRequired));
         }
 
         try
@@ -157,7 +158,7 @@ public static class TopicEndpoints
         }
         catch (ArgumentException ex)
         {
-            return Results.BadRequest(ApiEnvelope<object>.Fail(ex.Message));
+            return Results.BadRequest(ApiEnvelope<object>.Fail(ex.Message, ApiErrorCodes.ReorderTopicsFailed));
         }
     }
 
@@ -165,7 +166,7 @@ public static class TopicEndpoints
     {
         var topic = await topicService.GetTopicByIdAsync(id, ct);
         return topic is null
-            ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在"))
+            ? Results.NotFound(ApiEnvelope<TopicDto>.Fail("主题不存在", ApiErrorCodes.TopicNotFound))
             : Results.Ok(ApiEnvelope<TopicDto>.Ok(topic));
     }
 
@@ -179,7 +180,7 @@ public static class TopicEndpoints
     {
         if (string.IsNullOrWhiteSpace(q))
         {
-            return Results.BadRequest(ApiEnvelope<TopicMessagesResponse>.Fail("搜索关键词不能为空"));
+            return Results.BadRequest(ApiEnvelope<TopicMessagesResponse>.Fail("搜索关键词不能为空", ApiErrorCodes.SearchQueryRequired));
         }
 
         var result = await shareService.SearchTopicMessagesAsync(id, q, limit ?? 50, before, ct);
@@ -195,7 +196,7 @@ public static class TopicEndpoints
     {
         if (!TryResolveTimeZone(timeZone, out var resolved, out var error))
         {
-            return Results.BadRequest(ApiEnvelope<IReadOnlyList<ShareItemDto>>.Fail(error));
+            return Results.BadRequest(ApiEnvelope<IReadOnlyList<ShareItemDto>>.Fail(error, ApiErrorCodes.InvalidTimeZone));
         }
 
         var messages = await shareService.GetTopicMessagesByDateAsync(id, date, resolved, ct);
@@ -212,12 +213,12 @@ public static class TopicEndpoints
     {
         if (end < start)
         {
-            return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail("end 不能早于 start"));
+            return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail("end 不能早于 start", ApiErrorCodes.InvalidDateRange));
         }
 
         if (!TryResolveTimeZone(timeZone, out var resolved, out var error))
         {
-            return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail(error));
+            return Results.BadRequest(ApiEnvelope<IReadOnlyCollection<DateOnly>>.Fail(error, ApiErrorCodes.InvalidTimeZone));
         }
 
         var dates = await shareService.GetTopicActiveDatesAsync(id, start, end, resolved, ct);

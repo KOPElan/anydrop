@@ -10,8 +10,10 @@ namespace AnyDrop.Services;
 /// <summary>
 /// S1-03（DAT-09）：用 <see cref="IDbContextFactory{TContext}"/>、
 /// 每次调用建短寿命上下文，不再随 Blazor 电路持有同一上下文数小时。
+/// S3-06：时间统一走注入的 <see cref="TimeProvider"/>（与后台任务、清理服务同一时钟源），
+/// 不再直接读 <c>DateTimeOffset.UtcNow</c>。
 /// </summary>
-public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFactory, IHubContext<ShareHub> hubContext) : ITopicService
+public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFactory, IHubContext<ShareHub> hubContext, TimeProvider timeProvider) : ITopicService
 {
     private const int TopicIconMaxLength = 100;
 
@@ -27,7 +29,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         // S0-06：计数不含已到期的定时销毁消息。
         var counts = await dbContext.ShareItems
             .AsNoTracking()
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId != null)
             .GroupBy(x => x.TopicId)
             .Select(g => new { TopicId = g.Key!.Value, Count = g.Count() })
@@ -66,7 +68,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
 
         var messageCount = await dbContext.ShareItems
             .AsNoTracking()
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .CountAsync(x => x.TopicId == topicId, ct);
 
         return new TopicDto(
@@ -98,7 +100,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         // S0-06：计数不含已到期的定时销毁消息。
         var counts = await dbContext.ShareItems
             .AsNoTracking()
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId != null && topicIds.Contains(x.TopicId.Value))
             .GroupBy(x => x.TopicId)
             .Select(g => new { TopicId = g.Key!.Value, Count = g.Count() })
@@ -131,7 +133,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         {
             Name = name,
             SortOrder = int.MaxValue,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = timeProvider.GetUtcNow()
         };
 
         dbContext.Topics.Add(topic);
@@ -157,7 +159,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
@@ -177,7 +179,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
@@ -309,13 +311,13 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
             ?? throw new KeyNotFoundException("主题不存在");
 
         topic.IsPinned = isPinned;
-        topic.PinnedAt = isPinned ? DateTimeOffset.UtcNow : null;
+        topic.PinnedAt = isPinned ? timeProvider.GetUtcNow() : null;
 
         await dbContext.SaveChangesWithRetryAsync(ct);
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
@@ -328,7 +330,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
             ?? throw new KeyNotFoundException("主题不存在");
 
         topic.IsArchived = isArchived;
-        topic.ArchivedAt = isArchived ? DateTimeOffset.UtcNow : null;
+        topic.ArchivedAt = isArchived ? timeProvider.GetUtcNow() : null;
 
         // 归档时自动取消置顶
         if (isArchived)
@@ -341,7 +343,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         await BroadcastTopicsUpdatedAsync(ct);
 
         var messageCount = await dbContext.ShareItems
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .CountAsync(s => s.TopicId == topic.Id, ct);
         return new TopicDto(topic.Id, topic.Name, topic.Icon, topic.SortOrder, topic.CreatedAt, topic.LastMessageAt, messageCount, topic.IsBuiltIn, topic.LastMessagePreview, topic.IsPinned, topic.PinnedAt, topic.IsArchived, topic.ArchivedAt);
     }
@@ -367,7 +369,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
         // S0-06：已到期的定时销毁消息立即不可见，不等清理任务。
         var query = dbContext.ShareItems
             .AsNoTracking()
-            .NotExpired(DateTimeOffset.UtcNow)
+            .NotExpired(timeProvider.GetUtcNow())
             .Where(x => x.TopicId == topicId);
 
         if (after.HasValue)
@@ -401,7 +403,7 @@ public sealed class TopicService(IDbContextFactory<AnyDropDbContext> dbContextFa
             var lastCreatedAt = messages[^1].CreatedAt;
             hasMore = await dbContext.ShareItems
                 .AsNoTracking()
-                .NotExpired(DateTimeOffset.UtcNow)
+                .NotExpired(timeProvider.GetUtcNow())
                 .AnyAsync(x => x.TopicId == topicId && x.CreatedAt < lastCreatedAt, ct);
             if (hasMore)
             {

@@ -201,15 +201,16 @@ public sealed class FileUploadService : IFileUploadService
                 if (status is >= 400 and < 500 and not 408 and not 429)
                 {
                     var serverError = await ReadServerErrorAsync(response).ConfigureAwait(false);
-                    throw new NonRetryableException(
-                        serverError ?? $"上传分片 {index} 被拒绝：{(int)response.StatusCode} {response.ReasonPhrase}",
-                        response.StatusCode);
+                    throw new UploadFailedException(
+                        serverError.Message ?? $"上传分片 {index} 被拒绝：{(int)response.StatusCode} {response.ReasonPhrase}",
+                        response.StatusCode,
+                        serverError.Code);
                 }
 
                 lastError = new HttpRequestException(
                     $"上传分片 {index} 失败：{(int)response.StatusCode} {response.ReasonPhrase}");
             }
-            catch (NonRetryableException)
+            catch (UploadFailedException)
             {
                 throw;
             }
@@ -314,31 +315,30 @@ public sealed class FileUploadService : IFileUploadService
 
         var serverError = await ReadServerErrorAsync(response).ConfigureAwait(false);
 
-        throw new HttpRequestException(
-            string.IsNullOrWhiteSpace(serverError)
+        throw new UploadFailedException(
+            string.IsNullOrWhiteSpace(serverError.Message)
                 ? $"请求失败：{(int)response.StatusCode} {response.ReasonPhrase}"
-                : serverError,
-            null,
-            response.StatusCode);
+                : serverError.Message,
+            response.StatusCode,
+            serverError.Code);
     }
 
-    private static async Task<string?> ReadServerErrorAsync(HttpResponseMessage response)
+    /// <summary>服务端信封里的错误码与原文（S3-06）；读不到信封时两者皆空。</summary>
+    private sealed record ServerError(string? Code, string? Message);
+
+    private static async Task<ServerError> ReadServerErrorAsync(HttpResponseMessage response)
     {
         try
         {
             var envelope = await response.Content
                 .ReadFromJsonAsync<ApiEnvelope<object?>>()
                 .ConfigureAwait(false);
-            return envelope?.Error;
+            return new ServerError(envelope?.ErrorCode, envelope?.Error);
         }
         catch
         {
             // 读不到信封时回退到状态码描述
-            return null;
+            return new ServerError(null, null);
         }
     }
-
-    /// <summary>服务端明确拒绝（4xx）：重试无意义，重试循环遇到它直接抛，不重试。</summary>
-    private sealed class NonRetryableException(string message, System.Net.HttpStatusCode statusCode)
-        : HttpRequestException(message, null, statusCode);
 }

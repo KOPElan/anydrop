@@ -7,7 +7,7 @@
 @inject INotificationService Notifications
 @inject ISecureTokenStorage TokenStorage
 @inject NavigationManager Nav
-@inject IJSRuntime JS
+@inject IThemeService ThemeService
 @inject ILocalizationService Localization
 @inject IStringLocalizer<AppStrings> L
 
@@ -209,16 +209,8 @@
 
         try
         {
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-            // 从 Preferences 读取以确保 MAUI 端状态一致
-            var savedTheme = Preferences.Get("anydrop_theme", "light");
-            _isDark = string.Equals(savedTheme, "dark", StringComparison.OrdinalIgnoreCase);
-            // 同步 JS 端 CSS 类，确保 WebView 也应用正确主题
-            await JS.InvokeVoidAsync("ThemeManager.setTheme", _isDark ? "dark" : "light");
-#else
-            var savedTheme = await JS.InvokeAsync<string?>("ThemeManager.getTheme");
-            _isDark = string.Equals(savedTheme, "dark", StringComparison.OrdinalIgnoreCase);
-#endif
+            // S3-06：经共享 IThemeService（Preferences 镜像 + JS 同步收在实现里）
+            _isDark = await ThemeService.GetIsDarkAsync();
         }
         catch
         {
@@ -355,11 +347,8 @@
     private async Task ToggleThemeAsync()
     {
         _isDark = !_isDark;
-        var mode = _isDark ? "dark" : "light";
-#if ANDROID || IOS || MACCATALYST || WINDOWS
-        Preferences.Set("anydrop_theme", mode);
-#endif
-        await JS.InvokeVoidAsync("ThemeManager.setTheme", mode);
+        // S3-06：经共享 IThemeService
+        await ThemeService.SetIsDarkAsync(_isDark);
     }
 
     private Task OnLanguageChangedAsync(ChangeEventArgs e)

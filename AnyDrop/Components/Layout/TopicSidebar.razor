@@ -5,7 +5,7 @@
     <div class="flex items-center justify-between p-6">
         <div class="flex items-center gap-3">
             <div class="flex h-9 w-9 items-center justify-center rounded-xl shadow-lg"
-                 style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 4px 12px rgba(99,102,241,0.35);">
+                 style="background: linear-gradient(135deg, #3578F5, #5090FF); box-shadow: 0 4px 12px rgba(53,120,245,0.35);">
                 <span class="material-symbols-outlined text-white" style="font-size: 18px; font-variation-settings: 'FILL' 1;">sync_alt</span>
             </div>
             <span class="font-headline text-xl font-extrabold tracking-tight" style="color: var(--color-on-surface);">AnyDrop</span>
@@ -59,7 +59,7 @@
                                     @if (hasUnread)
                                     {
                                         <span class="inline-block w-2 h-2 rounded-full flex-shrink-0"
-                                              style="background: linear-gradient(135deg, #6366f1, #3b82f6); box-shadow: 0 0 4px rgba(99,102,241,0.60);"></span>
+                                              style="background: linear-gradient(135deg, #3578F5, #5090FF); box-shadow: 0 0 4px rgba(53,120,245,0.60);"></span>
                                     }
                                     @if (topic.LastMessageAt.HasValue)
                                     {
@@ -70,7 +70,7 @@
                             @* 激活时显示「Active now」；否则显示消息预览 *@
                             @if (isActive)
                             {
-                                <p class="text-[11px] font-medium italic" style="color: #3b82f6;">@L["Sidebar_ActiveNow"]</p>
+                                <p class="text-[11px] font-medium italic" style="color: #3578F5;">@L["Sidebar_ActiveNow"]</p>
                             }
                             else
                             {

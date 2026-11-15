@@ -77,8 +77,8 @@ public partial class Setup
     private sealed class SetupFormModel
     {
         [Required, StringLength(50)] public string Nickname { get; set; } = string.Empty;
-        [Required, MinLength(6)] public string Password { get; set; } = string.Empty;
-        [Required, MinLength(6)] public string ConfirmPassword { get; set; } = string.Empty;
+        [Required, MinLength(PasswordPolicy.MinLength, ErrorMessage = "密码长度至少 10 位。")] public string Password { get; set; } = string.Empty;
+        [Required, MinLength(PasswordPolicy.MinLength, ErrorMessage = "密码长度至少 10 位。")] public string ConfirmPassword { get; set; } = string.Empty;
     }
 
     private sealed class JsApiResult

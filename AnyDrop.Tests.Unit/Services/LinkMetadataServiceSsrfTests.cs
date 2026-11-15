@@ -93,4 +93,21 @@ public class LinkMetadataServiceSsrfTests
         handler.AllowAutoRedirect.Should().BeFalse();
         handler.ConnectCallback.Should().NotBeNull();
     }
+
+    // S3-02：端口白名单——只允许 80 / 443。用公网 IP 字面量避免 DNS 查询。
+    [Theory]
+    [InlineData("http://93.184.216.34:8080/")]
+    [InlineData("http://93.184.216.34:6379/")]
+    [InlineData("https://93.184.216.34:8443/")]
+    [InlineData("http://93.184.216.34:8000/admin")]
+    public async Task IsUrlSafeAsync_NonStandardPort_IsFalse(string url)
+        => (await LinkMetadataService.IsUrlSafeAsync(url, CancellationToken.None)).Should().BeFalse();
+
+    [Theory]
+    [InlineData("http://93.184.216.34/")]       // 默认端口 80
+    [InlineData("http://93.184.216.34:80/")]    // 显式 80
+    [InlineData("https://93.184.216.34/")]      // 默认端口 443
+    [InlineData("https://93.184.216.34:443/")]  // 显式 443
+    public async Task IsUrlSafeAsync_StandardPort_IsTrue(string url)
+        => (await LinkMetadataService.IsUrlSafeAsync(url, CancellationToken.None)).Should().BeTrue();
 }

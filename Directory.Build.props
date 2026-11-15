@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    S3-01（ENG-02）：Git 标签是唯一版本源。
+    - 发布时由 release 工作流（或 docker build 传 build-arg VERSION=标签）
+      传入 /p:Version=去掉 v 前缀的标签；本地开发构建未传版本时默认 0.0.0-dev。
+    - 提交哈希由 .NET SDK 自动追加：构建于 git 仓库内时，SDK 把完整提交
+      SHA 拼到 InformationalVersion 后（形如 1.0.0+abc1234…），无需
+      Directory.Build.targets 再写一遍（实测：自行追加会与 SDK 的追加
+      叠加成双哈希）。无 .git 的源码包构建时只有纯版本号。
+    - MAUI 的 ApplicationDisplayVersion 取同一 $(Version)，见 AnyDrop.App.csproj。
+  -->
+  <PropertyGroup>
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+    <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
+  </PropertyGroup>
+</Project>

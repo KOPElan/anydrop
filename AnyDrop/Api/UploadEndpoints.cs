@@ -22,7 +22,8 @@ public static class UploadEndpoints
 
         group.MapPost("/init", InitUploadAsync)
             .WithName("InitChunkedUpload")
-            .WithSummary("初始化分片上传会话");
+            .WithSummary("初始化分片上传会话")
+            .RequireRateLimiting(RateLimitPolicies.Upload);
 
         group.MapGet("/{uploadId:guid}", GetUploadStatusAsync)
             .WithName("GetChunkedUploadStatus")
@@ -31,11 +32,13 @@ public static class UploadEndpoints
         group.MapPut("/{uploadId:guid}/chunks/{index:int}", UploadChunkAsync)
             .WithName("UploadChunk")
             .WithSummary("上传单个分片（Content-Range）")
+            .RequireRateLimiting(RateLimitPolicies.Upload)
             .DisableAntiforgery();
 
         group.MapPost("/{uploadId:guid}/complete", CompleteUploadAsync)
             .WithName("CompleteChunkedUpload")
-            .WithSummary("完成分片上传：合并并校验后落库");
+            .WithSummary("完成分片上传：合并并校验后落库")
+            .RequireRateLimiting(RateLimitPolicies.Upload);
 
         group.MapDelete("/{uploadId:guid}", CancelUploadAsync)
             .WithName("CancelChunkedUpload")
@@ -83,7 +86,7 @@ public static class UploadEndpoints
 
         var status = await uploadService.GetStatusAsync(userId.Value, uploadId, ct);
         return status is null
-            ? Results.NotFound(ApiEnvelope<UploadStatusResponse>.Fail("上传会话不存在。"))
+            ? Results.NotFound(ApiEnvelope<UploadStatusResponse>.Fail("上传会话不存在。", ApiErrorCodes.UploadSessionNotFound))
             : Results.Ok(ApiEnvelope<UploadStatusResponse>.Ok(status));
     }
 
@@ -162,12 +165,12 @@ public static class UploadEndpoints
 
     private static IResult Unauthorized() =>
         Results.Json(
-            ApiEnvelope<object>.Fail("未授权。"),
+            ApiEnvelope<object>.Fail("未授权。", ApiErrorCodes.Unauthorized),
             statusCode: StatusCodes.Status401Unauthorized);
 
     private static IResult Error(ChunkedUploadException ex) =>
         Results.Json(
-            ApiEnvelope<object>.Fail(ex.Message),
+            ApiEnvelope<object>.Fail(ex.Message, ApiErrorCodes.UploadFailed),
             statusCode: ex.StatusCode);
 
     private static Guid? GetUserId(ClaimsPrincipal principal)

@@ -58,6 +58,11 @@ jobs:
           context: .
           file: AnyDrop/Dockerfile
           push: ${{ github.event_name == 'push' }}
+          # S3-01：Git 标签是唯一版本源。metadata-action 的 {{version}} 即标签
+          # 去掉 v 前缀（如 v1.0.0 -> 1.0.0），传进 Dockerfile 的 VERSION，
+          # 再由 dotnet publish /p:Version 写进程序集，/health 回显。
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

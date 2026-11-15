@@ -125,7 +125,7 @@ public class ExpiredMessageFilteringTests : IDisposable
         await SeedTextAsync(db, topicId, "alive", realNow.AddMinutes(10));
 
         var hubContext = new Mock<IHubContext<ShareHub>>();
-        var sut = new TopicService(factory, hubContext.Object);
+        var sut = new TopicService(factory, hubContext.Object, TimeProvider.System);
 
         var result = await sut.GetTopicMessagesAsync(topicId, 50, null);
         result.Should().NotBeNull();
@@ -213,7 +213,7 @@ public class ExpiredMessageFilteringTests : IDisposable
         services.AddSingleton(new FakeTimeProvider(Now));
         services.AddSingleton(new DbWriteGate());
         services.AddSingleton(hubContext.Object);
-        services.AddSingleton<ITopicService>(_ => new TopicService(factory, hubContext.Object));
+        services.AddSingleton<ITopicService>(_ => new TopicService(factory, hubContext.Object, TimeProvider.System));
         services.AddSingleton(NullLogger<ExpiredMessageCleanupService>.Instance);
         // 清理服务用工厂建短寿命上下文；注册与播种共用同一个 InMemory 库名的工厂。
         services.AddSingleton<IDbContextFactory<AnyDropDbContext>>(factory);
@@ -261,7 +261,7 @@ public class ExpiredMessageFilteringTests : IDisposable
         hubClients.Setup(c => c.All).Returns(new Mock<IClientProxy>().Object);
         var hubContext = new Mock<IHubContext<ShareHub>>();
         hubContext.Setup(c => c.Clients).Returns(hubClients.Object);
-        var sut = new TopicService(factory, hubContext.Object);
+        var sut = new TopicService(factory, hubContext.Object, TimeProvider.System);
 
         var deleted = await sut.DeleteTopicAsync(topicId);
 

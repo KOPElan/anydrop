@@ -1,4 +1,5 @@
 using AnyDrop.Resources;
+using AnyDrop.Shared;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ namespace AnyDrop.Components.Pages;
 public partial class Settings
 {
     [Inject] public required IJSRuntime JSRuntime { get; set; }
+    [Inject] public required IThemeService ThemeService { get; set; }
     [Inject] public required NavigationManager NavigationManager { get; set; }
     [Inject] public required IStringLocalizer<SharedStrings> L { get; set; }
     [Inject] public required ILogger<Settings> Logger { get; set; }
@@ -131,8 +133,8 @@ public partial class Settings
             _error = L["Settings_LoadFailed"];
         }
 
-        // 从 localStorage 读取主题设置
-        try { _isDarkMode = await JSRuntime.InvokeAsync<bool>("AnyDropTheme.get"); }
+        // 从 localStorage 读取主题设置（S3-06：经共享 IThemeService）
+        try { _isDarkMode = await ThemeService.GetIsDarkAsync(); }
         catch { _isDarkMode = false; }
 
         await LoadMissingFilesAsync();
@@ -363,7 +365,7 @@ public partial class Settings
         _isDarkMode = !_isDarkMode;
         try
         {
-            await JSRuntime.InvokeVoidAsync("AnyDropTheme.set", _isDarkMode);
+            await ThemeService.SetIsDarkAsync(_isDarkMode);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException or JSException)
         {
